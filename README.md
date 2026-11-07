@@ -44,6 +44,24 @@ node packages/server/dist/cli.js dev ./mi-prototipo
   toque, deslizamiento y cambio de página, y una lista "Qué hizo" para saltar a cada paso.
 - **Importar y exportar** sesiones como archivos `.json`.
 
+## Estudios: tareas con criterio de éxito
+
+En el panel, **Estudios** → "Nuevo estudio": nombre, bienvenida, y tareas con instrucción,
+página de inicio y criterio de éxito (llegó a una página, tocó un elemento, o lo decide el
+moderador). Hay tareas normales y de **first click** (terminan en el primer toque), y variantes
+**A/B** (cada participante recibe una al azar).
+
+El estudio tiene un link con QR: `http://<ip>:4321/?study=<id>`. El participante ve la
+bienvenida y una casilla de consentimiento; hasta que acepta, no se envía nada. Luego una barra
+con la tarea y los botones "Listo" / "No pude". En el panel, cada sesión muestra el resultado
+por tarea y el moderador puede corregirlo a mano.
+
+**Que lo escriba una IA.** En el constructor, "Copiar prompt para IA" arma un prompt con las
+páginas de tu prototipo y el formato exacto; pégalo en la IA que uses y guarda la respuesta como
+`study.json`. También hay una skill para Claude Code en `skills/taptana-study/` que lee el
+prototipo y escribe el archivo. Se importa desde Estudios → "Importar study.json". Taptana nunca
+llama a un modelo: la IA la pones tú. Ejemplo: `examples/tienda/study.json`.
+
 ## Probar sin servidor
 
 - **Panel en GitHub Pages (modo demo):** el panel con tres sesiones de ejemplo, y el prototipo

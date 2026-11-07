@@ -33,8 +33,9 @@ Es una prueba moderada en local: diseñador y participante están en el mismo lu
 - **v0.1 (actual):** grabación local, una laptop, una red Wi-Fi, HTTP simple.
 - **v0.2:** modo servidor (`taptana serve`): subir un zip del prototipo, obtener un link,
   imagen Docker. Recorder usable como script independiente en cualquier HTML.
-- **v0.3:** tareas y consentimiento. Formato `Study` importable, skill para que una IA arme
-  el estudio, y `packages/mcp` para que la IA hable con Taptana. Ver `docs/estudios-con-ia.md`.
+- **v0.3 (hecho, salvo MCP):** tareas y consentimiento, formato `Study` importable, constructor
+  en el panel, skill para que una IA arme el estudio. Pendiente: `packages/mcp`.
+  Ver `docs/estudios-con-ia.md` y `docs/constructor-de-estudios.md`.
 - **v0.4:** métricas: tiempo por tarea, éxito, mapas de toques.
 - **v0.5:** cuentas y equipos. Recién aquí tiene sentido el hospedado con pago.
 - **Fuera de v0.1:** tareas, consentimiento, panel completo, mapas de calor, login, HTTPS.
@@ -95,7 +96,9 @@ taptana/
 │   ├── web/         Panel: React + Vite + shadcn. Modo http (servidor) y modo demo (Pages)
 │   └── server/      CLI `taptana`, servidor Hono, SQLite, sirve el panel compilado
 ├── examples/
-│   └── tienda/      Prototipo HTML de ejemplo con varias páginas
+│   └── tienda/      Prototipo HTML de ejemplo con varias páginas (+ study.json de muestra)
+├── skills/
+│   └── taptana-study/   Skill para que una IA escriba un study.json leyendo el prototipo
 ├── .github/workflows/pages.yml   Publica panel + ejemplo en GitHub Pages en cada push a main
 ├── .devcontainer/   Codespaces con Node 22 y pnpm, para correr el servidor real sin instalar
 └── docs/            Propuestas y decisiones de diseño
@@ -168,6 +171,22 @@ pnpm -r test
 
 Las sesiones de ejemplo viven en `packages/server/seed/*.json`. Son grabaciones reales del
 prototipo de ejemplo hechas con Playwright; se usan para `pnpm seed` y para la demo en Pages.
+
+## Estudios (v0.3, implementado)
+
+- Formato `Study` en `shared` (`study.ts`), validado con `validateStudy`. Tareas con `kind`
+  (`task`, `first-click`) y `success` (`reached`, `tapped`, `manual`). Variantes A/B opcionales.
+- Server: tabla `studies`, columnas `study_id`, `variant_id`, `manual_results` en `sessions`.
+  Resultados por tarea en `results.ts` (función pura, probada). Rutas `/api/v1/studies`,
+  `/api/v1/prototypes/:id/pages`, `/api/v1/qr.svg`, `PATCH /api/v1/sessions/:id`.
+- Recorder: `study.ts`. `?study=<id>` → bienvenida + consentimiento (lotes retenidos hasta
+  aceptar), barra de tarea, first click con cinta inferior que no intercepta toques, eventos
+  `study` y `task`. Tras un toque que cierra una tarea, la siguiente se dibuja 350 ms después
+  para que el clic llegue al prototipo y no a nuestra barra.
+- Panel: `pages/Studies.tsx`, `pages/StudyEditor.tsx` (constructor, link con QR, "Copiar prompt
+  para IA"), resultados en `Sessions.tsx` y `Player.tsx` con marcas manuales.
+- `skills/taptana-study/SKILL.md`: skill para que una IA escriba el `study.json`.
+- Detalles y decisiones en `docs/constructor-de-estudios.md`.
 
 ## Estado de v0.1
 

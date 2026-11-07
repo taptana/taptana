@@ -1,6 +1,7 @@
 # Constructor de estudios (v0.3)
 
-Propuesta para revisar antes de escribir código. Parte del formato `Study` que ya existe en
+**Estado: implementado.** Los cinco pasos están en `main` y probados end-to-end con Playwright.
+Este documento fue la propuesta; Parte del formato `Study` que ya existe en
 `shared` (ver `docs/estudios-con-ia.md`).
 
 ## Qué es un estudio, en una frase
@@ -58,7 +59,7 @@ Estado final de una tarea: `logró` (regla o moderador), `dijo que terminó` (to
 regla no se cumplió), `no pudo` (tocó No pude), `sin terminar` (cerró antes). Más el tiempo que
 tardó.
 
-## Orden de construcción (cada paso se puede probar solo)
+## Orden de construcción (hecho)
 
 1. **Modelo y API.** Tabla, rutas, evento `task`, resultados por tarea. Con pruebas.
 2. **Constructor en el panel.** Crear, editar, importar, exportar, copiar prompt, link y QR.
