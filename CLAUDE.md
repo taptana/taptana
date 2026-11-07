@@ -123,6 +123,12 @@ pestaña esté abierta). Cada carga de página es un `pageId` nuevo dentro de la
 - Mensajes de commit en inglés, imperativo, cortos. Documentación para el dueño en español.
 - Nombres de código (variables, tipos, rutas) en inglés.
 
+## Git
+
+- Se trabaja directamente en `main`. Sin ramas de feature mientras seamos un equipo chico.
+  Las ramas y los pull requests llegan cuando haya contribuidores externos.
+- Commits pequeños y frecuentes, uno por paso explicable.
+
 ## Comandos
 
 ```

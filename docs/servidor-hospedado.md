@@ -82,6 +82,28 @@ La imagen es `node:22-alpine` + el paquete `@taptana/server`. HTTPS lo pone el h
 No usamos nada específico del proveedor, así que la demo pública y una instalación propia en
 una empresa son exactamente la misma imagen.
 
+### Lo que no sirve, y por qué
+
+- **Hosting compartido (cPanel, PHP).** No puede mantener un proceso Node corriendo de forma
+  continua ni correr Docker. Algunos ofrecen "Node.js app" vía Passenger, pero es frágil y no
+  es lo que la gente instala en su empresa. Mínimo: un VPS o una plataforma de contenedores.
+- **GitHub Pages.** Solo archivos estáticos. No recibe eventos ni guarda nada. Sí sirve para
+  la página de presentación, la documentación y una demo estática del reproductor con sesiones
+  grabadas de antemano.
+- **Front en Pages + base en Firestore (como en Guaguas).** Funciona para apps donde el
+  navegador escribe documentos chicos. Aquí no: una foto inicial del DOM de rrweb supera con
+  facilidad el límite de 1 MB por documento, los lotes cada 3 segundos agotan el nivel gratuito
+  en pocas sesiones, y haría que la demo fuera un producto distinto al que la gente instala.
+  Además acopla a Google, que es justo lo que decidimos no hacer.
+
+### Opción sin servidor que sí respeta la arquitectura
+
+Cloudflare Workers + D1 (que es SQLite) + R2 (archivos). Hono corre en Workers sin cambios,
+el esquema SQL es el mismo, y lo único específico de Cloudflare sería una implementación
+`store/d1.ts` y un archivo de despliegue. El nivel gratuito aguanta una demo con holgura y no
+hay máquina que administrar. Es la mejor opción si no queremos ni un VPS. Queda documentada
+como alternativa; la decisión se toma en v0.2 cuando la imagen Docker ya exista.
+
 ## Qué no es
 
 - No es multi-tenant con aislamiento fuerte. Para eso hay que esperar a cuentas (v0.5).
