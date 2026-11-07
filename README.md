@@ -113,3 +113,8 @@ Más contexto y decisiones en `CLAUDE.md` y en `docs/`.
 ## Licencia
 
 MIT.
+
+## Créditos
+
+- Idea de llevar Taptana a pruebas de tareas al estilo Maze: **Karla Díaz**.
+- Creado por Francisco Maldonado.
