@@ -19,6 +19,8 @@ export interface RecorderConfig {
   transport: TransportKind;
   /** Prefijo donde vive el prototipo ("/p/pr_abc"). Las rutas se registran sin él. */
   base: string;
+  /** Mostrar el botón "Terminar y exportar" en modo local (data-export="off" lo oculta). */
+  exportButton: boolean;
 }
 
 declare const __TAPTANA_VERSION__: string;
@@ -45,5 +47,6 @@ export function readConfig(): RecorderConfig {
     prototypeId: data['prototype'] || LOCAL_PROTOTYPE_ID,
     transport,
     base: (data['base'] ?? '').replace(/\/+$/, ''),
+    exportButton: data['export'] !== 'off',
   };
 }

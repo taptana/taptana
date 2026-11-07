@@ -68,3 +68,6 @@ export { deviceLabel } from './device.js';
 
 export type { ValidationResult } from './validate.js';
 export { isTaptanaEvent, validateEventBatch } from './validate.js';
+
+export { computeTaskResults, samePath, tapMatches } from './results.js';
+export { batchesToExport } from './batches.js';

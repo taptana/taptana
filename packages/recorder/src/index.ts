@@ -104,7 +104,7 @@ function main(): void {
 
   if (study) void study.start();
 
-  if (local) {
+  if (local && config.exportButton) {
     const mount = (): void =>
       mountLocalButton(async () => {
         await batcher.flush(false);

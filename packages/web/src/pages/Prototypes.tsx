@@ -14,6 +14,7 @@ export function PrototypesPage() {
   const [protos, setProtos] = useState<Prototype[] | null>(null);
   const [info, setInfo] = useState<ServerInfo | null>(null);
   const [canUpload, setCanUpload] = useState(true);
+  const [mode, setMode] = useState<'http' | 'static'>('http');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState('');
@@ -24,6 +25,7 @@ export function PrototypesPage() {
     try {
       const client = await getClient();
       setCanUpload(client.canUpload);
+      setMode(client.mode);
       const [i, list] = await Promise.all([client.info(), client.listPrototypes()]);
       setInfo(i);
       setProtos(list);
@@ -66,9 +68,24 @@ export function PrototypesPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Prototipos</h1>
         <p className="text-muted-foreground text-sm">
-          Sube un .html o un .zip con tu prototipo. Se guarda en esta computadora y no sale de ella.
+          {mode === 'static'
+            ? 'Sube un .html o un .zip. En la demo se guarda solo en este navegador y no sale de él.'
+            : 'Sube un .html o un .zip con tu prototipo. Se guarda en esta computadora y no sale de ella.'}
         </p>
       </header>
+
+      {mode === 'static' && (
+        <Card className="py-4 border-amber-500/40 bg-amber-500/5">
+          <CardContent className="px-5 text-sm space-y-1">
+            <p className="font-medium">Modo demo: todo vive en este navegador</p>
+            <p className="text-muted-foreground">
+              Puedes subir tu prototipo, armar estudios y probarlos tú mismo (o pasarle esta computadora a alguien). Las
+              sesiones aparecen solas en Sesiones. El link no funciona en otro dispositivo: para probar con celulares, corre
+              Taptana en tu computadora con <code className="text-foreground">pnpm start</code>.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {canUpload ? (
         <Card className="py-5 gap-4">

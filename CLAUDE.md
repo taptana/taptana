@@ -180,7 +180,13 @@ prototipo de ejemplo hechas con Playwright; se usan para `pnpm seed` y para la d
   en `/p/<id>/` con el recorder inyectado con `data-base="/p/<id>"`. El recorder quita ese
   prefijo de las rutas registradas, así las reglas de las tareas usan `/gracias.html` igual
   que en una carpeta local.
-- Todo local: no hay subida a ningún servicio externo. En la demo de Pages no se puede subir.
+- Todo local: no hay subida a ningún servicio externo.
+- En la demo de Pages también se puede subir: `api/static.ts` descomprime en el navegador
+  (`lib/unzip.ts`), guarda los archivos en IndexedDB y `public/sw.js` (service worker) los
+  sirve en `<base>local/<id>/` con el recorder en modo local, y responde el estudio en
+  `<base>__local/api/v1/studies/<id>`. El panel lee las sesiones de la base del recorder en el
+  mismo navegador y calcula resultados con `computeTaskResults` (ahora en `shared`). Límite:
+  solo funciona en ese navegador.
 - Seguridad: lo subido se sirve en el mismo origen que el panel. Está bien en local (son tus
   archivos); para el hospedado hace falta un dominio aparte (ver `docs/servidor-hospedado.md`).
 
