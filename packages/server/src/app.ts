@@ -11,7 +11,7 @@ import { Hono } from 'hono';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { API_PREFIX, PANEL_PATH, RECORDER_PATH } from '@taptana/shared';
+import { API_PREFIX, PANEL_PATH, RECORDER_PATH, type ServerInfo } from '@taptana/shared';
 import { injectRecorder } from './inject.js';
 import { apiRoutes } from './routes/api.js';
 import { mimeFor, readFile, resolveFile } from './static.js';
@@ -24,6 +24,8 @@ export interface AppOptions {
   recordSelf?: boolean;
   /** Carpeta public/ con recorder.js y panel/. Por defecto la del paquete. */
   publicDir?: string;
+  /** Datos para el panel: link del participante, nombre del prototipo. */
+  info?: ServerInfo;
 }
 
 const PANEL_PROTOTYPE_ID = 'taptana-panel';
@@ -49,7 +51,7 @@ export function createApp(opts: AppOptions): Hono {
   });
 
   // ── API ────────────────────────────────────────────────────────────
-  app.route(API_PREFIX, apiRoutes({ store: opts.store, prototypeDir: opts.prototypeDir }));
+  app.route(API_PREFIX, apiRoutes({ store: opts.store, prototypeDir: opts.prototypeDir, ...(opts.info && { info: opts.info }) }));
 
   // ── Panel ──────────────────────────────────────────────────────────
   if (opts.recordSelf) {

@@ -37,6 +37,15 @@ if (existsSync(seedDir)) {
   }
 }
 writeFileSync(join(demoDir, 'sessions.json'), JSON.stringify(summaries));
+// Páginas del prototipo de ejemplo, para el constructor de estudios en modo demo.
+const pagesList = readdirSync(join(root, 'examples/tienda'))
+  .filter((f) => f.endsWith('.html'))
+  .map((f) => {
+    const html = readFileSync(join(root, 'examples/tienda', f), 'utf8');
+    return { path: `/${f}`, title: (html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? '').trim() };
+  })
+  .sort((a, b) => (a.path === '/index.html' ? -1 : b.path === '/index.html' ? 1 : a.path.localeCompare(b.path)));
+writeFileSync(join(demoDir, 'pages.json'), JSON.stringify(pagesList));
 console.log(`${summaries.length} demo sessions`);
 
 // 3. Prototipo de ejemplo con recorder local

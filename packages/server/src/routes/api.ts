@@ -12,6 +12,7 @@ import {
   type ApiError,
   type EventBatchResponse,
   type PrototypePagesResponse,
+  type ServerInfo,
   type SessionExport,
   type SessionListResponse,
   type SessionPatch,
@@ -26,12 +27,20 @@ export interface ApiOptions {
   store: Store;
   /** Carpeta del prototipo local, para listar sus páginas. */
   prototypeDir?: string;
+  /** Datos del servidor para el panel (link del participante, nombre del prototipo). */
+  info?: ServerInfo;
 }
 
-export function apiRoutes({ store, prototypeDir }: ApiOptions): Hono {
+export function apiRoutes({ store, prototypeDir, info }: ApiOptions): Hono {
   const api = new Hono();
 
   api.use('*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], maxAge: 86400 }));
+
+  api.get('/info', (c) =>
+    c.json<ServerInfo>(
+      info ?? { version: '0.1.0', participantUrl: '', prototypeId: LOCAL_PROTOTYPE_ID, prototypeName: 'local' },
+    ),
+  );
 
   // ── Eventos ──────────────────────────────────────────────────────────
   api.post('/events', async (c) => {

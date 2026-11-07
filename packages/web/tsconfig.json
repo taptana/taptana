@@ -5,6 +5,7 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
+    "exactOptionalPropertyTypes": false,
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "types": ["vite/client"],

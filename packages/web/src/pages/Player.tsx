@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn, formatDate, formatDuration } from '@/lib/utils';
 import { Link } from '@/router';
+import { Layout } from '@/components/layout';
 
 /** Colores de los marcadores en la línea de tiempo del reproductor, por tipo de evento. */
 const TAGS: Record<string, string> = {
@@ -145,7 +146,7 @@ export function PlayerPage({ id }: { id: string }) {
   };
 
   return (
-    <div className="mx-auto max-w-6xl p-4 sm:p-6 space-y-4">
+    <Layout wide>
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
@@ -214,18 +215,15 @@ export function PlayerPage({ id }: { id: string }) {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </Layout>
   );
 }
 
 function Shell({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
-    <div className="mx-auto max-w-3xl p-6 space-y-3">
-      <Link to={{ name: 'list' }} className="text-sm text-muted-foreground hover:underline">
-        ← Sesiones
-      </Link>
+    <Layout>
       <h1 className="text-xl font-semibold">{title}</h1>
       {children && <p className="text-muted-foreground text-sm">{children}</p>}
-    </div>
+    </Layout>
   );
 }

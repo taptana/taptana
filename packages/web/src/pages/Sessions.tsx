@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDate, formatDuration, formatRelative } from '@/lib/utils';
 import { Link, useRouter } from '@/router';
+import { Layout } from '@/components/layout';
 
 export function SessionsPage() {
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
@@ -51,7 +52,7 @@ export function SessionsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl p-4 sm:p-6 space-y-4">
+    <Layout>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Sesiones</h1>
@@ -151,6 +152,6 @@ export function SessionsPage() {
           </Table>
         )}
       </Card>
-    </div>
+    </Layout>
   );
 }

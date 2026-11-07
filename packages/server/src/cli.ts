@@ -15,6 +15,8 @@ import { createApp } from './app.js';
 import { SqliteStore } from './store/sqlite.js';
 import { localAddresses, renderQr } from './network.js';
 
+const VERSION = (JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')) as { version: string }).version;
+
 const HELP = `taptana · pruebas de usabilidad para prototipos HTML
 
 Uso:
@@ -75,17 +77,24 @@ async function dev(dir: string, flags: Parameters<typeof resolveConfig>[1]): Pro
   const store = new SqliteStore(join(config.dataDir, 'taptana.db'));
   store.ensurePrototype({ id: LOCAL_PROTOTYPE_ID, name: basename(config.prototypeDir), createdAt: Date.now() });
 
+  const ips = config.host === '0.0.0.0' || config.host === '::' ? localAddresses() : [config.host];
+  const primary = ips[0] ?? 'localhost';
+  const participantUrl = `http://${primary}:${config.port}/`;
+
   const app = createApp({
     store,
     prototypeDir: config.prototypeDir,
     prototypeId: LOCAL_PROTOTYPE_ID,
     recordSelf: config.recordSelf,
+    info: {
+      version: VERSION,
+      participantUrl,
+      prototypeId: LOCAL_PROTOTYPE_ID,
+      prototypeName: basename(config.prototypeDir),
+    },
   });
 
   serve({ fetch: app.fetch, port: config.port, hostname: config.host }, async (info) => {
-    const ips = config.host === '0.0.0.0' || config.host === '::' ? localAddresses() : [config.host];
-    const primary = ips[0] ?? 'localhost';
-    const participantUrl = `http://${primary}:${info.port}/`;
     const lines = [
       '',
       `  Taptana · sirviendo ${config.prototypeDir}`,

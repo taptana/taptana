@@ -1,19 +1,48 @@
 import {
   API_PREFIX,
+  type ManualResults,
+  type PrototypePagesResponse,
+  type ServerInfo,
   type SessionEventsResponse,
   type SessionExport,
   type SessionListResponse,
   type SessionSummary,
+  type Study,
+  type StudyListResponse,
+  type StudyRecord,
 } from '@taptana/shared';
-import type { ApiClient } from './client.ts';
+import type { ApiClient, PrototypePage } from './client.ts';
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_PREFIX}${path}`, init);
+  if (!res.ok) {
+    let message = `${res.status}`;
+    try {
+      message = ((await res.json()) as { error?: string }).error ?? message;
+    } catch {
+      /* sin cuerpo */
+    }
+    throw new Error(message);
+  }
+  return (await res.json()) as T;
+}
+
+const json = (method: string, body: unknown): RequestInit => ({
+  method,
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(body),
+});
 
 export class HttpClient implements ApiClient {
   readonly mode = 'http' as const;
 
-  async listSessions(): Promise<SessionSummary[]> {
-    const res = await fetch(`${API_PREFIX}/sessions`);
-    if (!res.ok) throw new Error(`No se pudo cargar la lista (${res.status})`);
-    return ((await res.json()) as SessionListResponse).sessions;
+  info(): Promise<ServerInfo> {
+    return request<ServerInfo>('/info');
+  }
+
+  async listSessions(studyId?: string): Promise<SessionSummary[]> {
+    const q = studyId ? `?study=${encodeURIComponent(studyId)}` : '';
+    return (await request<SessionListResponse>(`/sessions${q}`)).sessions;
   }
 
   async getSessionEvents(id: string): Promise<SessionEventsResponse | null> {
@@ -24,16 +53,41 @@ export class HttpClient implements ApiClient {
   }
 
   async importSession(data: SessionExport): Promise<void> {
-    const res = await fetch(`${API_PREFIX}/sessions/import`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error(`No se pudo importar (${res.status})`);
+    await request('/sessions/import', json('POST', data));
   }
 
   async deleteSession(id: string): Promise<void> {
-    const res = await fetch(`${API_PREFIX}/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error(`No se pudo borrar (${res.status})`);
+    await request(`/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+
+  setManualResults(id: string, manual: ManualResults): Promise<SessionSummary> {
+    return request<SessionSummary>(`/sessions/${encodeURIComponent(id)}`, json('PATCH', { manual }));
+  }
+
+  async listStudies(): Promise<StudyRecord[]> {
+    return (await request<StudyListResponse>('/studies')).studies;
+  }
+
+  async getStudy(id: string): Promise<StudyRecord | null> {
+    const res = await fetch(`${API_PREFIX}/studies/${encodeURIComponent(id)}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`No se pudo cargar el estudio (${res.status})`);
+    return (await res.json()) as StudyRecord;
+  }
+
+  saveStudy(study: Study, id?: string): Promise<StudyRecord> {
+    return id ? request<StudyRecord>(`/studies/${encodeURIComponent(id)}`, json('PUT', study)) : request<StudyRecord>('/studies', json('POST', study));
+  }
+
+  async deleteStudy(id: string): Promise<void> {
+    await request(`/studies/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+
+  async listPrototypePages(prototypeId: string): Promise<PrototypePage[]> {
+    return (await request<PrototypePagesResponse>(`/prototypes/${encodeURIComponent(prototypeId)}/pages`)).pages;
+  }
+
+  qrImageUrl(text: string): string {
+    return `${API_PREFIX}/qr.svg?text=${encodeURIComponent(text)}`;
   }
 }

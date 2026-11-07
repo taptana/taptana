@@ -33,6 +33,7 @@ export type {
   SessionExport,
   StudyListResponse,
   PrototypePagesResponse,
+  ServerInfo,
   SessionPatch,
   ApiError,
 } from './api.js';

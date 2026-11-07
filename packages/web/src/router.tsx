@@ -1,27 +1,49 @@
 /**
- * Router mínimo para dos rutas: la lista y el reproductor. Usa el historial del navegador.
+ * Router mínimo. Usa el historial del navegador.
  * La base (BASE_URL) la pone Vite: '/sessions/' en el server, '/' o '/taptana/' en Pages.
+ *
+ *   /                 lista de sesiones
+ *   /:id              reproductor
+ *   /studies          lista de estudios
+ *   /studies/new      constructor (nuevo)
+ *   /studies/:id      constructor (editar)
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-export type Route = { name: 'list' } | { name: 'player'; id: string };
+export type Route =
+  | { name: 'list' }
+  | { name: 'player'; id: string }
+  | { name: 'studies' }
+  | { name: 'study'; id: string | null };
 
 function parse(pathname: string): Route {
   const rel = pathname.startsWith(BASE) ? pathname.slice(BASE.length) : pathname;
-  const parts = rel.split('/').filter(Boolean);
-  if (parts.length >= 1 && parts[0]) return { name: 'player', id: decodeURIComponent(parts[0]) };
+  const parts = rel.split('/').filter(Boolean).map(decodeURIComponent);
+  if (parts[0] === 'studies') {
+    if (!parts[1]) return { name: 'studies' };
+    return { name: 'study', id: parts[1] === 'new' ? null : parts[1] };
+  }
+  if (parts[0]) return { name: 'player', id: parts[0] };
   return { name: 'list' };
 }
 
 export function href(route: Route): string {
-  if (route.name === 'player') return `${BASE}/${encodeURIComponent(route.id)}`;
-  return `${BASE}/`;
+  switch (route.name) {
+    case 'player':
+      return `${BASE}/${encodeURIComponent(route.id)}`;
+    case 'studies':
+      return `${BASE}/studies`;
+    case 'study':
+      return `${BASE}/studies/${route.id === null ? 'new' : encodeURIComponent(route.id)}`;
+    default:
+      return `${BASE}/`;
+  }
 }
 
-const RouterContext = createContext<{ route: Route; navigate: (r: Route) => void }>({
+const RouterContext = createContext<{ route: Route; navigate: (r: Route, replace?: boolean) => void }>({
   route: { name: 'list' },
   navigate: () => {},
 });
@@ -33,8 +55,9 @@ export function RouterProvider({ children }: { children: ReactNode }) {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
-  const navigate = (r: Route): void => {
-    history.pushState(null, '', href(r));
+  const navigate = (r: Route, replace = false): void => {
+    if (replace) history.replaceState(null, '', href(r));
+    else history.pushState(null, '', href(r));
     setRoute(r);
   };
   return <RouterContext.Provider value={{ route, navigate }}>{children}</RouterContext.Provider>;

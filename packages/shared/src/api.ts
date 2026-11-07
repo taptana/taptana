@@ -60,6 +60,15 @@ export interface PrototypePagesResponse {
   pages: Array<{ path: string; title: string }>;
 }
 
+/** GET /api/v1/info: lo que el panel necesita saber del servidor. */
+export interface ServerInfo {
+  version: string;
+  /** URL que abre el participante (IP de la red local). */
+  participantUrl: string;
+  prototypeId: string;
+  prototypeName: string;
+}
+
 /** PATCH /api/v1/sessions/:id */
 export interface SessionPatch {
   manual?: ManualResults;
