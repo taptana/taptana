@@ -1,21 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import rrwebPlayer from 'rrweb-player';
 import type { eventWithTime } from '@rrweb/types';
-import { ArrowLeft, Download, Hand, MoveHorizontal, Navigation, Smartphone, Monitor } from 'lucide-react';
-import type { SessionEventsResponse, TaptanaEvent, TaptanaOwnEvent } from '@taptana/shared';
+import { ArrowLeft, Download, Hand, MoveHorizontal, Navigation, Smartphone, Monitor, ListChecks, Flag, ThumbsUp, ThumbsDown } from 'lucide-react';
+import type { SessionEventsResponse, TaptanaEvent, TaptanaOwnEvent, TaskResult } from '@taptana/shared';
 import { getClient } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { cn, formatDate, formatDuration } from '@/lib/utils';
-import { Link } from '@/router';
 import { Layout } from '@/components/layout';
+import { cn, formatDate, formatDuration } from '@/lib/utils';
+import { OUTCOME_CLASS, OUTCOME_LABEL } from '@/lib/outcomes';
+import { Link } from '@/router';
 
 /** Colores de los marcadores en la línea de tiempo del reproductor, por tipo de evento. */
 const TAGS: Record<string, string> = {
   tap: '#2f7d4f',
   swipe: '#d97706',
   navigation: '#2563eb',
+  task: '#7c3aed',
 };
 
 const RRWEB_CUSTOM = 5;
@@ -29,14 +31,16 @@ function toPlayerEvents(events: TaptanaEvent[]): eventWithTime[] {
   const out: eventWithTime[] = [];
   for (const e of events) {
     if (e.kind === 'rrweb') out.push(e.data as eventWithTime);
-    else if (e.type === 'tap' || e.type === 'swipe' || e.type === 'navigation') {
+    else if (e.type === 'tap' || e.type === 'swipe' || e.type === 'navigation' || (e.type === 'task' && e.action === 'start')) {
       out.push({ type: RRWEB_CUSTOM, timestamp: e.t, data: { tag: e.type, payload: e } } as eventWithTime);
     }
   }
   return out.sort((a, b) => a.timestamp - b.timestamp);
 }
 
-function describe(e: TaptanaOwnEvent): string {
+type StepEvent = Extract<TaptanaOwnEvent, { type: 'tap' | 'swipe' | 'navigation' | 'task' | 'study' }>;
+
+function describe(e: TaptanaOwnEvent, taskTitle: (id: string) => string): string {
   switch (e.type) {
     case 'tap':
       return e.target.text ? `Tocó “${e.target.text}”` : `Tocó ${e.target.tag}${e.target.id ? `#${e.target.id}` : ''}`;
@@ -49,7 +53,7 @@ function describe(e: TaptanaOwnEvent): string {
     case 'viewport':
       return `Pantalla ${e.width}×${e.height}`;
     case 'task':
-      return { start: 'Empezó la tarea', done: 'Marcó la tarea como lista', skip: 'No pudo con la tarea' }[e.action];
+      return { start: `Empezó: ${taskTitle(e.taskId)}`, done: `Marcó “Listo”: ${taskTitle(e.taskId)}`, skip: `Marcó “No pude”: ${taskTitle(e.taskId)}` }[e.action];
     case 'study':
       return e.action === 'start' ? 'Aceptó grabar y empezó el estudio' : 'Terminó el estudio';
   }
@@ -59,6 +63,7 @@ function Icon({ type }: { type: TaptanaOwnEvent['type'] }) {
   const cls = 'size-3.5';
   if (type === 'tap') return <Hand className={cls} style={{ color: TAGS['tap'] }} />;
   if (type === 'swipe') return <MoveHorizontal className={cls} style={{ color: TAGS['swipe'] }} />;
+  if (type === 'task' || type === 'study') return <Flag className={cls} style={{ color: TAGS['task'] }} />;
   return <Navigation className={cls} style={{ color: TAGS['navigation'] }} />;
 }
 
@@ -91,7 +96,7 @@ export function PlayerPage({ id }: { id: string }) {
   const steps = useMemo(
     () =>
       (data?.events ?? []).filter(
-        (e): e is TaptanaOwnEvent => e.kind === 'taptana' && (e.type === 'tap' || e.type === 'swipe' || e.type === 'navigation'),
+        (e): e is StepEvent => e.kind === 'taptana' && (e.type === 'tap' || e.type === 'swipe' || e.type === 'navigation' || e.type === 'task' || e.type === 'study'),
       ),
     [data],
   );
@@ -134,8 +139,11 @@ export function PlayerPage({ id }: { id: string }) {
   if (data === null) return <Shell title="No existe esta sesión">Puede haberse borrado.</Shell>;
 
   const start = data.session.startedAt;
+  const taskTitle = (taskId: string): string => data.study?.tasks.find((t) => t.id === taskId)?.title ?? taskId;
   let activeIndex = -1;
   for (let i = 0; i < steps.length; i++) if (steps[i]!.t - start <= current) activeIndex = i;
+  const goto = (t: number): void => player.current?.goto(Math.max(0, t - start), true);
+
   const onExport = (): void => {
     const blob = new Blob([JSON.stringify({ v: 1, exportedAt: Date.now(), ...data })], { type: 'application/json' });
     const a = document.createElement('a');
@@ -143,6 +151,12 @@ export function PlayerPage({ id }: { id: string }) {
     a.download = `taptana-${data.session.id}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  };
+
+  const onManual = async (taskId: string, value: 'success' | 'failure'): Promise<void> => {
+    const client = await getClient();
+    const session = await client.setManualResults(data.session.id, { [taskId]: value });
+    setData({ ...data, session });
   };
 
   return (
@@ -156,10 +170,16 @@ export function PlayerPage({ id }: { id: string }) {
           </Button>
           <div>
             <h1 className="text-xl font-semibold tracking-tight">{formatDate(start)}</h1>
-            <p className="text-muted-foreground text-sm inline-flex items-center gap-1.5">
+            <p className="text-muted-foreground text-sm inline-flex items-center gap-1.5 flex-wrap">
               {data.session.touch ? <Smartphone className="size-4" /> : <Monitor className="size-4" />}
               {data.session.deviceLabel} · {data.session.viewport.width}×{data.session.viewport.height} ·{' '}
               {formatDuration(data.session.durationMs)}
+              {data.study && (
+                <Badge variant="secondary">
+                  {data.study.name}
+                  {data.session.variantId ? ` · ${data.session.variantId}` : ''}
+                </Badge>
+              )}
               {mode === 'static' && <Badge variant="outline">demo</Badge>}
             </p>
           </div>
@@ -169,16 +189,36 @@ export function PlayerPage({ id }: { id: string }) {
         </Button>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <Card className="py-4">
-          <CardContent className="px-4">
-            {playerEvents.length < 2 ? (
-              <p className="text-muted-foreground text-sm py-10 text-center">Esta sesión no tiene suficientes eventos para reproducirse.</p>
-            ) : (
-              <div ref={frame} className="flex justify-center" />
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="space-y-4">
+          <Card className="py-4">
+            <CardContent className="px-4">
+              {playerEvents.length < 2 ? (
+                <p className="text-muted-foreground text-sm py-10 text-center">Esta sesión no tiene suficientes eventos para reproducirse.</p>
+              ) : (
+                <div ref={frame} className="flex justify-center" />
+              )}
+            </CardContent>
+          </Card>
+
+          {data.study && data.session.tasks && (
+            <Card className="py-4 gap-3">
+              <CardHeader className="px-4">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ListChecks className="size-4" /> Tareas
+                </CardTitle>
+                <CardDescription>Toca una tarea para ir a donde empezó. Puedes corregir el resultado a mano.</CardDescription>
+              </CardHeader>
+              <CardContent className="px-4">
+                <ol className="divide-y">
+                  {data.session.tasks.map((r, i) => (
+                    <TaskRow key={r.taskId} index={i} result={r} title={taskTitle(r.taskId)} kind={data.study?.tasks.find((t) => t.id === r.taskId)?.kind ?? 'task'} onGoto={goto} onManual={onManual} />
+                  ))}
+                </ol>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
         <Card className="py-4 gap-3 max-h-[80vh] overflow-hidden flex flex-col">
           <CardHeader className="px-4">
@@ -192,21 +232,23 @@ export function PlayerPage({ id }: { id: string }) {
               {steps.map((e, i) => {
                 const offset = e.t - start;
                 const active = i === activeIndex;
+                const isMarker = e.type === 'task' || e.type === 'study';
                 return (
                   <li key={i}>
                     <button
                       type="button"
-                      onClick={() => player.current?.goto(Math.max(0, offset), true)}
+                      onClick={() => goto(e.t)}
                       className={cn(
                         'w-full text-left flex items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent',
                         active && 'bg-accent',
+                        isMarker && 'font-medium',
                       )}
                     >
                       <span className="text-muted-foreground tabular-nums w-10 shrink-0 text-xs pt-0.5">{formatDuration(offset)}</span>
                       <span className="pt-0.5">
                         <Icon type={e.type} />
                       </span>
-                      <span className="min-w-0 break-words">{describe(e)}</span>
+                      <span className="min-w-0 break-words">{describe(e, taskTitle)}</span>
                     </button>
                   </li>
                 );
@@ -216,6 +258,71 @@ export function PlayerPage({ id }: { id: string }) {
         </Card>
       </div>
     </Layout>
+  );
+}
+
+function TaskRow({
+  index,
+  result,
+  title,
+  kind,
+  onGoto,
+  onManual,
+}: {
+  index: number;
+  result: TaskResult;
+  title: string;
+  kind: string;
+  onGoto: (t: number) => void;
+  onManual: (taskId: string, value: 'success' | 'failure') => Promise<void>;
+}) {
+  const detail: string[] = [];
+  if (result.durationMs !== undefined) detail.push(formatDuration(result.durationMs));
+  if (result.ruleMatched) detail.push('regla cumplida');
+  if (result.reported === 'done') detail.push('tocó Listo');
+  if (result.reported === 'skip') detail.push('tocó No pude');
+  if (result.manual) detail.push(`moderador: ${result.manual === 'success' ? 'logró' : 'no logró'}`);
+  if (kind === 'first-click' && result.firstTap) detail.push(`primer toque: ${result.firstTap.text ?? result.firstTap.selector}`);
+
+  return (
+    <li className="flex items-start gap-3 py-2.5">
+      <button
+        type="button"
+        className="flex-1 text-left min-w-0 disabled:cursor-default"
+        disabled={result.startedAt === undefined}
+        onClick={() => result.startedAt !== undefined && onGoto(result.startedAt)}
+      >
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-muted-foreground tabular-nums text-xs w-4">{index + 1}</span>
+          <span className="font-medium">{title}</span>
+          {kind === 'first-click' && <Badge variant="secondary">first click</Badge>}
+          <Badge variant="outline" className={OUTCOME_CLASS[result.outcome]}>
+            {OUTCOME_LABEL[result.outcome]}
+          </Badge>
+        </div>
+        {detail.length > 0 && <div className="text-muted-foreground text-xs pl-6 mt-0.5">{detail.join(' · ')}</div>}
+      </button>
+      <div className="flex gap-0.5 shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Marcar como logrado"
+          className={cn(result.manual === 'success' && 'bg-emerald-500/15 text-emerald-700')}
+          onClick={() => void onManual(result.taskId, 'success')}
+        >
+          <ThumbsUp />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Marcar como no logrado"
+          className={cn(result.manual === 'failure' && 'bg-red-500/15 text-red-700')}
+          onClick={() => void onManual(result.taskId, 'failure')}
+        >
+          <ThumbsDown />
+        </Button>
+      </div>
+    </li>
   );
 }
 

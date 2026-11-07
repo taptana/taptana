@@ -1,19 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { Smartphone, Monitor, Upload, Trash2, RefreshCw } from 'lucide-react';
-import type { SessionSummary } from '@taptana/shared';
+import type { SessionSummary, StudyRecord } from '@taptana/shared';
 import { getClient, parseSessionFile } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatDate, formatDuration, formatRelative } from '@/lib/utils';
-import { Link, useRouter } from '@/router';
 import { Layout } from '@/components/layout';
+import { cn, formatDate, formatDuration, formatRelative } from '@/lib/utils';
+import { summarizeTasks } from '@/lib/outcomes';
+import { Link, useRouter } from '@/router';
 
 export function SessionsPage() {
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [studies, setStudies] = useState<Map<string, StudyRecord>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<'http' | 'static'>('http');
+  const [filter, setFilter] = useState<string>('');
   const fileInput = useRef<HTMLInputElement>(null);
   const { navigate } = useRouter();
 
@@ -21,7 +24,9 @@ export function SessionsPage() {
     try {
       const client = await getClient();
       setMode(client.mode);
-      setSessions(await client.listSessions());
+      const [list, studyList] = await Promise.all([client.listSessions(), client.listStudies()]);
+      setSessions(list);
+      setStudies(new Map(studyList.map((s) => [s.id, s])));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -50,6 +55,9 @@ export function SessionsPage() {
     await client.deleteSession(s.id);
     await load();
   };
+
+  const visible = (sessions ?? []).filter((s) => (filter === '' ? true : filter === 'free' ? !s.studyId : s.studyId === filter));
+  const hasStudies = (sessions ?? []).some((s) => s.studyId);
 
   return (
     <Layout>
@@ -83,6 +91,22 @@ export function SessionsPage() {
         </div>
       </header>
 
+      {hasStudies && (
+        <div className="flex flex-wrap gap-1.5">
+          <FilterChip active={filter === ''} onClick={() => setFilter('')}>
+            Todas
+          </FilterChip>
+          <FilterChip active={filter === 'free'} onClick={() => setFilter('free')}>
+            Sin estudio
+          </FilterChip>
+          {Array.from(new Set((sessions ?? []).map((s) => s.studyId).filter((id): id is string => !!id))).map((id) => (
+            <FilterChip key={id} active={filter === id} onClick={() => setFilter(id)}>
+              {studies.get(id)?.name ?? id}
+            </FilterChip>
+          ))}
+        </div>
+      )}
+
       {error && (
         <Card className="border-destructive/40 py-4">
           <CardContent className="text-sm text-destructive">{error}</CardContent>
@@ -92,7 +116,7 @@ export function SessionsPage() {
       <Card className="py-0 gap-0 overflow-hidden">
         {sessions === null ? (
           <CardContent className="py-10 text-center text-muted-foreground text-sm">Cargando…</CardContent>
-        ) : sessions.length === 0 ? (
+        ) : visible.length === 0 ? (
           <CardHeader className="py-10 text-center">
             <CardTitle>Todavía no hay sesiones</CardTitle>
             <CardDescription>
@@ -107,7 +131,7 @@ export function SessionsPage() {
               <TableRow>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Dispositivo</TableHead>
-                <TableHead>Pantalla</TableHead>
+                {hasStudies && <TableHead>Estudio</TableHead>}
                 <TableHead className="text-right">Duración</TableHead>
                 <TableHead className="text-right">Páginas</TableHead>
                 <TableHead className="text-right">Toques</TableHead>
@@ -116,42 +140,75 @@ export function SessionsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sessions.map((s) => (
-                <TableRow key={s.id} className="cursor-pointer" onClick={() => navigate({ name: 'player', id: s.id })}>
-                  <TableCell>
-                    <Link to={{ name: 'player', id: s.id }} className="font-medium hover:underline">
-                      {formatDate(s.startedAt)}
-                    </Link>
-                    <div className="text-muted-foreground text-xs">{formatRelative(s.startedAt)}</div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center gap-1.5">
-                      {s.touch ? <Smartphone className="size-4 text-muted-foreground" /> : <Monitor className="size-4 text-muted-foreground" />}
-                      {s.deviceLabel}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {s.viewport.width}×{s.viewport.height}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatDuration(s.durationMs)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{s.pageCount}</TableCell>
-                  <TableCell className="text-right tabular-nums">{s.tapCount}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="font-mono font-normal">
-                      {s.entryPath || '/'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" aria-label="Borrar sesión" onClick={() => void onDelete(s)}>
-                      <Trash2 className="text-muted-foreground" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {visible.map((s) => {
+                const summary = summarizeTasks(s.tasks);
+                return (
+                  <TableRow key={s.id} className="cursor-pointer" onClick={() => navigate({ name: 'player', id: s.id })}>
+                    <TableCell>
+                      <Link to={{ name: 'player', id: s.id }} className="font-medium hover:underline">
+                        {formatDate(s.startedAt)}
+                      </Link>
+                      <div className="text-muted-foreground text-xs">{formatRelative(s.startedAt)}</div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1.5">
+                        {s.touch ? <Smartphone className="size-4 text-muted-foreground" /> : <Monitor className="size-4 text-muted-foreground" />}
+                        {s.deviceLabel}
+                      </span>
+                      <div className="text-muted-foreground text-xs">
+                        {s.viewport.width}×{s.viewport.height}
+                      </div>
+                    </TableCell>
+                    {hasStudies && (
+                      <TableCell>
+                        {s.studyId ? (
+                          <>
+                            <div className="truncate max-w-48">{studies.get(s.studyId)?.name ?? s.studyId}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {summary ? `${summary.done}/${summary.total} logradas` : ''}
+                              {s.variantId ? ` · variante ${s.variantId}` : ''}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-right tabular-nums">{formatDuration(s.durationMs)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{s.pageCount}</TableCell>
+                    <TableCell className="text-right tabular-nums">{s.tapCount}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="font-mono font-normal">
+                        {s.entryPath || '/'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" aria-label="Borrar sesión" onClick={() => void onDelete(s)}>
+                        <Trash2 className="text-muted-foreground" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
       </Card>
     </Layout>
+  );
+}
+
+function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+        active ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground hover:text-foreground',
+      )}
+    >
+      {children}
+    </button>
   );
 }

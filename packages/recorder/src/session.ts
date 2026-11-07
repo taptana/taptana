@@ -38,8 +38,16 @@ function safeSet(key: string, value: string): void {
   }
 }
 
+/** Ruta actual con query, sin el parámetro `study` (es de Taptana, no del prototipo). */
 export function currentPath(): string {
-  return location.pathname + location.search;
+  let search = location.search;
+  if (search.includes('study=')) {
+    const params = new URLSearchParams(search);
+    params.delete('study');
+    const rest = params.toString();
+    search = rest ? `?${rest}` : '';
+  }
+  return location.pathname + search;
 }
 
 export function collectDevice(): DeviceInfo {
