@@ -172,6 +172,18 @@ pnpm -r test
 Las sesiones de ejemplo viven en `packages/server/seed/*.json`. Son grabaciones reales del
 prototipo de ejemplo hechas con Playwright; se usan para `pnpm seed` y para la demo en Pages.
 
+## Prototipos subidos (implementado)
+
+- `taptana dev` sin carpeta abre el panel; `pnpm start` hace eso con datos en `./.taptana`.
+- Panel → Prototipos: subir `.html` o `.zip` (hasta 50 MB), nueva versión, borrar, link y QR.
+- Se guardan en `<dataDir>/prototypes/<id>/` (`uploads.ts`, con `fflate`, JS puro) y se sirven
+  en `/p/<id>/` con el recorder inyectado con `data-base="/p/<id>"`. El recorder quita ese
+  prefijo de las rutas registradas, así las reglas de las tareas usan `/gracias.html` igual
+  que en una carpeta local.
+- Todo local: no hay subida a ningún servicio externo. En la demo de Pages no se puede subir.
+- Seguridad: lo subido se sirve en el mismo origen que el panel. Está bien en local (son tus
+  archivos); para el hospedado hace falta un dominio aparte (ver `docs/servidor-hospedado.md`).
+
 ## Estudios (v0.3, implementado)
 
 - Formato `Study` en `shared` (`study.ts`), validado con `validateStudy`. Tareas con `kind`

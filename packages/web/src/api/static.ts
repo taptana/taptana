@@ -9,6 +9,7 @@
 
 import type {
   ManualResults,
+  Prototype,
   ServerInfo,
   SessionEventsResponse,
   SessionExport,
@@ -54,6 +55,7 @@ function createId(prefix: string): string {
 
 export class StaticClient implements ApiClient {
   readonly mode = 'static' as const;
+  readonly canUpload = false;
   private readonly base: string;
 
   constructor(base: string) {
@@ -147,6 +149,18 @@ export class StaticClient implements ApiClient {
 
   listPrototypePages(): Promise<PrototypePage[]> {
     return this.fetchJson<PrototypePage[]>('demo/pages.json', []);
+  }
+
+  async listPrototypes(): Promise<Prototype[]> {
+    return [{ id: 'demo-tienda', name: 'Tienda (demo)', createdAt: 0, source: 'upload', entryPath: '/index.html', url: `${this.base}prototipo/` }];
+  }
+
+  uploadPrototype(): Promise<Prototype> {
+    return Promise.reject(new Error('En la demo no se suben archivos. Corre Taptana en tu computadora para probar tus propios prototipos.'));
+  }
+
+  deletePrototype(): Promise<void> {
+    return Promise.reject(new Error('No disponible en la demo.'));
   }
 
   qrImageUrl(): null {

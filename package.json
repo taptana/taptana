@@ -17,6 +17,7 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "dev": "pnpm --filter @taptana/server dev ./examples/tienda",
+    "start": "pnpm --filter @taptana/server start",
     "seed": "pnpm --filter @taptana/server seed",
     "site": "node scripts/build-site.mjs",
     "clean": "pnpm -r clean && rm -rf site"

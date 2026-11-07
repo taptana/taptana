@@ -1,6 +1,8 @@
 import {
   API_PREFIX,
   type ManualResults,
+  type Prototype,
+  type PrototypeListResponse,
   type PrototypePagesResponse,
   type ServerInfo,
   type SessionEventsResponse,
@@ -35,6 +37,7 @@ const json = (method: string, body: unknown): RequestInit => ({
 
 export class HttpClient implements ApiClient {
   readonly mode = 'http' as const;
+  readonly canUpload = true;
 
   info(): Promise<ServerInfo> {
     return request<ServerInfo>('/info');
@@ -85,6 +88,23 @@ export class HttpClient implements ApiClient {
 
   async listPrototypePages(prototypeId: string): Promise<PrototypePage[]> {
     return (await request<PrototypePagesResponse>(`/prototypes/${encodeURIComponent(prototypeId)}/pages`)).pages;
+  }
+
+  async listPrototypes(): Promise<Prototype[]> {
+    return (await request<PrototypeListResponse>('/prototypes')).prototypes;
+  }
+
+  uploadPrototype(file: File, opts: { name?: string; id?: string } = {}): Promise<Prototype> {
+    const form = new FormData();
+    form.append('file', file);
+    if (opts.name) form.append('name', opts.name);
+    return opts.id
+      ? request<Prototype>(`/prototypes/${encodeURIComponent(opts.id)}`, { method: 'PUT', body: form })
+      : request<Prototype>('/prototypes', { method: 'POST', body: form });
+  }
+
+  async deletePrototype(id: string): Promise<void> {
+    await request(`/prototypes/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   qrImageUrl(text: string): string {

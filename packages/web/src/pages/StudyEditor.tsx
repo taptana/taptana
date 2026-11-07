@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowDown, ArrowUp, Copy, Check, Download, Plus, Trash2, Spa
 import {
   DEFAULT_CONSENT_TEXT,
   validateStudy,
+  type Prototype,
   type ServerInfo,
   type Study,
   type StudyRecord,
@@ -17,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input, Label, NativeSelect, Textarea } from '@/components/ui/input';
 import { Layout } from '@/components/layout';
 import { buildStudyPrompt } from '@/lib/prompt';
+import { participantUrl } from '@/lib/links';
 import { cn } from '@/lib/utils';
 import { Link, useRouter } from '@/router';
 import { downloadStudy } from './Studies';
@@ -40,6 +42,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
   const [goal, setGoal] = useState('');
   const [copied, setCopied] = useState<'prompt' | 'link' | null>(null);
   const [mode, setMode] = useState<'http' | 'static'>('http');
+  const [protos, setProtos] = useState<Prototype[]>([]);
   const { navigate } = useRouter();
 
   useEffect(() => {
@@ -51,7 +54,8 @@ export function StudyEditorPage({ id }: { id: string | null }) {
         if (cancelled) return;
         setMode(client.mode);
         setInfo(serverInfo);
-        setPages(await client.listPrototypePages(serverInfo.prototypeId));
+        const list = await client.listPrototypes();
+        setProtos(list);
         if (id) {
           const found = await client.getStudy(id);
           if (!found) {
@@ -62,7 +66,8 @@ export function StudyEditorPage({ id }: { id: string | null }) {
           const { id: _i, createdAt: _c, updatedAt: _u, ...clean } = found;
           setStudy(clean);
         } else {
-          setStudy(emptyStudy(serverInfo.prototypeId));
+          // Por defecto, el prototipo más reciente.
+          setStudy(emptyStudy(list[0]?.id ?? serverInfo.prototypeId));
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -72,6 +77,16 @@ export function StudyEditorPage({ id }: { id: string | null }) {
       cancelled = true;
     };
   }, [id]);
+
+  // Las páginas del desplegable dependen del prototipo elegido.
+  const prototypeId = study?.prototypeId;
+  useEffect(() => {
+    if (!prototypeId) return;
+    void getClient()
+      .then((c) => c.listPrototypePages(prototypeId))
+      .then(setPages)
+      .catch(() => setPages([]));
+  }, [prototypeId]);
 
   const update = (patch: Partial<Study>): void => {
     setStudy((s) => (s ? { ...s, ...patch } : s));
@@ -138,9 +153,8 @@ export function StudyEditorPage({ id }: { id: string | null }) {
   if (error && !study) return <Layout><p className="text-destructive text-sm">{error}</p></Layout>;
   if (!study || !info) return <Layout><p className="text-muted-foreground text-sm">Cargando…</p></Layout>;
 
-  const participantLink = record ? `${info.participantUrl}${info.participantUrl.includes('?') ? '&' : '?'}study=${record.id}` : null;
-  const qr = participantLink ? (async () => (await getClient()).qrImageUrl(participantLink))() : null;
-  void qr;
+  const proto = protos.find((p) => p.id === study.prototypeId);
+  const participantLink = record ? participantUrl(info, proto, record.id) : null;
 
   return (
     <Layout wide>
@@ -154,7 +168,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
           <div>
             <h1 className="text-xl font-semibold tracking-tight">{record ? study.name || 'Estudio' : 'Nuevo estudio'}</h1>
             <p className="text-muted-foreground text-sm">
-              Prototipo: {info.prototypeName} {dirty && <Badge variant="outline">sin guardar</Badge>}
+              Prototipo: {proto?.name ?? study.prototypeId} {dirty && <Badge variant="outline">sin guardar</Badge>}
             </p>
           </div>
         </div>
@@ -183,6 +197,23 @@ export function StudyEditorPage({ id }: { id: string | null }) {
               <CardTitle className="text-base">Lo básico</CardTitle>
             </CardHeader>
             <CardContent className="px-5 space-y-4">
+              <div>
+                <Label htmlFor="proto">Prototipo</Label>
+                {protos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Primero sube un prototipo en <Link to={{ name: 'prototypes' }} className="underline">Prototipos</Link>.
+                  </p>
+                ) : (
+                  <NativeSelect id="proto" value={study.prototypeId} onChange={(e) => update({ prototypeId: e.target.value })}>
+                    {!proto && <option value={study.prototypeId}>{study.prototypeId} (no disponible)</option>}
+                    {protos.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                )}
+              </div>
               <div>
                 <Label htmlFor="name">Nombre</Label>
                 <Input id="name" value={study.name} onChange={(e) => update({ name: e.target.value })} placeholder="Compra en la tienda móvil" />
@@ -274,7 +305,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
               <Button
                 variant="secondary"
                 className="w-full"
-                onClick={() => void copy(buildStudyPrompt({ prototypeId: info.prototypeId, prototypeName: info.prototypeName, pages, goal }), 'prompt')}
+                onClick={() => void copy(buildStudyPrompt({ prototypeId: study.prototypeId, prototypeName: proto?.name ?? study.prototypeId, pages, goal }), 'prompt')}
               >
                 {copied === 'prompt' ? <Check /> : <Copy />} {copied === 'prompt' ? 'Copiado' : 'Copiar prompt para IA'}
               </Button>

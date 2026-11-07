@@ -5,6 +5,7 @@
 
 import type {
   ManualResults,
+  Prototype,
   ServerInfo,
   SessionEventsResponse,
   SessionExport,
@@ -34,6 +35,12 @@ export interface ApiClient {
   deleteStudy(id: string): Promise<void>;
 
   listPrototypePages(prototypeId: string): Promise<PrototypePage[]>;
+  listPrototypes(): Promise<Prototype[]>;
+  /** Sube un .html o .zip. Con `id`, reemplaza los archivos de ese prototipo. */
+  uploadPrototype(file: File, opts?: { name?: string; id?: string }): Promise<Prototype>;
+  deletePrototype(id: string): Promise<void>;
+  /** Se pueden subir prototipos (solo con el servidor local). */
+  readonly canUpload: boolean;
   /** URL de una imagen QR para ese texto, o null si no hay forma de generarlo. */
   qrImageUrl(text: string): string | null;
 }

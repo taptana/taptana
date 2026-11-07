@@ -17,6 +17,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --no-warnings=ExperimentalWarning --test \"dist/**/*.test.js\"",
     "dev": "pnpm build && node --no-warnings=ExperimentalWarning dist/cli.js dev",
+    "start": "node --no-warnings=ExperimentalWarning dist/cli.js dev --data-dir ../../.taptana",
     "seed": "pnpm build && node --no-warnings=ExperimentalWarning dist/cli.js seed",
     "clean": "rm -rf dist public/recorder.js public/panel"
   },

@@ -17,11 +17,13 @@ export type Route =
   | { name: 'list' }
   | { name: 'player'; id: string }
   | { name: 'studies' }
+  | { name: 'prototypes' }
   | { name: 'study'; id: string | null };
 
 function parse(pathname: string): Route {
   const rel = pathname.startsWith(BASE) ? pathname.slice(BASE.length) : pathname;
   const parts = rel.split('/').filter(Boolean).map(decodeURIComponent);
+  if (parts[0] === 'prototypes') return { name: 'prototypes' };
   if (parts[0] === 'studies') {
     if (!parts[1]) return { name: 'studies' };
     return { name: 'study', id: parts[1] === 'new' ? null : parts[1] };
@@ -36,6 +38,8 @@ export function href(route: Route): string {
       return `${BASE}/${encodeURIComponent(route.id)}`;
     case 'studies':
       return `${BASE}/studies`;
+    case 'prototypes':
+      return `${BASE}/prototypes`;
     case 'study':
       return `${BASE}/studies/${route.id === null ? 'new' : encodeURIComponent(route.id)}`;
     default:

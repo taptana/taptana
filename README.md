@@ -26,7 +26,17 @@ pnpm build
 pnpm dev            # sirve examples/tienda
 ```
 
-La terminal muestra la IP local y un QR. Escanéalo con un celular en la misma Wi-Fi, usa la
+O, para probar **tus propios prototipos** sin tocar la terminal otra vez:
+
+```bash
+pnpm start          # abre el panel; sube tu .html o .zip en "Prototipos"
+```
+
+Cada prototipo subido tiene su link y su QR. Se guarda en `.taptana/` dentro de esta carpeta:
+nada sale de tu computadora. Subir una nueva versión mantiene el link, los estudios y las
+sesiones.
+
+Con `pnpm dev`, la terminal muestra la IP local y un QR. Escanéalo con un celular en la misma Wi-Fi, usa la
 tienda de ejemplo, y abre `http://<ip>:4321/sessions` en la laptop para ver la grabación.
 
 Para probar con tu propio prototipo:
