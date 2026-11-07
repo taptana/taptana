@@ -33,7 +33,8 @@ Es una prueba moderada en local: diseñador y participante están en el mismo lu
 - **v0.1 (actual):** grabación local, una laptop, una red Wi-Fi, HTTP simple.
 - **v0.2:** modo servidor (`taptana serve`): subir un zip del prototipo, obtener un link,
   imagen Docker. Recorder usable como script independiente en cualquier HTML.
-- **v0.3:** tareas y consentimiento.
+- **v0.3:** tareas y consentimiento. Formato `Study` importable, skill para que una IA arme
+  el estudio, y `packages/mcp` para que la IA hable con Taptana. Ver `docs/estudios-con-ia.md`.
 - **v0.4:** métricas: tiempo por tarea, éxito, mapas de toques.
 - **v0.5:** cuentas y equipos. Recién aquí tiene sentido el hospedado con pago.
 - **Fuera de v0.1:** tareas, consentimiento, panel completo, mapas de calor, login, HTTPS.
@@ -93,8 +94,12 @@ taptana/
 │   └── tienda/      Prototipo HTML de ejemplo con varias páginas
 └── docs/            Propuestas y decisiones de diseño
     ├── propuesta-v0.1.md       Carpetas, formato de eventos, esquema SQLite
-    └── servidor-hospedado.md   Cómo será la versión para probar en vivo sin instalar
+    ├── servidor-hospedado.md   Cómo será la versión para probar en vivo sin instalar
+    └── estudios-con-ia.md      Formato Study, skill y MCP para crear estudios con IA
 ```
+
+El servidor nunca llama a un modelo de IA. La IA la pone el usuario con su herramienta; Taptana
+solo expone un formato de estudio importable y, después, un MCP sobre su propia API.
 
 Dependencias entre paquetes: `shared` no depende de nadie. `recorder` y `server` dependen
 de `shared`. `server` empaqueta el bundle de `recorder` para inyectarlo.
