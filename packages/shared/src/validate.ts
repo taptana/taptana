@@ -5,6 +5,7 @@
 
 import type { EventBatch } from './api.js';
 import type { TaptanaEvent } from './events.js';
+import type { Study, SuccessRule } from './study.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -50,4 +51,54 @@ export function validateEventBatch(value: unknown): ValidationResult<EventBatch>
     return { ok: false, error: 'device must be an object' };
   }
   return { ok: true, value: value as unknown as EventBatch };
+}
+
+function isSuccessRule(value: unknown): value is SuccessRule {
+  if (!isRecord(value)) return false;
+  if (value['type'] === 'manual') return true;
+  if (value['type'] === 'reached') return isNonEmptyString(value['path']);
+  if (value['type'] === 'tapped') return isNonEmptyString(value['selector']);
+  return false;
+}
+
+/** Valida un archivo de estudio (lo que escribe una IA o una persona). */
+export function validateStudy(value: unknown): ValidationResult<Study> {
+  if (!isRecord(value)) return { ok: false, error: 'study must be an object' };
+  if (value['v'] !== 1) return { ok: false, error: 'unsupported study version (expected v: 1)' };
+  if (!isNonEmptyString(value['name'])) return { ok: false, error: 'name is required' };
+  if (!isNonEmptyString(value['prototypeId'])) return { ok: false, error: 'prototypeId is required' };
+  for (const key of ['description', 'welcome', 'consent'] as const) {
+    if (value[key] !== undefined && typeof value[key] !== 'string') return { ok: false, error: `${key} must be a string` };
+  }
+  const tasks = value['tasks'];
+  if (!Array.isArray(tasks) || tasks.length === 0) return { ok: false, error: 'tasks must be a non-empty array' };
+  const ids = new Set<string>();
+  for (let i = 0; i < tasks.length; i++) {
+    const t: unknown = tasks[i];
+    if (!isRecord(t)) return { ok: false, error: `tasks[${i}] must be an object` };
+    if (!isNonEmptyString(t['id'])) return { ok: false, error: `tasks[${i}].id is required` };
+    if (ids.has(t['id'])) return { ok: false, error: `tasks[${i}].id "${t['id']}" is duplicated` };
+    ids.add(t['id']);
+    if (!isNonEmptyString(t['title'])) return { ok: false, error: `tasks[${i}].title is required` };
+    if (!isNonEmptyString(t['instruction'])) return { ok: false, error: `tasks[${i}].instruction is required` };
+    if (t['kind'] !== undefined && t['kind'] !== 'task' && t['kind'] !== 'first-click') {
+      return { ok: false, error: `tasks[${i}].kind must be "task" or "first-click"` };
+    }
+    if (t['startPath'] !== undefined && typeof t['startPath'] !== 'string') return { ok: false, error: `tasks[${i}].startPath must be a string` };
+    if (!isSuccessRule(t['success'])) return { ok: false, error: `tasks[${i}].success must be {type:"reached",path} | {type:"tapped",selector} | {type:"manual"}` };
+  }
+  const variants = value['variants'];
+  if (variants !== undefined) {
+    if (!Array.isArray(variants)) return { ok: false, error: 'variants must be an array' };
+    const vids = new Set<string>();
+    for (let i = 0; i < variants.length; i++) {
+      const v: unknown = variants[i];
+      if (!isRecord(v) || !isNonEmptyString(v['id']) || !isNonEmptyString(v['name'])) {
+        return { ok: false, error: `variants[${i}] needs id and name` };
+      }
+      if (vids.has(v['id'])) return { ok: false, error: `variants[${i}].id is duplicated` };
+      vids.add(v['id']);
+    }
+  }
+  return { ok: true, value: value as unknown as Study };
 }

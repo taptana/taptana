@@ -47,6 +47,10 @@ function describe(e: TaptanaOwnEvent): string {
       return `Scroll al ${Math.round(e.depth * 100)}%`;
     case 'viewport':
       return `Pantalla ${e.width}×${e.height}`;
+    case 'task':
+      return { start: 'Empezó la tarea', done: 'Marcó la tarea como lista', skip: 'No pudo con la tarea' }[e.action];
+    case 'study':
+      return e.action === 'start' ? 'Aceptó grabar y empezó el estudio' : 'Terminó el estudio';
   }
 }
 

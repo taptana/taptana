@@ -5,23 +5,40 @@
 
 import type {
   EventBatch,
+  ManualResults,
   Prototype,
   SessionEventsResponse,
   SessionExport,
   SessionSummary,
+  Study,
+  StudyRecord,
 } from '@taptana/shared';
+
+export interface ListSessionsFilter {
+  prototypeId?: string;
+  studyId?: string;
+}
 
 export interface Store {
   /** Crea el prototipo si no existe. */
   ensurePrototype(prototype: Prototype): void;
   /** Guarda un lote de eventos. Crea la sesión y la página si hacen falta. */
   ingestBatch(batch: EventBatch): { received: number };
-  listSessions(prototypeId?: string): SessionSummary[];
+  listSessions(filter?: ListSessionsFilter): SessionSummary[];
   getSession(id: string): SessionSummary | null;
-  /** Sesión completa con páginas y eventos, para el reproductor. */
+  /** Sesión completa con páginas, eventos y estudio, para el reproductor. */
   getSessionEvents(id: string): SessionEventsResponse | null;
   /** Importa una sesión exportada (modo local o de otra instalación). Reemplaza si ya existe. */
   importSession(data: SessionExport): void;
+  /** Marcas manuales del moderador por tarea. Se mezclan con las existentes. */
+  setManualResults(sessionId: string, manual: ManualResults): boolean;
   deleteSession(id: string): boolean;
+
+  listStudies(prototypeId?: string): StudyRecord[];
+  getStudy(id: string): StudyRecord | null;
+  /** Crea (sin id) o reemplaza (con id) un estudio. Devuelve el registro guardado. */
+  saveStudy(study: Study, id?: string): StudyRecord;
+  deleteStudy(id: string): boolean;
+
   close(): void;
 }

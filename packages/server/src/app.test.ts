@@ -74,3 +74,57 @@ test('serves the panel and its assets, injecting the recorder only with recordSe
   const { app: self } = makeApp(true);
   assert.match(await (await self.request('/sessions')).text(), /data-prototype="taptana-panel"/);
 });
+
+test('studies CRUD, prototype pages and qr through the API', async () => {
+  const { app } = makeApp();
+  const study = {
+    v: 1,
+    name: 'Compra',
+    prototypeId: 'local',
+    tasks: [{ id: 't1', title: 'Comprar', instruction: 'Compra', success: { type: 'manual' } }],
+  };
+  const created = await app.request('/api/v1/studies', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(study) });
+  assert.equal(created.status, 201);
+  const record = (await created.json()) as { id: string; name: string };
+  assert.match(record.id, /^st_/);
+
+  const bad = await app.request('/api/v1/studies', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...study, tasks: [] }) });
+  assert.equal(bad.status, 400);
+
+  const put = await app.request(`/api/v1/studies/${record.id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...study, name: 'Otro' }) });
+  assert.equal(((await put.json()) as { name: string }).name, 'Otro');
+  const list = (await (await app.request('/api/v1/studies')).json()) as { studies: Array<{ id: string }> };
+  assert.equal(list.studies.length, 1);
+
+  const pages = (await (await app.request('/api/v1/prototypes/local/pages')).json()) as { pages: Array<{ path: string }> };
+  assert.deepEqual(pages.pages.map((p) => p.path), ['/index.html']);
+
+  const qr = await app.request('/api/v1/qr.svg?text=http://192.168.1.2:4321/?study=st_1');
+  assert.equal(qr.headers.get('content-type'), 'image/svg+xml');
+  assert.match(await qr.text(), /<svg/);
+
+  const del = await app.request(`/api/v1/studies/${record.id}`, { method: 'DELETE' });
+  assert.equal(del.status, 200);
+  assert.equal((await app.request(`/api/v1/studies/${record.id}`)).status, 404);
+});
+
+test('manual results through PATCH', async () => {
+  const { app, store } = makeApp();
+  const saved = store.saveStudy({ v: 1, name: 'S', prototypeId: 'local', tasks: [{ id: 't1', title: 'T', instruction: 'I', success: { type: 'manual' } }] });
+  store.ingestBatch({
+    v: 1, prototypeId: 'local', sessionId: 's_9', pageId: 'p_9', seq: 0, sentAt: 1,
+    page: { path: '/', title: 'T', referrer: '', startedAt: 1 },
+    events: [
+      { kind: 'taptana', type: 'study', t: 1, studyId: saved.id, action: 'start' },
+      { kind: 'taptana', type: 'task', t: 2, taskId: 't1', action: 'start' },
+      { kind: 'taptana', type: 'task', t: 9, taskId: 't1', action: 'done' },
+    ],
+  });
+  const before = (await (await app.request('/api/v1/sessions/s_9')).json()) as { tasks: Array<{ outcome: string }> };
+  assert.equal(before.tasks[0]?.outcome, 'reported');
+  const res = await app.request('/api/v1/sessions/s_9', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ manual: { t1: 'success' } }) });
+  assert.equal(res.status, 200);
+  assert.equal(((await res.json()) as { tasks: Array<{ outcome: string }> }).tasks[0]?.outcome, 'success');
+  const invalid = await app.request('/api/v1/sessions/s_9', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ manual: { t1: 'maybe' } }) });
+  assert.equal(invalid.status, 400);
+});

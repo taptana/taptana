@@ -8,6 +8,8 @@ export type {
   Orientation,
   ViewportEvent,
   NavigationEvent,
+  TaskEvent,
+  StudyEvent,
   TaptanaOwnEvent,
   TaptanaEvent,
   TaptanaOwnEventType,
@@ -29,6 +31,9 @@ export type {
   SessionListResponse,
   SessionEventsResponse,
   SessionExport,
+  StudyListResponse,
+  PrototypePagesResponse,
+  SessionPatch,
   ApiError,
 } from './api.js';
 export {
@@ -42,7 +47,19 @@ export {
   BEACON_MAX_BYTES,
 } from './api.js';
 
-export type { SuccessRule, Task, Study } from './study.js';
+export type {
+  SuccessRule,
+  TaskKind,
+  Task,
+  StudyVariant,
+  Study,
+  StudyRecord,
+  TaskOutcome,
+  TaskResult,
+  ManualResults,
+} from './study.js';
+export { DEFAULT_CONSENT_TEXT } from './study.js';
+export { validateStudy } from './validate.js';
 
 export { deviceLabel } from './device.js';
 

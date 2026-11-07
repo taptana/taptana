@@ -4,6 +4,7 @@
 
 import type { TaptanaEvent } from './events.js';
 import type { DeviceInfo, PageInfo, SessionPage, SessionSummary } from './session.js';
+import type { ManualResults, StudyRecord } from './study.js';
 
 export const API_PREFIX = '/api/v1';
 export const RECORDER_PATH = '/__taptana/recorder.js';
@@ -46,18 +47,31 @@ export interface SessionEventsResponse {
   session: SessionSummary;
   pages: SessionPage[];
   events: TaptanaEvent[];
+  /** El estudio, si la sesión pertenece a uno. */
+  study?: StudyRecord;
+}
+
+export interface StudyListResponse {
+  studies: StudyRecord[];
+}
+
+/** Páginas HTML del prototipo, para los desplegables del constructor. */
+export interface PrototypePagesResponse {
+  pages: Array<{ path: string; title: string }>;
+}
+
+/** PATCH /api/v1/sessions/:id */
+export interface SessionPatch {
+  manual?: ManualResults;
 }
 
 /**
  * Sesión exportada como archivo. Es lo que produce el recorder en modo local y lo que el
  * panel importa. Misma forma que SessionEventsResponse, con versión para poder cambiarla.
  */
-export interface SessionExport {
+export interface SessionExport extends SessionEventsResponse {
   v: 1;
   exportedAt: number;
-  session: SessionSummary;
-  pages: SessionPage[];
-  events: TaptanaEvent[];
 }
 
 export interface ApiError {

@@ -93,12 +93,37 @@ export interface NavigationEvent {
   to: string;
 }
 
+/**
+ * El participante empezó, terminó o saltó una tarea de un estudio.
+ * El éxito por regla no es un evento: lo calcula el servidor al leer la sesión.
+ */
+export interface TaskEvent {
+  kind: 'taptana';
+  type: 'task';
+  t: number;
+  taskId: string;
+  action: 'start' | 'done' | 'skip';
+}
+
+/** La sesión pertenece a un estudio. `start` se emite después del consentimiento. */
+export interface StudyEvent {
+  kind: 'taptana';
+  type: 'study';
+  t: number;
+  studyId: string;
+  /** Variante asignada al azar (A/B), si el estudio tiene variantes. */
+  variantId?: string;
+  action: 'start' | 'finish';
+}
+
 export type TaptanaOwnEvent =
   | TapEvent
   | SwipeEvent
   | ScrollEvent
   | ViewportEvent
-  | NavigationEvent;
+  | NavigationEvent
+  | TaskEvent
+  | StudyEvent;
 
 export type TaptanaEvent = RrwebEvent | TaptanaOwnEvent;
 

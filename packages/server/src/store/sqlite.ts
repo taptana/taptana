@@ -5,18 +5,23 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import {
   deviceLabel,
   type EventBatch,
+  type ManualResults,
   type Prototype,
   type SessionEventsResponse,
   type SessionExport,
   type SessionPage,
   type SessionSummary,
+  type Study,
+  type StudyRecord,
   type TaptanaEvent,
 } from '@taptana/shared';
-import { SCHEMA } from './schema.js';
-import type { Store } from './store.js';
+import { MIGRATIONS, SCHEMA } from './schema.js';
+import type { ListSessionsFilter, Store } from './store.js';
+import { computeTaskResults } from '../results.js';
 
 interface SessionRow {
   id: string;
@@ -29,8 +34,18 @@ interface SessionRow {
   viewport_h: number | null;
   touch: number | null;
   entry_path: string | null;
+  study_id: string | null;
+  variant_id: string | null;
+  manual_results: string | null;
   page_count: number;
   tap_count: number;
+}
+
+interface StudyRow {
+  id: string;
+  data: string;
+  created_at: number;
+  updated_at: number;
 }
 
 const SESSION_SELECT = `
@@ -40,8 +55,16 @@ const SESSION_SELECT = `
   FROM sessions s
 `;
 
+const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+function createId(prefix: string, length = 8): string {
+  const bytes = randomBytes(length);
+  let out = '';
+  for (const b of bytes) out += ALPHABET[b % ALPHABET.length];
+  return `${prefix}_${out}`;
+}
+
 function rowToSummary(row: SessionRow): SessionSummary {
-  return {
+  const s: SessionSummary = {
     id: row.id,
     prototypeId: row.prototype_id,
     startedAt: row.started_at,
@@ -54,6 +77,23 @@ function rowToSummary(row: SessionRow): SessionSummary {
     pageCount: Number(row.page_count),
     tapCount: Number(row.tap_count),
   };
+  if (row.study_id) s.studyId = row.study_id;
+  if (row.variant_id) s.variantId = row.variant_id;
+  return s;
+}
+
+function parseManual(raw: string | null): ManualResults {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as ManualResults;
+  } catch {
+    return {};
+  }
+}
+
+function rowToStudy(row: StudyRow): StudyRecord {
+  const data = JSON.parse(row.data) as Study;
+  return { ...data, id: row.id, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 export class SqliteStore implements Store {
@@ -65,6 +105,17 @@ export class SqliteStore implements Store {
     this.db.exec('PRAGMA journal_mode = WAL;');
     this.db.exec('PRAGMA foreign_keys = ON;');
     this.db.exec(SCHEMA);
+    this.migrate();
+  }
+
+  /** Agrega columnas nuevas a bases creadas por versiones anteriores. */
+  private migrate(): void {
+    for (const [table, column, definition] of MIGRATIONS) {
+      const cols = this.db.prepare(`PRAGMA table_info(${table})`).all() as unknown as Array<{ name: string }>;
+      if (!cols.some((c) => c.name === column)) {
+        this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      }
+    }
   }
 
   ensurePrototype(prototype: Prototype): void {
@@ -140,6 +191,15 @@ export class SqliteStore implements Store {
         }
       }
 
+      // Si el lote trae el inicio de un estudio, la sesión queda ligada a él.
+      for (const ev of batch.events) {
+        if (ev.kind === 'taptana' && ev.type === 'study' && ev.action === 'start') {
+          this.db
+            .prepare('UPDATE sessions SET study_id = ?, variant_id = COALESCE(?, variant_id) WHERE id = ?')
+            .run(ev.studyId, ev.variantId ?? null, batch.sessionId);
+        }
+      }
+
       const page = batch.page;
       this.db
         .prepare(
@@ -164,18 +224,45 @@ export class SqliteStore implements Store {
     return { received: batch.events.length };
   }
 
-  listSessions(prototypeId?: string): SessionSummary[] {
-    const rows = (
-      prototypeId
-        ? this.db.prepare(`${SESSION_SELECT} WHERE s.prototype_id = ? ORDER BY s.started_at DESC`).all(prototypeId)
-        : this.db.prepare(`${SESSION_SELECT} ORDER BY s.started_at DESC`).all()
-    ) as unknown as SessionRow[];
-    return rows.map(rowToSummary);
+  private withTasks(row: SessionRow): SessionSummary {
+    const summary = rowToSummary(row);
+    if (row.study_id) {
+      const study = this.getStudy(row.study_id);
+      if (study) {
+        const events = this.readEvents(row.id, true);
+        summary.tasks = computeTaskResults(study, events, parseManual(row.manual_results), row.last_seen_at);
+      }
+    }
+    return summary;
+  }
+
+  /** Eventos de una sesión. Con `onlyTaptana`, salta los de rrweb (más liviano para resultados). */
+  private readEvents(sessionId: string, onlyTaptana = false): TaptanaEvent[] {
+    const sql = onlyTaptana
+      ? "SELECT data FROM events WHERE session_id = ? AND kind = 'taptana' ORDER BY t, id"
+      : 'SELECT data FROM events WHERE session_id = ? ORDER BY t, id';
+    return (this.db.prepare(sql).all(sessionId) as unknown as Array<{ data: string }>).map((r) => JSON.parse(r.data) as TaptanaEvent);
+  }
+
+  listSessions(filter: ListSessionsFilter = {}): SessionSummary[] {
+    const where: string[] = [];
+    const params: string[] = [];
+    if (filter.prototypeId) {
+      where.push('s.prototype_id = ?');
+      params.push(filter.prototypeId);
+    }
+    if (filter.studyId) {
+      where.push('s.study_id = ?');
+      params.push(filter.studyId);
+    }
+    const sql = `${SESSION_SELECT} ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY s.started_at DESC`;
+    const rows = this.db.prepare(sql).all(...params) as unknown as SessionRow[];
+    return rows.map((row) => this.withTasks(row));
   }
 
   getSession(id: string): SessionSummary | null {
     const row = this.db.prepare(`${SESSION_SELECT} WHERE s.id = ?`).get(id) as unknown as SessionRow | undefined;
-    return row ? rowToSummary(row) : null;
+    return row ? this.withTasks(row) : null;
   }
 
   getSessionEvents(id: string): SessionEventsResponse | null {
@@ -186,10 +273,13 @@ export class SqliteStore implements Store {
         .prepare('SELECT id, path, title, referrer, started_at FROM pages WHERE session_id = ? ORDER BY started_at')
         .all(id) as unknown as Array<{ id: string; path: string; title: string | null; referrer: string | null; started_at: number }>
     ).map<SessionPage>((p) => ({ id: p.id, path: p.path, title: p.title ?? '', referrer: p.referrer ?? '', startedAt: p.started_at }));
-    const events = (
-      this.db.prepare('SELECT data FROM events WHERE session_id = ? ORDER BY t, id').all(id) as unknown as Array<{ data: string }>
-    ).map((r) => JSON.parse(r.data) as TaptanaEvent);
-    return { session, pages, events };
+    const events = this.readEvents(id);
+    const out: SessionEventsResponse = { session, pages, events };
+    if (session.studyId) {
+      const study = this.getStudy(session.studyId);
+      if (study) out.study = study;
+    }
+    return out;
   }
 
   importSession(data: SessionExport): void {
@@ -201,18 +291,30 @@ export class SqliteStore implements Store {
       this.db
         .prepare(
           `INSERT INTO sessions (id, prototype_id, started_at, last_seen_at, device_label,
-             viewport_w, viewport_h, touch, entry_path)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             viewport_w, viewport_h, touch, entry_path, study_id, variant_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(s.id, s.prototypeId, s.startedAt, s.lastSeenAt, s.deviceLabel, s.viewport.width, s.viewport.height, s.touch ? 1 : 0, s.entryPath);
+        .run(
+          s.id,
+          s.prototypeId,
+          s.startedAt,
+          s.lastSeenAt,
+          s.deviceLabel,
+          s.viewport.width,
+          s.viewport.height,
+          s.touch ? 1 : 0,
+          s.entryPath,
+          s.studyId ?? null,
+          s.variantId ?? null,
+        );
+      if (data.study) {
+        const exists = this.db.prepare('SELECT id FROM studies WHERE id = ?').get(data.study.id);
+        if (!exists) this.saveStudy(data.study, data.study.id);
+      }
       const insertPage = this.db.prepare(
         'INSERT INTO pages (id, session_id, path, title, referrer, started_at) VALUES (?, ?, ?, ?, ?, ?)',
       );
-      const pageIds = new Set<string>();
-      for (const p of data.pages) {
-        insertPage.run(p.id, s.id, p.path, p.title, p.referrer, p.startedAt);
-        pageIds.add(p.id);
-      }
+      for (const p of data.pages) insertPage.run(p.id, s.id, p.path, p.title, p.referrer, p.startedAt);
       // Los eventos exportados no traen pageId: se asignan por tiempo a la página vigente.
       const sortedPages = [...data.pages].sort((a, b) => a.startedAt - b.startedAt);
       let fallbackPage = sortedPages[0]?.id;
@@ -235,8 +337,62 @@ export class SqliteStore implements Store {
     }
   }
 
+  setManualResults(sessionId: string, manual: ManualResults): boolean {
+    const row = this.db.prepare('SELECT manual_results FROM sessions WHERE id = ?').get(sessionId) as
+      | { manual_results: string | null }
+      | undefined;
+    if (!row) return false;
+    const merged = { ...parseManual(row.manual_results), ...manual };
+    this.db.prepare('UPDATE sessions SET manual_results = ? WHERE id = ?').run(JSON.stringify(merged), sessionId);
+    return true;
+  }
+
   deleteSession(id: string): boolean {
     const result = this.db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+    return Number(result.changes) > 0;
+  }
+
+  // ── Estudios ─────────────────────────────────────────────────────────
+
+  listStudies(prototypeId?: string): StudyRecord[] {
+    const rows = (
+      prototypeId
+        ? this.db.prepare('SELECT * FROM studies WHERE prototype_id = ? ORDER BY updated_at DESC').all(prototypeId)
+        : this.db.prepare('SELECT * FROM studies ORDER BY updated_at DESC').all()
+    ) as unknown as StudyRow[];
+    return rows.map(rowToStudy);
+  }
+
+  getStudy(id: string): StudyRecord | null {
+    const row = this.db.prepare('SELECT * FROM studies WHERE id = ?').get(id) as unknown as StudyRow | undefined;
+    return row ? rowToStudy(row) : null;
+  }
+
+  saveStudy(study: Study, id?: string): StudyRecord {
+    const now = Date.now();
+    this.ensurePrototype({ id: study.prototypeId, name: study.prototypeId, createdAt: now });
+    const existing = id ? this.getStudy(id) : null;
+    const finalId = id ?? createId('st');
+    // Se guarda el Study limpio, sin id ni fechas, para que exportarlo sea trivial.
+    const { v, name, description, prototypeId, welcome, consent, tasks, variants } = study;
+    const clean: Study = { v, name, prototypeId, tasks };
+    if (description !== undefined) clean.description = description;
+    if (welcome !== undefined) clean.welcome = welcome;
+    if (consent !== undefined) clean.consent = consent;
+    if (variants !== undefined) clean.variants = variants;
+    const createdAt = existing?.createdAt ?? now;
+    this.db
+      .prepare(
+        `INSERT INTO studies (id, prototype_id, name, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET prototype_id = excluded.prototype_id, name = excluded.name,
+           data = excluded.data, updated_at = excluded.updated_at`,
+      )
+      .run(finalId, prototypeId, name, JSON.stringify(clean), createdAt, now);
+    return { ...clean, id: finalId, createdAt, updatedAt: now };
+  }
+
+  deleteStudy(id: string): boolean {
+    const result = this.db.prepare('DELETE FROM studies WHERE id = ?').run(id);
     return Number(result.changes) > 0;
   }
 

@@ -82,3 +82,36 @@ tardó.
    constructor en modo demo guarda en el navegador y el link del estudio no funciona. Propongo
    aceptarlo: el constructor se ve y se prueba en Pages, pero correr un estudio requiere
    servidor (local o Codespaces).
+
+## Decisiones tomadas
+
+1. Link del estudio: `?study=<id>` en la URL del prototipo.
+2. Consentimiento solo cuando hay estudio (v0.3). Se reconsidera para el hospedado.
+3. Pregunta de dificultad por tarea: v0.4, con las métricas.
+4. En Pages el constructor se ve y se prueba; correr un estudio requiere servidor.
+
+## Otros tipos de prueba (pensados desde ahora, construidos después)
+
+El formato queda abierto para no rehacer el modelo cuando lleguen. Dos cosas se fijan ya:
+
+- **Cada tarea tiene un `kind`.** `task` es la tarea normal. Los demás tipos son tareas con
+  otra regla de fin y otro resultado:
+
+  | `kind` | Qué hace el participante | Cuándo termina | Resultado | Versión |
+  |---|---|---|---|---|
+  | `task` | Cumple una instrucción | Toca Listo / No pude, o la regla se cumple | logró / dijo / no pudo / sin terminar, tiempo | v0.3 |
+  | `first-click` | "¿Dónde tocarías para X?" | En el primer toque | coordenadas y elemento del toque, acierto si coincide con la regla | v0.4 |
+  | `five-seconds` | Mira una pantalla 5 s | Se cumple el tiempo | respuestas a preguntas | v0.5 (necesita preguntas) |
+  | `preference` | Elige entre dos pantallas | Elige | elección | v0.5 |
+
+  First click es casi gratis: la tarea termina en el primer `tap`, que ya grabamos con `x`,
+  `y` y `selector`. Con varios participantes, esos puntos son el mapa de calor de v0.4.
+
+- **El estudio puede tener `variants` (A/B).** Cada variante tiene un nombre y una página de
+  inicio distinta (o un prototipo distinto, cuando haya varios). Al empezar, el recorder asigna
+  una variante al azar y la guarda en la sesión. Las tareas son las mismas; el panel compara
+  resultados por variante. El reparto es aleatorio simple; con pocos participantes es lo único
+  que tiene sentido.
+
+Lo que no entra en el formato: card sorting y tree testing. No usan el prototipo y son otro
+producto.

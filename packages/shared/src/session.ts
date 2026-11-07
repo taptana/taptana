@@ -6,6 +6,8 @@
  *   al empezar cada una.
  */
 
+import type { TaskResult } from './study.js';
+
 export interface DeviceInfo {
   /** Texto del navegador. El server lo resume en `deviceLabel`. */
   userAgent: string;
@@ -54,6 +56,12 @@ export interface SessionSummary {
   entryPath: string;
   pageCount: number;
   tapCount: number;
+  /** Estudio al que pertenece, si abrió un link de estudio y aceptó grabar. */
+  studyId?: string;
+  /** Variante A/B asignada, si el estudio tiene variantes. */
+  variantId?: string;
+  /** Resultado por tarea. Lo calcula el servidor cuando la sesión tiene estudio. */
+  tasks?: TaskResult[];
 }
 
 /** Página dentro de una sesión, como la guarda el server. */

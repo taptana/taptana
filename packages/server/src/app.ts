@@ -49,7 +49,7 @@ export function createApp(opts: AppOptions): Hono {
   });
 
   // ── API ────────────────────────────────────────────────────────────
-  app.route(API_PREFIX, apiRoutes(opts.store));
+  app.route(API_PREFIX, apiRoutes({ store: opts.store, prototypeDir: opts.prototypeDir }));
 
   // ── Panel ──────────────────────────────────────────────────────────
   if (opts.recordSelf) {
