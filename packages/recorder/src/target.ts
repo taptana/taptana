@@ -56,6 +56,8 @@ export function describeTarget(raw: Element): TargetInfo {
     selector: buildSelector(el),
   };
   if (el.id) info.id = el.id;
+  const classes = Array.from(el.classList).slice(0, 5);
+  if (classes.length) info.classes = classes;
   const role = el.getAttribute('role');
   if (role) info.role = role;
   if (!isSensitive(el)) {

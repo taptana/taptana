@@ -23,9 +23,13 @@ export function watchGestures(emit: Emit): () => void {
   let start: TouchStart | null = null;
   let lastTouchEndAt = 0;
 
+  // Toques sobre la interfaz de Taptana (barra de tarea, botón de exportar) no cuentan.
+  const isOurs = (target: EventTarget | null): boolean =>
+    target instanceof Element && target.closest('[data-taptana-ui]') !== null;
+
   const onTouchStart = (e: TouchEvent): void => {
     const touch = e.touches[0];
-    if (!touch || e.touches.length > 1) {
+    if (!touch || e.touches.length > 1 || isOurs(e.target)) {
       start = null;
       return;
     }
@@ -88,7 +92,7 @@ export function watchGestures(emit: Emit): () => void {
   // si hubo un touchend hace menos de un segundo, para no contar el toque dos veces.
   const onClick = (e: MouseEvent): void => {
     if (Date.now() - lastTouchEndAt < 1000) return;
-    if (!e.isTrusted) return;
+    if (!e.isTrusted || isOurs(e.target)) return;
     const target = e.target instanceof Element ? e.target : document.body;
     emit({
       kind: 'taptana',

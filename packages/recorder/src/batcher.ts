@@ -2,6 +2,9 @@
  * Acumula eventos y los manda por lotes: cada 3 segundos, o antes si hay más de 200.
  * Si falla el envío, los eventos se quedan en la cola y se reintentan en el siguiente ciclo.
  * Al cerrar o esconder la página, manda lo que queda con `final: true` (sendBeacon).
+ *
+ * Con `paused` (estudio sin consentimiento todavía) los eventos se acumulan pero no salen.
+ * `resume()` los libera; `discard()` los tira y apaga el batcher.
  */
 
 import {
@@ -21,7 +24,12 @@ export interface BatcherOptions {
   pageId: string;
   page: PageInfo;
   device: DeviceInfo;
+  /** Empezar sin enviar nada (hasta `resume()`). */
+  paused?: boolean;
 }
+
+/** Tope de eventos retenidos mientras se espera el consentimiento. */
+const PAUSED_MAX_EVENTS = 5000;
 
 export class Batcher {
   private queue: TaptanaEvent[] = [];
@@ -29,8 +37,10 @@ export class Batcher {
   private timer: number | undefined;
   private sending = false;
   private closed = false;
+  private paused: boolean;
 
   constructor(private readonly opts: BatcherOptions) {
+    this.paused = opts.paused ?? false;
     this.timer = window.setInterval(() => void this.flush(false), BATCH_INTERVAL_MS);
     const onHide = (): void => {
       if (document.visibilityState === 'hidden') void this.flush(true);
@@ -42,6 +52,10 @@ export class Batcher {
   push(event: TaptanaEvent): void {
     if (this.closed) return;
     this.queue.push(event);
+    if (this.paused) {
+      if (this.queue.length > PAUSED_MAX_EVENTS) this.queue.splice(0, this.queue.length - PAUSED_MAX_EVENTS);
+      return;
+    }
     if (this.queue.length >= BATCH_MAX_EVENTS) void this.flush(false);
   }
 
@@ -49,8 +63,22 @@ export class Batcher {
     return this.queue.length;
   }
 
+  get isPaused(): boolean {
+    return this.paused;
+  }
+
+  resume(): void {
+    this.paused = false;
+    void this.flush(false);
+  }
+
+  discard(): void {
+    this.queue = [];
+    this.stop();
+  }
+
   async flush(final: boolean): Promise<void> {
-    if (this.queue.length === 0) return;
+    if (this.paused || this.queue.length === 0) return;
     if (this.sending && !final) return;
     this.sending = true;
 

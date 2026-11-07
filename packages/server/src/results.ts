@@ -5,14 +5,33 @@
 
 import type { ManualResults, Study, TapEvent, TaptanaEvent, Task, TaskResult } from '@taptana/shared';
 
-function tapMatches(tap: TapEvent, selector: string): boolean {
+/**
+ * ¿El toque cae en lo que pide la regla? Acepta selectores simples:
+ *   "#agregar"            por id
+ *   ".cart-link"          por clase
+ *   "button.btn-primary"  tag + clase
+ *   "a"                   por tag
+ *   "body > header > a"   la ruta exacta que grabó el recorder
+ */
+export function tapMatches(tap: TapEvent, selector: string): boolean {
   const s = selector.trim();
   if (!s) return false;
-  if (s.startsWith('#') && tap.target.id === s.slice(1)) return true;
-  if (tap.target.selector === s) return true;
-  // Coincidencia por el último segmento: "button#agregar", ".cart-link", "a"
-  const last = tap.target.selector.split('>').pop()?.trim() ?? '';
-  return last === s;
+  const { id, classes = [], selector: recorded, tag } = tap.target;
+  if (recorded === s) return true;
+  const last = recorded.split('>').pop()?.trim() ?? '';
+  if (last === s) return true;
+
+  // Selector simple: tag opcional, luego #id y/o .clases
+  const m = s.match(/^([a-z][a-z0-9-]*)?((?:[#.][\w-]+)+)?$/i);
+  if (!m) return false;
+  const [, wantTag, parts = ''] = m;
+  if (wantTag && wantTag.toLowerCase() !== tag) return false;
+  if (!wantTag && !parts) return false;
+  for (const part of parts.match(/[#.][\w-]+/g) ?? []) {
+    if (part.startsWith('#') && id !== part.slice(1)) return false;
+    if (part.startsWith('.') && !classes.includes(part.slice(1))) return false;
+  }
+  return true;
 }
 
 function ruleMatchedIn(task: Task, events: TaptanaEvent[], from: number, to: number): { matched: boolean; at?: number } {

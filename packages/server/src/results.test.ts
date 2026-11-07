@@ -78,3 +78,20 @@ test('first-click ends at the first tap and records it', () => {
   const miss = computeTaskResults(study, [task(100, 't4', 'start'), tap(250, 'a.other')]);
   assert.equal(miss[3]?.outcome, 'reported');
 });
+
+import { tapMatches } from './results.js';
+
+test('tapMatches understands ids, classes, tags and recorded paths', () => {
+  const t = (overrides: Partial<TaptanaEvent & { target: unknown }>): import('@taptana/shared').TapEvent =>
+    ({ kind: 'taptana', type: 'tap', t: 1, x: 0, y: 0, target: { tag: 'a', selector: 'body > header > a', classes: ['cart-link', 'icon'], id: 'cart' }, ...overrides }) as import('@taptana/shared').TapEvent;
+  const tap = t({});
+  assert.equal(tapMatches(tap, '.cart-link'), true);
+  assert.equal(tapMatches(tap, 'a.cart-link'), true);
+  assert.equal(tapMatches(tap, '#cart'), true);
+  assert.equal(tapMatches(tap, 'a'), true);
+  assert.equal(tapMatches(tap, 'body > header > a'), true);
+  assert.equal(tapMatches(tap, '.other'), false);
+  assert.equal(tapMatches(tap, 'button.cart-link'), false);
+  assert.equal(tapMatches(tap, '#nope'), false);
+  assert.equal(tapMatches(tap, ''), false);
+});

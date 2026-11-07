@@ -28,6 +28,8 @@ export interface TargetInfo {
   text?: string;
   /** Ruta CSS corta: "main > .card:nth-child(2) > button". */
   selector: string;
+  /** Hasta 5 clases del elemento, para reglas tipo ".cart-link". */
+  classes?: string[];
   /** aria-role si tiene. */
   role?: string;
 }

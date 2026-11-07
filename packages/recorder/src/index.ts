@@ -1,10 +1,11 @@
 /**
  * Punto de entrada del recorder. Arranca todo al cargar la página.
  *
- * Orden: configuración → sesión → transporte → cola → rrweb + gestos + scroll + viewport.
+ * Orden: configuración → sesión → estudio (si hay) → transporte → cola →
+ *        rrweb + gestos + scroll + viewport.
  */
 
-import type { NavigationEvent } from '@taptana/shared';
+import type { NavigationEvent, TaptanaEvent } from '@taptana/shared';
 import { readConfig, VERSION } from './config.js';
 import { startSession } from './session.js';
 import { HttpTransport, LocalTransport, type Transport } from './transport.js';
@@ -15,11 +16,13 @@ import { watchScroll } from './scroll.js';
 import { watchViewport } from './viewport.js';
 import { batchesToExport, downloadExport } from './export.js';
 import { mountLocalButton } from './local-ui.js';
+import { detectStudy, StudyController } from './study.js';
 
 interface TaptanaGlobal {
   version: string;
   sessionId: string;
   pageId: string;
+  studyId: string | null;
   flush(): Promise<void>;
   pending(): number;
   stop(): void;
@@ -37,6 +40,9 @@ function main(): void {
 
   const config = readConfig();
   const ctx = startSession();
+  const studyState = detectStudy();
+  // Con estudio y sin consentimiento, nada sale del celular hasta que el participante acepte.
+  const holdUntilConsent = !!studyState && !studyState.consented && !studyState.declined;
 
   const local = config.transport === 'local' ? new LocalTransport() : null;
   const transport: Transport = local ?? new HttpTransport(config.endpoint);
@@ -48,7 +54,34 @@ function main(): void {
     pageId: ctx.pageId,
     page: ctx.page,
     device: ctx.device,
+    paused: holdUntilConsent,
   });
+
+  let study: StudyController | null = null;
+  const stops: Array<() => void> = [];
+  const stopAll = (): void => {
+    for (const stop of stops) stop();
+    stops.length = 0;
+  };
+
+  const push = (e: TaptanaEvent): void => {
+    batcher.push(e);
+    if (study && e.kind === 'taptana' && e.type === 'tap') study.onTap(e);
+  };
+
+  if (studyState && !studyState.declined) {
+    study = new StudyController({
+      endpoint: config.endpoint,
+      state: studyState,
+      emit: push,
+      onConsent: () => batcher.resume(),
+      onDecline: () => {
+        batcher.discard();
+        stopAll();
+      },
+      onFinish: () => void batcher.flush(false),
+    });
+  }
 
   const navigation: NavigationEvent = {
     kind: 'taptana',
@@ -57,14 +90,18 @@ function main(): void {
     from: ctx.previousPath,
     to: ctx.page.path,
   };
-  batcher.push(navigation);
+  push(navigation);
 
-  const stops = [
-    watchViewport((e) => batcher.push(e)),
-    startRrweb((e) => batcher.push(e)),
-    watchGestures((e) => batcher.push(e)),
-    watchScroll((e) => batcher.push(e)),
-  ];
+  if (!studyState?.declined) {
+    stops.push(
+      watchViewport(push),
+      startRrweb(push),
+      watchGestures(push),
+      watchScroll(push),
+    );
+  }
+
+  if (study) void study.start();
 
   if (local) {
     const mount = (): void =>
@@ -82,10 +119,11 @@ function main(): void {
     version: VERSION,
     sessionId: ctx.sessionId,
     pageId: ctx.pageId,
+    studyId: studyState?.studyId ?? null,
     flush: () => batcher.flush(false),
     pending: () => batcher.pending,
     stop: () => {
-      for (const stop of stops) stop();
+      stopAll();
       batcher.stop();
     },
   };
