@@ -52,13 +52,16 @@ Es una prueba moderada en local: diseñador y participante están en el mismo lu
 | Servidor HTTP | Hono + `@hono/node-server` | Liviano, portable, mismo código sirve para Node y Docker después |
 | Grabación | rrweb 2.x | Graba el DOM y lo reproduce fielmente, sin video |
 | Reproducción | rrweb-player 2.x | Reproductor listo con línea de tiempo |
+| Panel | React + Vite + Tailwind v4 + shadcn en `packages/web` | Sin construir un sistema de diseño; se compila a estáticos que Hono sirve |
 | QR en terminal | qrcode-terminal | Sin dependencias nativas |
 | Red | Escucha en `0.0.0.0`, puerto 4321 por defecto | Accesible desde el celular en la misma Wi-Fi |
 | Privacidad | `maskAllInputs: true` en rrweb | Todo texto escrito por el participante se enmascara |
 
 Reglas duras:
 
-- **Nunca** agregar una dependencia que necesite compilación nativa (node-gyp, prebuilds).
+- **Nunca** agregar una dependencia nativa a lo que ejecuta el servidor (nada de node-gyp ni
+  prebuilds en `server`, `recorder` o `shared`). Herramientas de build con binarios
+  precompilados (esbuild, Tailwind v4) están bien: solo corren al construir, nunca en producción.
 - **Nunca** acoplar a un proveedor cloud. Todo tiene que correr con `node` y una carpeta.
 - Las entradas de texto siempre van enmascaradas. No hay opción para desactivarlo en v0.1.
 
@@ -89,9 +92,12 @@ taptana/
 ├── packages/
 │   ├── shared/      Tipos y formato de eventos (sin dependencias)
 │   ├── recorder/    Script que se inyecta en el prototipo (corre en el celular)
-│   └── server/      CLI `taptana`, servidor Hono, SQLite, página /sessions
+│   ├── web/         Panel: React + Vite + shadcn. Modo http (servidor) y modo demo (Pages)
+│   └── server/      CLI `taptana`, servidor Hono, SQLite, sirve el panel compilado
 ├── examples/
 │   └── tienda/      Prototipo HTML de ejemplo con varias páginas
+├── .github/workflows/pages.yml   Publica panel + ejemplo en GitHub Pages en cada push a main
+├── .devcontainer/   Codespaces con Node 22 y pnpm, para correr el servidor real sin instalar
 └── docs/            Propuestas y decisiones de diseño
     ├── propuesta-v0.1.md       Carpetas, formato de eventos, esquema SQLite
     ├── servidor-hospedado.md   Cómo será la versión para probar en vivo sin instalar
@@ -101,8 +107,19 @@ taptana/
 El servidor nunca llama a un modelo de IA. La IA la pone el usuario con su herramienta; Taptana
 solo expone un formato de estudio importable y, después, un MCP sobre su propia API.
 
-Dependencias entre paquetes: `shared` no depende de nadie. `recorder` y `server` dependen
-de `shared`. `server` empaqueta el bundle de `recorder` para inyectarlo.
+Dependencias entre paquetes: `shared` no depende de nadie. `recorder`, `web` y `server`
+dependen de `shared`. `server` empaqueta el bundle de `recorder` para inyectarlo y los
+estáticos de `web` para servir el panel.
+
+## Probar sin servidor
+
+- El recorder tiene dos transportes: `http` (lotes a la API) y `local` (IndexedDB + botón
+  "exportar sesión" que descarga un `.json`). Se elige con `data-transport` en el `<script>`.
+- El panel tiene dos fuentes de datos: `http.ts` (API real) y `static.ts` (JSON incluidos en
+  el sitio, modo demo). El panel también importa un `.json` exportado por el recorder.
+- GitHub Pages publica el panel en modo demo y el prototipo de ejemplo con recorder local.
+- Codespaces corre el servidor real con URL pública. Es la forma de probar `taptana dev`
+  desde un celular sin instalar nada.
 
 Detalle completo de carpetas y del formato de eventos en `docs/propuesta-v0.1.md`.
 
@@ -124,7 +141,10 @@ pestaña esté abierta). Cada carga de página es un `pageId` nuevo dentro de la
 - ESM en todos los paquetes (`"type": "module"`).
 - `pnpm -r build` compila todo. `pnpm -r test` corre pruebas con `node --test` (sin frameworks).
 - El recorder se compila con esbuild a un solo archivo IIFE: `recorder.js`.
-- Sin frameworks de frontend en `/sessions`: HTML + CSS + JS plano servido por Hono.
+- El panel es React con shadcn. Los componentes de shadcn se copian a `packages/web/src/components/ui/`,
+  no se instalan como dependencia.
+- El panel nunca accede a datos directamente: siempre a través de `api/client.ts`, para que el
+  modo demo y el modo real sean intercambiables.
 - Mensajes de commit en inglés, imperativo, cortos. Documentación para el dueño en español.
 - Nombres de código (variables, tipos, rutas) en inglés.
 
@@ -140,5 +160,7 @@ pestaña esté abierta). Cada carga de página es un `pageId` nuevo dentro de la
 pnpm install
 pnpm -r build
 pnpm --filter @taptana/server dev ./examples/tienda   # arranca el servidor en desarrollo
+pnpm --filter @taptana/web dev                        # panel con recarga instantánea
+pnpm seed                                             # sesiones de ejemplo en la base local
 pnpm -r test
 ```

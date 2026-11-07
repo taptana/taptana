@@ -408,6 +408,81 @@ solo, siguiendo el tiempo real.
 
 ---
 
+## 4b. El panel: `packages/web` con shadcn
+
+El panel (`/sessions` y el reproductor) es una aplicación React construida con Vite, Tailwind
+v4 y componentes de shadcn. Se compila a archivos estáticos que el servidor Hono sirve. En
+producción no corre React en el servidor: solo entrega archivos.
+
+Por qué así y no HTML plano: con tareas, métricas y consentimiento en camino, dos páginas en
+HTML plano se iban a reescribir igual. shadcn evita construir un sistema de diseño, y es lo que
+las herramientas de vibe coding ya saben generar.
+
+```
+packages/web/                @taptana/web
+├── package.json
+├── vite.config.ts
+├── index.html
+└── src/
+    ├── main.tsx
+    ├── api/
+    │   ├── client.ts        Interfaz: listSessions(), getSessionEvents(id)
+    │   ├── http.ts          Implementación real: habla con /api/v1/
+    │   └── static.ts        Modo demo: lee JSON de /demo/*.json (GitHub Pages)
+    ├── pages/
+    │   ├── Sessions.tsx     Lista
+    │   └── Player.tsx       Reproductor con rrweb-player
+    └── components/ui/       Componentes de shadcn (copiados, no instalados)
+```
+
+Matiz sobre la regla "nada nativo": Tailwind v4 y esbuild traen binarios precompilados por
+plataforma. No compilan nada al instalar y solo se usan al construir el panel, nunca cuando el
+servidor corre. La regla queda como: nada nativo en lo que ejecuta el servidor.
+
+## 4c. Probar sin servidor: GitHub Pages, modo local y Codespaces
+
+Tres piezas que permiten ver y probar Taptana sin instalar nada ni armar un servidor.
+
+### El panel en GitHub Pages (modo demo)
+
+El panel se construye con `static.ts` en lugar de `http.ts`: lee las sesiones de archivos JSON
+incluidos en el sitio (`public/demo/sessions.json` y `public/demo/<id>.json`). Son tres o
+cuatro sesiones grabadas de antemano con el prototipo de ejemplo. Lista, dispositivo, duración,
+reproductor: todo funciona igual que con servidor.
+
+Una acción de GitHub (`.github/workflows/pages.yml`) construye y publica el panel en Pages en
+cada push a `main`. Flujo: editar desde cualquier lugar, push, y dos minutos después se ve.
+
+El prototipo de ejemplo (`examples/tienda`) también se publica en Pages, con el recorder en
+modo local (abajo), para poder probarlo desde un celular real.
+
+### El recorder en modo local
+
+El envío de eventos está detrás de una interfaz `Transport` con dos implementaciones:
+
+- `http`: lotes a `/api/v1/events`. Es el modo normal.
+- `local`: guarda los lotes en IndexedDB del navegador del celular. Muestra un botón flotante
+  "Terminar y exportar" que descarga la sesión como un archivo `.json`. En iPhone y Android
+  eso abre la hoja de compartir (AirDrop, WhatsApp, Drive).
+
+El panel tiene "Importar sesión": se arrastra el `.json` y se reproduce. Es más manual que el
+flujo real, pero permite probar el recorrido completo (celular real, gestos, enmascarado,
+reproducción) sin servidor. El modo se elige con `data-transport="local"` en el `<script>`.
+
+El archivo exportado tiene exactamente la forma de lo que el servidor guardaría: el `DeviceInfo`,
+las páginas y la lista de eventos. El mismo formato sirve después para exportar desde el panel
+real y para pasar sesiones entre instalaciones.
+
+### El servidor real sin instalarlo: Codespaces
+
+Un `.devcontainer/devcontainer.json` permite abrir el repo en GitHub Codespaces con Node 22 y
+pnpm listos. Al correr `taptana dev ./examples/tienda` ahí, Codespaces expone el puerto 4321
+con una URL pública. Se abre desde el celular por internet y es `taptana dev` de verdad, con
+SQLite y todo. Gratis hasta 60 horas al mes. Es el puente entre "Pages para la interfaz" y "un
+servidor para la demo pública".
+
+---
+
 ## 5. Decisiones
 
 ### Tomadas
@@ -416,6 +491,14 @@ solo, siguiendo el tiempo real.
 - **Arquitectura preparada para el hospedado** (un binario con dos modos, recorder
   independiente, tabla `prototypes`, interfaz `Store`, configuración por entorno, API `/v1`).
   Detalle en `CLAUDE.md` y en `docs/servidor-hospedado.md`.
+- **Panel en `packages/web` con React, Vite, Tailwind v4 y shadcn** (sección 4b).
+- **Probar sin servidor** (sección 4c): panel en GitHub Pages con modo demo, recorder con modo
+  local y exportación, importación de sesiones en el panel, Codespaces para el servidor real.
+- **Tipos `Study` y `Task` en `shared` desde v0.1**, sin uso hasta v0.3
+  (`docs/estudios-con-ia.md`).
+- **`pnpm seed`** llena la base con sesiones de ejemplo para iterar el panel sin grabar cada vez.
+- **`taptana dev --record-self`** inyecta el recorder también en el panel, para probar la
+  usabilidad de Taptana con Taptana.
 
 ### Asumidas salvo que digas lo contrario
 
