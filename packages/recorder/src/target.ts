@@ -59,7 +59,9 @@ export function describeTarget(raw: Element): TargetInfo {
   const role = el.getAttribute('role');
   if (role) info.role = role;
   if (!isSensitive(el)) {
-    const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+    // innerText respeta el layout (pone saltos entre bloques); textContent los pega.
+    const raw = el instanceof HTMLElement ? el.innerText : el.textContent;
+    const text = (raw ?? '').replace(/\s+/g, ' ').trim();
     if (text) info.text = text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT - 1)}…` : text;
   }
   return info;

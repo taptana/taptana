@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Producto · Verde</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="back" href="index.html" aria-label="Volver">←</a>
+    <span class="brand">Verde</span>
+    <a class="cart-link" href="carrito.html" aria-label="Carrito">🛒 <span data-cart-count>0</span></a>
+  </header>
+
+  <main class="product" id="producto">
+    <div class="gallery" data-gallery>
+      <div class="gallery-track">
+        <div class="slide" data-color="#9ccc9c"></div>
+        <div class="slide" data-color="#7cb87c"></div>
+        <div class="slide" data-color="#5fa65f"></div>
+      </div>
+      <div class="dots" aria-hidden="true"><span class="is-active"></span><span></span><span></span></div>
+      <p class="hint">Desliza para ver más fotos</p>
+    </div>
+
+    <h1 data-name>Planta</h1>
+    <p class="price" data-price>S/ 0</p>
+    <p class="muted" data-description></p>
+
+    <h2>Tamaño</h2>
+    <div class="options" role="radiogroup" aria-label="Tamaño">
+      <button class="option is-active" data-size="S">Pequeña</button>
+      <button class="option" data-size="M">Mediana</button>
+      <button class="option" data-size="L">Grande</button>
+    </div>
+
+    <h2>Cuidados</h2>
+    <details>
+      <summary>Luz y riego</summary>
+      <p>Luz indirecta. Riego cada 7 a 10 días, cuando la tierra esté seca al tacto.</p>
+    </details>
+    <details>
+      <summary>Envío y devoluciones</summary>
+      <p>Llega en 2 a 4 días hábiles. Si llega dañada, la cambiamos sin costo.</p>
+    </details>
+  </main>
+
+  <div class="sticky-bar">
+    <button class="btn btn-primary" id="agregar">Agregar al carrito</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

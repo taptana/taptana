@@ -1,0 +1,32 @@
+{
+  "name": "@taptana/server",
+  "version": "0.1.0",
+  "description": "CLI y servidor de Taptana: sirve el prototipo, graba sesiones en SQLite y muestra el panel.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "taptana": "./dist/cli.js"
+  },
+  "files": ["dist", "public"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --no-warnings=ExperimentalWarning --test \"dist/**/*.test.js\"",
+    "dev": "pnpm build && node --no-warnings=ExperimentalWarning dist/cli.js dev",
+    "seed": "pnpm build && node --no-warnings=ExperimentalWarning dist/cli.js seed",
+    "clean": "rm -rf dist public/recorder.js public/panel"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.6",
+    "@taptana/shared": "workspace:*",
+    "hono": "^4.13.16",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "@taptana/recorder": "workspace:*",
+    "@taptana/web": "workspace:*",
+    "@types/node": "^22.20.5",
+    "@types/qrcode-terminal": "^0.12.2",
+    "typescript": "^5.9.0"
+  }
+}

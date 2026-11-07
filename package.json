@@ -9,6 +9,9 @@
   "engines": {
     "node": ">=22.5"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
   "scripts": {
     "build": "pnpm -r --workspace-concurrency=1 build",
     "test": "pnpm -r test",

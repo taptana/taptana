@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Carrito · Verde</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="back" href="index.html" aria-label="Volver">←</a>
+    <span class="brand">Tu carrito</span>
+    <span></span>
+  </header>
+
+  <main>
+    <section id="items" class="cart-items"></section>
+    <p class="empty" id="vacio" hidden>Tu carrito está vacío. <a href="index.html">Ver plantas</a></p>
+
+    <section class="summary" id="resumen">
+      <div class="row"><span>Subtotal</span><span data-subtotal>S/ 0</span></div>
+      <div class="row"><span>Envío</span><span data-envio>S/ 0</span></div>
+      <div class="row total"><span>Total</span><span data-total>S/ 0</span></div>
+    </section>
+
+    <form class="form" id="form-envio" novalidate>
+      <h2>Datos de envío</h2>
+      <p class="muted">Lo que escribas aquí se graba enmascarado: en la reproducción se ven asteriscos.</p>
+
+      <label>Nombre completo
+        <input type="text" name="nombre" autocomplete="name" placeholder="Ej. Ana Pérez" required>
+      </label>
+      <label>Celular
+        <input type="tel" name="celular" autocomplete="tel" inputmode="numeric" placeholder="9XX XXX XXX" required>
+      </label>
+      <label>Dirección
+        <input type="text" name="direccion" autocomplete="street-address" placeholder="Calle, número, distrito" required>
+      </label>
+      <label>Nota para el repartidor (opcional)
+        <textarea name="nota" rows="2" placeholder="Tocar el timbre dos veces"></textarea>
+      </label>
+      <label class="check">
+        <input type="checkbox" name="terminos" required> Acepto los términos y condiciones
+      </label>
+      <p class="error" id="error" hidden>Completa los campos marcados.</p>
+    </form>
+  </main>
+
+  <div class="sticky-bar">
+    <button class="btn btn-primary" id="pagar" form="form-envio">Pagar</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
