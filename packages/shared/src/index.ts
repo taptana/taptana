@@ -44,5 +44,7 @@ export {
 
 export type { SuccessRule, Task, Study } from './study.js';
 
+export { deviceLabel } from './device.js';
+
 export type { ValidationResult } from './validate.js';
 export { isTaptanaEvent, validateEventBatch } from './validate.js';
