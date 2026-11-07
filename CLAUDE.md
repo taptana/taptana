@@ -18,12 +18,27 @@ qué resuelven para la prueba de usabilidad.
 
 Es una prueba moderada en local: diseñador y participante están en el mismo lugar.
 
+## Posicionamiento y modelo
+
+- Alternativa open source a Maze, para prototipos HTML reales en celulares reales.
+- Modelo tipo Penpot: todo el código es abierto y cualquiera lo instala en su infraestructura.
+  Nosotros ofreceremos además un servidor hospedado (para probar en vivo sin instalar y, a
+  futuro, para monetizar). Ver `docs/servidor-hospedado.md`.
+- **Licencia: MIT en todos los paquetes.** Decidido. No se cambia sin discutirlo explícitamente.
+- No competimos en reportes el primer año. Ganamos en "funciona con cualquier HTML, lo instalo
+  donde quiera, mis datos son míos".
+
 ## Hoja de ruta
 
 - **v0.1 (actual):** grabación local, una laptop, una red Wi-Fi, HTTP simple.
-- **Después:** servidor compartido instalable en cualquier lado (Node, Docker, Azure).
-  Por eso: cero dependencias de un proveedor específico, nada de servicios cloud propietarios.
+- **v0.2:** modo servidor (`taptana serve`): subir un zip del prototipo, obtener un link,
+  imagen Docker. Recorder usable como script independiente en cualquier HTML.
+- **v0.3:** tareas y consentimiento.
+- **v0.4:** métricas: tiempo por tarea, éxito, mapas de toques.
+- **v0.5:** cuentas y equipos. Recién aquí tiene sentido el hospedado con pago.
 - **Fuera de v0.1:** tareas, consentimiento, panel completo, mapas de calor, login, HTTPS.
+- Servidor compartido instalable en cualquier lado (Node, Docker, Azure). Por eso: cero
+  dependencias de un proveedor específico, nada de servicios cloud propietarios.
 
 ## Stack y decisiones técnicas
 
@@ -46,6 +61,26 @@ Reglas duras:
 - **Nunca** acoplar a un proveedor cloud. Todo tiene que correr con `node` y una carpeta.
 - Las entradas de texto siempre van enmascaradas. No hay opción para desactivarlo en v0.1.
 
+## Decisiones de arquitectura pensando en el servidor hospedado
+
+Son baratas en v0.1 y caras después. Se aplican desde el primer commit de código:
+
+1. **Un solo binario, dos modos.** `taptana dev <carpeta>` (local) y, más adelante,
+   `taptana serve` (compartido). Mismo código, misma base, misma página de sesiones.
+   Solo cambia de dónde salen los prototipos: carpeta local hoy, zip subido mañana.
+2. **El recorder funciona solo.** Se puede pegar como `<script>` en cualquier HTML alojado
+   en cualquier lado. Lee el endpoint y el prototipo de atributos `data-*` del script.
+   Nunca asume que el servidor es el mismo origen. El server responde CORS en `/api/`.
+3. **Los datos pertenecen a un prototipo.** Tabla `prototypes`; cada sesión apunta a una.
+   En v0.1 hay un solo prototipo (la carpeta servida), creado automáticamente.
+4. **Base de datos detrás de una interfaz.** `Store` con pocas funciones. Implementación
+   SQLite hoy; Postgres mañana sin tocar rutas.
+5. **Configuración por variables de entorno y flags.** `TAPTANA_PORT`, `TAPTANA_DATA_DIR`,
+   `TAPTANA_HOST`. Los flags del CLI las sobreescriben. Sin archivos de configuración.
+6. **API con versión.** Todo bajo `/api/v1/`.
+
+Lo que NO se hace antes de v0.4: usuarios y login, multi-tenant real, planes de pago, Postgres.
+
 ## Estructura del monorepo
 
 ```
@@ -57,6 +92,8 @@ taptana/
 ├── examples/
 │   └── tienda/      Prototipo HTML de ejemplo con varias páginas
 └── docs/            Propuestas y decisiones de diseño
+    ├── propuesta-v0.1.md       Carpetas, formato de eventos, esquema SQLite
+    └── servidor-hospedado.md   Cómo será la versión para probar en vivo sin instalar
 ```
 
 Dependencias entre paquetes: `shared` no depende de nadie. `recorder` y `server` dependen
@@ -66,8 +103,8 @@ Detalle completo de carpetas y del formato de eventos en `docs/propuesta-v0.1.md
 
 ## Formato de eventos (resumen)
 
-Todo lo que graba el recorder viaja en lotes (`EventBatch`) a `POST /api/events`.
-Cada lote lleva `sessionId`, `pageId`, y una lista de `events`. Hay dos familias:
+Todo lo que graba el recorder viaja en lotes (`EventBatch`) a `POST /api/v1/events`.
+Cada lote lleva `prototypeId`, `sessionId`, `pageId`, y una lista de `events`. Hay dos familias:
 
 - `rrweb`: eventos crudos de rrweb (snapshot del DOM, mutaciones, scroll, etc.). Son los que
   alimentan al reproductor.

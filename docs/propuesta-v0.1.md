@@ -76,17 +76,18 @@ taptana/
 │       │   ├── sessions.html    Lista de sesiones
 │       │   └── session.html     Reproductor de una sesión
 │       └── src/
-│           ├── cli.ts           Comando `taptana dev <carpeta>`
+│           ├── cli.ts           Comandos: `taptana dev <carpeta>` (y `serve` en v0.2)
+│           ├── config.ts        Lee variables de entorno y flags, con valores por defecto
 │           ├── app.ts           Crea la app Hono y monta las rutas
 │           ├── inject.ts        Inserta <script src="/__taptana/recorder.js"> en cada HTML
 │           ├── static.ts        Sirve la carpeta del prototipo
 │           ├── network.ts       Detecta la IP local y genera el QR
-│           ├── db/
-│           │   ├── index.ts     Abre SQLite y aplica el esquema
-│           │   ├── schema.sql   Tablas (ver sección 4)
-│           │   └── sessions.ts  Consultas: crear sesión, guardar lote, listar, leer
+│           ├── store/
+│           │   ├── store.ts     Interfaz Store: las pocas funciones que el server necesita
+│           │   ├── sqlite.ts    Implementación con node:sqlite
+│           │   └── schema.sql   Tablas (ver sección 4)
 │           └── routes/
-│               ├── api.ts       POST /api/events, GET /api/sessions, GET /api/sessions/:id
+│               ├── api.ts       /api/v1/events, /api/v1/sessions, /api/v1/sessions/:id
 │               └── sessions.ts  GET /sessions y GET /sessions/:id (páginas HTML)
 │
 ├── examples/
@@ -111,6 +112,13 @@ taptana/
   en npm, ya trae el recorder adentro. Quien instala no necesita compilar nada.
 - **Las vistas son HTML plano.** `/sessions` es una página sencilla sin React ni nada. Para v0.1
   alcanza, y evita una capa más de build.
+- **`store/` separa "qué guardo" de "dónde lo guardo".** Las rutas hablan con la interfaz `Store`
+  (crear sesión, guardar lote, listar sesiones, leer eventos, borrar sesión). Hoy la única
+  implementación es SQLite. Cuando el servidor hospedado necesite Postgres, se agrega
+  `postgres.ts` y nada más cambia.
+- **`config.ts` lee variables de entorno.** `TAPTANA_PORT` (4321), `TAPTANA_HOST` (0.0.0.0),
+  `TAPTANA_DATA_DIR` (`.taptana/`). Los flags del CLI (`--port`, etc.) las sobreescriben.
+  Es lo que Docker y Azure esperan.
 - **`examples/tienda` tiene un formulario a propósito.** Para que al reproducir se vea que lo
   escrito aparece como asteriscos.
 
@@ -120,15 +128,20 @@ taptana/
 |---|---|---|
 | `GET /` y `GET /*.html` | Celular | Sirve el prototipo con el recorder inyectado |
 | `GET /__taptana/recorder.js` | Celular | El script de grabación |
-| `POST /api/events` | Celular | Recibe un lote de eventos |
+| `POST /api/v1/events` | Celular | Recibe un lote de eventos |
 | `GET /sessions` | Laptop | Lista de sesiones |
 | `GET /sessions/:id` | Laptop | Reproductor de una sesión |
-| `GET /api/sessions` | Laptop | Lista en JSON (la usa la página) |
-| `GET /api/sessions/:id/events` | Laptop | Eventos en JSON (los usa el reproductor) |
+| `GET /api/v1/sessions` | Laptop | Lista en JSON (la usa la página) |
+| `GET /api/v1/sessions/:id/events` | Laptop | Eventos en JSON (los usa el reproductor) |
 
-Todo lo propio de Taptana vive bajo `/__taptana/` y `/api/` y `/sessions` para no chocar con
+Todo lo propio de Taptana vive bajo `/__taptana/`, `/api/v1/` y `/sessions` para no chocar con
 archivos del prototipo. Si tu prototipo tuviera una página `sessions.html` no hay conflicto porque
 la ruta es distinta.
+
+La API lleva `v1` en la ruta desde el principio. Cuando cambiemos el formato, los recorders viejos
+(pegados en prototipos que ya nadie actualiza) siguen hablando con `/api/v1` y los nuevos con
+`/api/v2`. `/api/v1/` responde cabeceras CORS para que un recorder alojado en otro dominio pueda
+enviar datos (ver 3.8).
 
 ---
 
@@ -168,6 +181,7 @@ La duración de una sesión se calcula como último evento menos primer evento.
 // Lo que el recorder manda a POST /api/events
 interface EventBatch {
   v: 1;                    // versión del formato, para poder cambiarlo después
+  prototypeId: string;     // ej. "local" en modo dev; un id real en modo servidor
   sessionId: string;       // ej. "s_7Kq2mNp4xR"
   pageId: string;          // ej. "p_3fLw9Az1bT"
   seq: number;             // 0, 1, 2... número del lote dentro de la página
@@ -296,15 +310,43 @@ foco, cuántos caracteres se escribieron (por la cantidad de asteriscos) y cuán
   con `navigator.sendBeacon`, que el navegador garantiza entregar aunque la página ya no exista.
 - Límite de sendBeacon: 64 KB. Si la cola es más grande, se manda en varios beacons.
 
+### 3.8 El recorder como script independiente
+
+En modo `dev` el server inyecta esto en cada HTML:
+
+```html
+<script src="/__taptana/recorder.js" data-prototype="local"></script>
+```
+
+Pero el mismo archivo se puede pegar a mano en un prototipo alojado en cualquier otro lado:
+
+```html
+<script src="https://taptana.midominio.com/__taptana/recorder.js"
+        data-endpoint="https://taptana.midominio.com"
+        data-prototype="pr_9xKq2mN"></script>
+```
+
+El recorder lee `data-endpoint` (si falta, usa el origen del propio script) y `data-prototype`.
+Esto es lo que permite el flujo "comparte un link y prueba" sin que Taptana sirva el HTML, y es
+la base del servidor hospedado. El server responde CORS en `/api/v1/` para aceptar lotes desde
+otro origen.
+
 ---
 
 ## 4. Cómo se guarda en SQLite
 
-Tres tablas, directas:
+Cuatro tablas, directas:
 
 ```sql
+CREATE TABLE prototypes (
+  id            TEXT PRIMARY KEY,     -- "local" en modo dev
+  name          TEXT NOT NULL,        -- nombre de la carpeta, o el que ponga el usuario
+  created_at    INTEGER NOT NULL
+);
+
 CREATE TABLE sessions (
   id            TEXT PRIMARY KEY,
+  prototype_id  TEXT NOT NULL REFERENCES prototypes(id),
   started_at    INTEGER NOT NULL,     -- ms epoch, del primer evento
   last_seen_at  INTEGER NOT NULL,     -- se actualiza con cada lote
   user_agent    TEXT,
@@ -336,7 +378,12 @@ CREATE TABLE events (
 );
 
 CREATE INDEX events_session_t ON events (session_id, t);
+CREATE INDEX sessions_prototype ON sessions (prototype_id, started_at);
 ```
+
+En v0.1 la tabla `prototypes` tiene una sola fila, `local`, que el server crea al arrancar con
+el nombre de la carpeta. Existe para que en v0.2 (varios prototipos subidos) y v0.5 (equipos)
+no haya que migrar datos: las sesiones ya saben a qué prototipo pertenecen.
 
 Un evento por fila, con el JSON completo en `data`. Las columnas `kind` y `type` están
 duplicadas fuera del JSON para poder filtrar rápido ("dame solo los taps de esta sesión")
@@ -361,29 +408,28 @@ solo, siguiendo el tiempo real.
 
 ---
 
-## 5. Decisiones abiertas (necesito tu opinión)
+## 5. Decisiones
 
-1. **Puerto por defecto.** Propongo `4321`. Es fácil de recordar y rara vez está ocupado.
-   ¿Te parece o prefieres otro?
+### Tomadas
 
-2. **Nombre del comando.** Escribiste `taptan dev`. Asumo que es `taptana dev` (con la "a"
-   final), igual que el proyecto. Si prefieres `taptan` como comando corto, se puede.
+- **Licencia MIT en todos los paquetes.**
+- **Arquitectura preparada para el hospedado** (un binario con dos modos, recorder
+  independiente, tabla `prototypes`, interfaz `Store`, configuración por entorno, API `/v1`).
+  Detalle en `CLAUDE.md` y en `docs/servidor-hospedado.md`.
 
-3. **Nombre del prototipo de ejemplo.** Propongo una tienda móvil de 4 páginas
-   (home → producto → carrito con formulario → gracias). Es un flujo que cualquier participante
-   entiende y tiene un formulario para demostrar el enmascarado. ¿Otro tema que prefieras?
+### Asumidas salvo que digas lo contrario
 
-4. **Umbrales de gestos.** Los números de la sección 3.5 (300 ms, 10 px, 40 px...) son puntos
-   de partida razonables. Se pueden ajustar después con grabaciones reales. ¿Los dejamos así?
+1. **Puerto por defecto `4321`.** Fácil de recordar y rara vez ocupado.
+2. **El comando es `taptana dev`** (con la "a" final), igual que el proyecto.
+3. **Prototipo de ejemplo: tienda móvil de 4 páginas** (home → producto → carrito con
+   formulario → gracias). Flujo que cualquiera entiende y con formulario para demostrar el
+   enmascarado.
+4. **Umbrales de gestos** de la sección 3.5. Se afinan con grabaciones reales.
+5. **Sesión y pestaña.** Recargar continúa la sesión; cerrar la pestaña y volver a abrir crea
+   una nueva.
+6. **Mouse en laptop.** El recorder también funciona con mouse para probar sin celular. En
+   `/sessions` se ve `touch: no`.
 
-5. **Nueva sesión en cada recarga, o persistir.** Con `sessionStorage`, si el participante
-   recarga la página la sesión continúa (bien). Si cierra la pestaña y vuelve a abrir, es una
-   sesión nueva (bien para v0.1, cada participante nuevo abre el QR). ¿Confirmas?
-
-6. **Mouse en laptop.** Propongo que el recorder también funcione con mouse para que puedas
-   probar sin celular. Los eventos quedan marcados igual; en `/sessions` se ve `touch: no`.
-   ¿Lo incluimos en v0.1?
-
-Si todo está bien, el siguiente paso es armar el esqueleto del monorepo (package.json,
-workspaces, tsconfig) y el paquete `shared` con exactamente estos tipos. Después el recorder,
-después el server, y al final el ejemplo. Cada paso lo explico al terminarlo.
+Siguiente paso: esqueleto del monorepo (package.json, workspaces, tsconfig) y el paquete `shared`
+con exactamente estos tipos. Después el recorder, después el server, y al final el ejemplo.
+Cada paso se explica al terminarlo.
