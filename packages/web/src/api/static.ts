@@ -12,6 +12,8 @@
 import {
   batchesToExport,
   computeTaskResults,
+  computeStudyReport,
+  type StudyReport,
   type EventBatch,
   type ManualResults,
   type Prototype,
@@ -224,18 +226,36 @@ export class StaticClient implements ApiClient {
   async listStudies(): Promise<StudyRecord[]> {
     try {
       const list = await panel<StudyRecord[]>(STUDIES, 'readonly', (s) => s.getAll() as IDBRequest<StudyRecord[]>);
-      return list.sort((a, b) => b.updatedAt - a.updatedAt);
+      const demo = (await this.demoStudies()).filter((d) => !list.some((s) => s.id === d.id));
+      return [...list, ...demo].sort((a, b) => b.updatedAt - a.updatedAt);
     } catch {
-      return [];
+      return this.demoStudies();
     }
+  }
+
+  /** Estudios de ejemplo incluidos en el sitio (vienen dentro de las sesiones de ejemplo). */
+  private demoStudies(): Promise<StudyRecord[]> {
+    return this.fetchJson<StudyRecord[]>('demo/studies.json', []);
   }
 
   async getStudy(id: string): Promise<StudyRecord | null> {
     try {
-      return (await panel<StudyRecord | undefined>(STUDIES, 'readonly', (s) => s.get(id) as IDBRequest<StudyRecord | undefined>)) ?? null;
+      const own = await panel<StudyRecord | undefined>(STUDIES, 'readonly', (s) => s.get(id) as IDBRequest<StudyRecord | undefined>);
+      if (own) return own;
     } catch {
-      return null;
+      /* seguimos con los de ejemplo */
     }
+    return (await this.demoStudies()).find((s) => s.id === id) ?? null;
+  }
+
+  async getStudyReport(id: string): Promise<StudyReport | null> {
+    const study = await this.getStudy(id);
+    if (!study) return null;
+    const summaries = (await this.listSessions(id)).filter((s) => s.studyId === id);
+    const sessions = (await Promise.all(summaries.map((s) => this.getSessionEvents(s.id))))
+      .filter((d): d is SessionEventsResponse => d !== null)
+      .map((d) => ({ session: d.session, events: d.events.filter((e) => e.kind === 'taptana') }));
+    return computeStudyReport(study, sessions);
   }
 
   async saveStudy(study: Study, id?: string): Promise<StudyRecord> {

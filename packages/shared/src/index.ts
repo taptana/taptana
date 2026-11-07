@@ -71,3 +71,5 @@ export { isTaptanaEvent, validateEventBatch } from './validate.js';
 
 export { computeTaskResults, samePath, tapMatches } from './results.js';
 export { batchesToExport } from './batches.js';
+export type { ReportSession, HeatPoint, ScreenReport, PathReport, TaskOutcomeCounts, TaskReport, StudyReport } from './report.js';
+export { computeStudyReport, screenPath } from './report.js';

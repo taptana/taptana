@@ -37,6 +37,13 @@ if (existsSync(seedDir)) {
   }
 }
 writeFileSync(join(demoDir, 'sessions.json'), JSON.stringify(summaries));
+// Estudios de ejemplo: los que vienen dentro de las sesiones de ejemplo.
+const studies = new Map();
+for (const file of readdirSync(seedDir).filter((f) => f.endsWith('.json'))) {
+  const data = JSON.parse(readFileSync(join(seedDir, file), 'utf8'));
+  if (data.study) studies.set(data.study.id, { ...data.study, prototypeId: 'demo-tienda' });
+}
+writeFileSync(join(demoDir, 'studies.json'), JSON.stringify([...studies.values()]));
 // Páginas del prototipo de ejemplo, para el constructor de estudios en modo demo.
 const pagesList = readdirSync(join(root, 'examples/tienda'))
   .filter((f) => f.endsWith('.html'))

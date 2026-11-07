@@ -4,6 +4,7 @@ import { PlayerPage } from '@/pages/Player';
 import { StudiesPage } from '@/pages/Studies';
 import { StudyEditorPage } from '@/pages/StudyEditor';
 import { PrototypesPage } from '@/pages/Prototypes';
+import { ReportPage } from '@/pages/Report';
 
 function Routes() {
   const { route } = useRouter();
@@ -14,6 +15,8 @@ function Routes() {
       return <StudiesPage />;
     case 'prototypes':
       return <PrototypesPage />;
+    case 'report':
+      return <ReportPage key={route.id} id={route.id} />;
     case 'study':
       return <StudyEditorPage key={route.id ?? 'new'} id={route.id} />;
     default:

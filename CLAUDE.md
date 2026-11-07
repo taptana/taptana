@@ -206,6 +206,24 @@ prototipo de ejemplo hechas con Playwright; se usan para `pnpm seed` y para la d
 - `skills/taptana-study/SKILL.md`: skill para que una IA escriba el `study.json`.
 - Detalles y decisiones en `docs/constructor-de-estudios.md`.
 
+## Reporte del estudio (v0.4, implementado)
+
+- `shared/report.ts` → `computeStudyReport(study, sessions)`, función pura con pruebas. Por
+  tarea: éxito directo (siguió el camino esperado) e indirecto, "dijo que terminó", no pudo, sin
+  terminar; tiempo mediano; misclicks (toques con `target.interactive === false`); embudo del
+  camino esperado; caminos más comunes; toques por pantalla con `pageX/pageY`; comparación A/B.
+- Camino esperado: `Task.expectedPath` opcional (editor en Diseño). Si falta, el camino más
+  corto de quienes lo lograron. En first click, un toque equivocado cuenta como "no pudo".
+- Recorder: marca `interactive` (enlace, botón, campo o cursor de mano) y guarda `pageX/pageY`.
+  Con `?taptana-preview` o `window.name === 'taptana-preview'` no graba (vista previa).
+- Panel: `/studies/:id/report` (`pages/Report.tsx`) con indicadores, embudo, mapas de calor
+  (`components/heatmap.tsx`: la pantalla real en un iframe sin grabar + canvas encima), caminos y
+  participantes. Menú lateral, `PageHeader`, `RouteTabs` (Diseño | Resultados), `EmptyState`.
+- Limitación conocida: el mapa de calor dibuja la pantalla en su estado inicial; si la pantalla
+  cambia mucho según lo que hizo el participante (carrito lleno vs. vacío), los puntos pueden no
+  caer sobre lo que vio. A futuro: usar la foto de rrweb de esa sesión como fondo.
+- Demo: `packages/server/seed/04-09-estudio-*.json` son seis participantes del estudio de ejemplo.
+
 ## Estado de v0.1
 
 Implementado y probado end-to-end (Playwright emulando iPhone y Android): grabación con la

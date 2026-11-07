@@ -85,6 +85,9 @@ export function validateStudy(value: unknown): ValidationResult<Study> {
       return { ok: false, error: `tasks[${i}].kind must be "task" or "first-click"` };
     }
     if (t['startPath'] !== undefined && typeof t['startPath'] !== 'string') return { ok: false, error: `tasks[${i}].startPath must be a string` };
+    if (t['expectedPath'] !== undefined && (!Array.isArray(t['expectedPath']) || !t['expectedPath'].every(isNonEmptyString))) {
+      return { ok: false, error: `tasks[${i}].expectedPath must be a list of page paths` };
+    }
     if (!isSuccessRule(t['success'])) return { ok: false, error: `tasks[${i}].success must be {type:"reached",path} | {type:"tapped",selector} | {type:"manual"}` };
   }
   const variants = value['variants'];

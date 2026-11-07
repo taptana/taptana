@@ -66,7 +66,7 @@ export function PrototypesPage() {
   return (
     <Layout>
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Prototipos</h1>
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Prototipos</h1>
         <p className="text-muted-foreground text-sm">
           {mode === 'static'
             ? 'Sube un .html o un .zip. En la demo se guarda solo en este navegador y no sale de él.'

@@ -61,6 +61,8 @@ export function watchGestures(emit: Emit): () => void {
         t: Date.now(),
         x: Math.round(touch.clientX),
         y: Math.round(touch.clientY),
+        pageX: Math.round(touch.clientX + window.scrollX),
+        pageY: Math.round(touch.clientY + window.scrollY),
         target: describeTarget(target ?? document.body),
       });
       return;
@@ -100,6 +102,8 @@ export function watchGestures(emit: Emit): () => void {
       t: Date.now(),
       x: Math.round(e.clientX),
       y: Math.round(e.clientY),
+      pageX: Math.round(e.clientX + window.scrollX),
+      pageY: Math.round(e.clientY + window.scrollY),
       target: describeTarget(target),
     });
   };

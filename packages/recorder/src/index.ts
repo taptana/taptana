@@ -36,6 +36,8 @@ declare global {
 
 function main(): void {
   if (window.__taptana) return; // ya está corriendo (script duplicado)
+  // Vista previa del panel (mapas de calor): mostrar el prototipo sin grabar.
+  if (/[?&]taptana-preview\b/.test(location.search) || window.name === 'taptana-preview') return;
   if (window.top !== window.self && !document.currentScript) return;
 
   const config = readConfig();

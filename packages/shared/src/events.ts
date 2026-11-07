@@ -32,6 +32,11 @@ export interface TargetInfo {
   classes?: string[];
   /** aria-role si tiene. */
   role?: string;
+  /**
+   * ¿El toque cayó en algo que se puede tocar (enlace, botón, campo, o algo con cursor de mano)?
+   * false = misclick. Ausente en grabaciones anteriores a v0.4.
+   */
+  interactive?: boolean;
 }
 
 /** Dedo baja y sube en menos de 300 ms moviéndose menos de 10 px. */
@@ -42,6 +47,9 @@ export interface TapEvent {
   /** Posición en el viewport, en píxeles CSS. */
   x: number;
   y: number;
+  /** Posición en la página completa (con scroll). Para mapas de calor. */
+  pageX?: number;
+  pageY?: number;
   target: TargetInfo;
 }
 

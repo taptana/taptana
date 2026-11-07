@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowDown, ArrowUp, Copy, Check, Download, Plus, Trash2, Sparkles, QrCode } from 'lucide-react';
+import { ArrowRight, X, ArrowLeft, ArrowDown, ArrowUp, Copy, Check, Download, Plus, Trash2, Sparkles, QrCode } from 'lucide-react';
 import {
   DEFAULT_CONSENT_TEXT,
   validateStudy,
@@ -16,7 +16,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input, Label, NativeSelect, Textarea } from '@/components/ui/input';
-import { Layout } from '@/components/layout';
+import { Layout, PageHeader } from '@/components/layout';
+import { StudyTabs } from './Report';
 import { buildStudyPrompt } from '@/lib/prompt';
 import { participantUrl } from '@/lib/links';
 import { cn } from '@/lib/utils';
@@ -158,31 +159,34 @@ export function StudyEditorPage({ id }: { id: string | null }) {
 
   return (
     <Layout wide>
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" asChild>
+      <PageHeader
+        back={
+          <Button variant="ghost" size="icon" asChild className="mt-1">
             <Link to={{ name: 'studies' }}>
               <ArrowLeft />
             </Link>
           </Button>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">{record ? study.name || 'Estudio' : 'Nuevo estudio'}</h1>
-            <p className="text-muted-foreground text-sm">
-              Prototipo: {proto?.name ?? study.prototypeId} {dirty && <Badge variant="outline">sin guardar</Badge>}
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {record && (
-            <Button variant="outline" size="sm" onClick={() => downloadStudy({ ...study, id: record.id, createdAt: record.createdAt, updatedAt: record.updatedAt })}>
-              <Download /> Exportar
+        }
+        title={record ? study.name || 'Estudio' : 'Nuevo estudio'}
+        description={
+          <span className="flex items-center gap-2">
+            Prototipo: {proto?.name ?? study.prototypeId} {dirty && <Badge variant="outline">cambios sin guardar</Badge>}
+          </span>
+        }
+        actions={
+          <>
+            {record && <StudyTabs id={record.id} active="design" />}
+            {record && (
+              <Button variant="outline" onClick={() => downloadStudy({ ...study, id: record.id, createdAt: record.createdAt, updatedAt: record.updatedAt })}>
+                <Download /> Exportar
+              </Button>
+            )}
+            <Button onClick={() => void onSave()} disabled={!validation?.ok || saving || (!dirty && !!record)}>
+              {saving ? 'Guardando…' : record ? 'Guardar cambios' : 'Crear estudio'}
             </Button>
-          )}
-          <Button size="sm" onClick={() => void onSave()} disabled={!validation?.ok || saving || (!dirty && !!record)}>
-            {saving ? 'Guardando…' : record ? 'Guardar cambios' : 'Crear estudio'}
-          </Button>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       {error && (
         <Card className="border-destructive/40 py-4">
@@ -190,7 +194,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
         </Card>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
           <Card className="py-5 gap-4">
             <CardHeader className="px-5">
@@ -408,6 +412,51 @@ function TaskCard({
             )}
           </div>
         </div>
+      </div>
+      {kind === 'task' && <ExpectedPathEditor value={task.expectedPath ?? []} pages={pages} onChange={(v) => onChange({ expectedPath: v.length ? v : undefined })} />}
+    </div>
+  );
+}
+
+/** Camino esperado: pantallas en orden. Sirve para distinguir éxito directo de indirecto. */
+function ExpectedPathEditor({ value, pages, onChange }: { value: string[]; pages: PrototypePage[]; onChange: (v: string[]) => void }) {
+  const [adding, setAdding] = useState('');
+  return (
+    <div className="rounded-lg bg-muted/50 p-4 space-y-2.5">
+      <div>
+        <Label className="mb-1">Camino esperado (opcional)</Label>
+        <p className="text-xs text-muted-foreground">
+          Las pantallas por las que debería pasar, en orden. Si lo dejas vacío, Taptana usa el camino más corto de quienes lo lograron.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {value.map((p, i) => (
+          <span key={i} className="flex items-center gap-1.5">
+            {i > 0 && <ArrowRight className="size-3.5 text-muted-foreground" />}
+            <span className="inline-flex items-center gap-1 rounded-md border bg-background pl-2.5 pr-1 py-1 text-sm">
+              <span className="text-muted-foreground tabular-nums text-xs">{i + 1}</span> {p}
+              <button type="button" aria-label={`Quitar ${p}`} className="rounded p-0.5 hover:bg-accent" onClick={() => onChange(value.filter((_, j) => j !== i))}>
+                <X className="size-3.5" />
+              </button>
+            </span>
+          </span>
+        ))}
+        <NativeSelect
+          aria-label="Agregar pantalla al camino"
+          value={adding}
+          className="w-auto h-8"
+          onChange={(e) => {
+            if (e.target.value) onChange([...value, e.target.value]);
+            setAdding('');
+          }}
+        >
+          <option value="">+ Agregar pantalla</option>
+          {pages.map((p) => (
+            <option key={p.path} value={p.path}>
+              {p.path}
+            </option>
+          ))}
+        </NativeSelect>
       </div>
     </div>
   );

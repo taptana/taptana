@@ -18,7 +18,8 @@ export type Route =
   | { name: 'player'; id: string }
   | { name: 'studies' }
   | { name: 'prototypes' }
-  | { name: 'study'; id: string | null };
+  | { name: 'study'; id: string | null }
+  | { name: 'report'; id: string };
 
 function parse(pathname: string): Route {
   const rel = pathname.startsWith(BASE) ? pathname.slice(BASE.length) : pathname;
@@ -26,6 +27,7 @@ function parse(pathname: string): Route {
   if (parts[0] === 'prototypes') return { name: 'prototypes' };
   if (parts[0] === 'studies') {
     if (!parts[1]) return { name: 'studies' };
+    if (parts[2] === 'report') return { name: 'report', id: parts[1] };
     return { name: 'study', id: parts[1] === 'new' ? null : parts[1] };
   }
   if (parts[0]) return { name: 'player', id: parts[0] };
@@ -42,6 +44,8 @@ export function href(route: Route): string {
       return `${BASE}/prototypes`;
     case 'study':
       return `${BASE}/studies/${route.id === null ? 'new' : encodeURIComponent(route.id)}`;
+    case 'report':
+      return `${BASE}/studies/${encodeURIComponent(route.id)}/report`;
     default:
       return `${BASE}/`;
   }

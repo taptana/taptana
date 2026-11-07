@@ -10,6 +10,7 @@ import {
   LOCAL_PROTOTYPE_ID,
   validateEventBatch,
   validateStudy,
+  computeStudyReport,
   type ApiError,
   type EventBatchResponse,
   type PrototypePagesResponse,
@@ -167,6 +168,18 @@ export function apiRoutes({ store, prototypeDir, dataDir, info }: ApiOptions): H
   api.get('/studies/:id', (c) => {
     const study = store.getStudy(c.req.param('id'));
     return study ? c.json(study) : c.json<ApiError>({ error: 'not found' }, 404);
+  });
+
+  /** Reporte del estudio: junta todas sus sesiones (ver computeStudyReport). */
+  api.get('/studies/:id/report', (c) => {
+    const study = store.getStudy(c.req.param('id'));
+    if (!study) return c.json<ApiError>({ error: 'not found' }, 404);
+    const sessions = store
+      .listSessions({ studyId: study.id })
+      .map((s) => store.getSessionEvents(s.id))
+      .filter((d): d is NonNullable<typeof d> => d !== null)
+      .map((d) => ({ session: d.session, events: d.events.filter((e) => e.kind === 'taptana') }));
+    return c.json(computeStudyReport(study, sessions));
   });
 
   api.put('/studies/:id', async (c) => {

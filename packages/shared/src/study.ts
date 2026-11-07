@@ -30,6 +30,12 @@ export interface Task {
   /** "/index.html". Si falta, empieza donde esté. */
   startPath?: string;
   success: SuccessRule;
+  /**
+   * Camino esperado: las pantallas en orden ("/index.html", "/producto.html", ...). Quien lo
+   * sigue exacto y lo logra es "éxito directo"; quien lo logra por otro lado, "indirecto".
+   * Si falta, se usa el camino más corto de quienes lo lograron.
+   */
+  expectedPath?: string[];
 }
 
 /** Variante de un estudio A/B. Las tareas son las mismas; cambia dónde empieza. */

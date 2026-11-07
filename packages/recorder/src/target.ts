@@ -49,11 +49,27 @@ function interactiveAncestor(el: Element): Element {
   return el.closest('button, a, input, textarea, select, label, [role="button"], [role="link"], summary') ?? el;
 }
 
+/** Algo con cursor de mano cuenta como tocable: los prototipos con IA usan divs con onClick. */
+function looksClickable(el: Element): boolean {
+  let node: Element | null = el;
+  for (let i = 0; node && i < 4; i++, node = node.parentElement) {
+    if (node === document.body) break;
+    try {
+      if (getComputedStyle(node).cursor === 'pointer') return true;
+    } catch {
+      return false;
+    }
+    if ((node as HTMLElement).onclick) return true;
+  }
+  return false;
+}
+
 export function describeTarget(raw: Element): TargetInfo {
   const el = interactiveAncestor(raw);
   const info: TargetInfo = {
     tag: el.tagName.toLowerCase(),
     selector: buildSelector(el),
+    interactive: el !== raw || el.matches('button, a, input, textarea, select, label, summary, [role="button"], [role="link"]') || looksClickable(raw),
   };
   if (el.id) info.id = el.id;
   const classes = Array.from(el.classList).slice(0, 5);

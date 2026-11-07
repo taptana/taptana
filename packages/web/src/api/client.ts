@@ -12,6 +12,7 @@ import type {
   SessionSummary,
   Study,
   StudyRecord,
+  StudyReport,
 } from '@taptana/shared';
 
 export interface PrototypePage {
@@ -33,6 +34,7 @@ export interface ApiClient {
   getStudy(id: string): Promise<StudyRecord | null>;
   saveStudy(study: Study, id?: string): Promise<StudyRecord>;
   deleteStudy(id: string): Promise<void>;
+  getStudyReport(id: string): Promise<StudyReport | null>;
 
   listPrototypePages(prototypeId: string): Promise<PrototypePage[]>;
   listPrototypes(): Promise<Prototype[]>;

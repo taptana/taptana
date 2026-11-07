@@ -63,7 +63,7 @@ export function SessionsPage() {
     <Layout>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Sesiones</h1>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Sesiones</h1>
           <p className="text-muted-foreground text-sm">
             {mode === 'static'
               ? 'Modo demo: sesiones de ejemplo y las que importes en este navegador.'

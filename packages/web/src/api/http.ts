@@ -12,6 +12,7 @@ import {
   type Study,
   type StudyListResponse,
   type StudyRecord,
+  type StudyReport,
 } from '@taptana/shared';
 import type { ApiClient, PrototypePage } from './client.ts';
 
@@ -84,6 +85,13 @@ export class HttpClient implements ApiClient {
 
   async deleteStudy(id: string): Promise<void> {
     await request(`/studies/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+
+  async getStudyReport(id: string): Promise<StudyReport | null> {
+    const res = await fetch(`${API_PREFIX}/studies/${encodeURIComponent(id)}/report`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`No se pudo cargar el reporte (${res.status})`);
+    return (await res.json()) as StudyReport;
   }
 
   async listPrototypePages(prototypeId: string): Promise<PrototypePage[]> {
