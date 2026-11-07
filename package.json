@@ -1,0 +1,20 @@
+{
+  "name": "taptana-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pruebas de usabilidad para prototipos HTML, mobile first. Open source (MIT).",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=1 build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "dev": "pnpm --filter @taptana/server dev ./examples/tienda",
+    "seed": "pnpm --filter @taptana/server seed",
+    "clean": "pnpm -r clean"
+  }
+}
