@@ -162,5 +162,16 @@ pnpm -r build
 pnpm --filter @taptana/server dev ./examples/tienda   # arranca el servidor en desarrollo
 pnpm --filter @taptana/web dev                        # panel con recarga instantánea
 pnpm seed                                             # sesiones de ejemplo en la base local
+pnpm site                                             # sitio estático para GitHub Pages en ./site
 pnpm -r test
 ```
+
+Las sesiones de ejemplo viven en `packages/server/seed/*.json`. Son grabaciones reales del
+prototipo de ejemplo hechas con Playwright; se usan para `pnpm seed` y para la demo en Pages.
+
+## Estado de v0.1
+
+Implementado y probado end-to-end (Playwright emulando iPhone y Android): grabación con la
+misma sesión entre páginas, enmascarado de inputs, lotes por HTTP y sendBeacon, modo local con
+exportar e importar, panel con reproductor y marcas en la línea de tiempo, `pnpm seed`,
+`--record-self`, sitio estático para Pages, devcontainer para Codespaces.

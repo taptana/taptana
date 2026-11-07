@@ -105,23 +105,77 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
+/**
+ * IndexedDB es asíncrono: al cerrar la página, la escritura puede no terminar. Por eso el lote
+ * final se guarda primero en localStorage (síncrono) y se vuelca a IndexedDB en la siguiente
+ * carga de página o al exportar.
+ */
+const PENDING_PREFIX = 'taptana:pending:';
+
 export class LocalTransport implements Transport {
   private db: Promise<IDBDatabase> | null = null;
+
+  constructor() {
+    void this.drainPending();
+  }
 
   private getDb(): Promise<IDBDatabase> {
     if (!this.db) this.db = openDb();
     return this.db;
   }
 
-  async send(batch: EventBatch): Promise<boolean> {
+  private put(batch: EventBatch): Promise<void> {
+    return this.getDb().then(
+      (db) =>
+        new Promise<void>((resolve, reject) => {
+          const tx = db.transaction(STORE, 'readwrite');
+          tx.objectStore(STORE).put(batch);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        }),
+    );
+  }
+
+  /** Mueve a IndexedDB los lotes que quedaron en localStorage al cerrar una página. */
+  private async drainPending(): Promise<void> {
+    const keys: string[] = [];
     try {
-      const db = await this.getDb();
-      await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readwrite');
-        tx.objectStore(STORE).put(batch);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(PENDING_PREFIX)) keys.push(key);
+      }
+    } catch {
+      return;
+    }
+    for (const key of keys) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) await this.put(JSON.parse(raw) as EventBatch);
+        localStorage.removeItem(key);
+      } catch {
+        /* se reintenta en la próxima carga */
+      }
+    }
+  }
+
+  async send(batch: EventBatch, final: boolean): Promise<boolean> {
+    if (final) {
+      try {
+        localStorage.setItem(`${PENDING_PREFIX}${batch.sessionId}:${batch.pageId}:${batch.seq}`, JSON.stringify(batch));
+      } catch {
+        /* sin espacio: igual intentamos IndexedDB */
+      }
+      void this.put(batch).then(() => {
+        try {
+          localStorage.removeItem(`${PENDING_PREFIX}${batch.sessionId}:${batch.pageId}:${batch.seq}`);
+        } catch {
+          /* nada */
+        }
       });
+      return true;
+    }
+    try {
+      await this.put(batch);
       return true;
     } catch {
       return false;
@@ -129,6 +183,7 @@ export class LocalTransport implements Transport {
   }
 
   async readSession(sessionId: string): Promise<EventBatch[]> {
+    await this.drainPending();
     const db = await this.getDb();
     return new Promise((resolve, reject) => {
       const req = db.transaction(STORE, 'readonly').objectStore(STORE).index('bySession').getAll(sessionId);

@@ -7,7 +7,7 @@
   "bin": {
     "taptana": "./dist/cli.js"
   },
-  "files": ["dist", "public"],
+  "files": ["dist", "public", "seed"],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",

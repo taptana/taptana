@@ -18,6 +18,7 @@
     "typecheck": "pnpm -r typecheck",
     "dev": "pnpm --filter @taptana/server dev ./examples/tienda",
     "seed": "pnpm --filter @taptana/server seed",
-    "clean": "pnpm -r clean"
+    "site": "node scripts/build-site.mjs",
+    "clean": "pnpm -r clean && rm -rf site"
   }
 }

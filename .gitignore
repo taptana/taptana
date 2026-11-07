@@ -5,3 +5,6 @@ dist/
 *.db-journal
 *.db-wal
 .DS_Store
+site/
+dist-pages/
+packages/server/public/

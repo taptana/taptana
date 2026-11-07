@@ -7,7 +7,7 @@ export function mountLocalButton(onExport: () => Promise<void>): void {
   const host = document.createElement('div');
   host.className = 'rr-block';
   host.setAttribute('data-taptana-ui', '');
-  const shadow = host.attachShadow({ mode: 'closed' });
+  const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
     <style>
       :host { all: initial; position: fixed; right: 12px; bottom: 12px; z-index: 2147483647; }
