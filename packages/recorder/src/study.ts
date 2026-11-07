@@ -18,7 +18,7 @@ import {
   type Task,
   type TaskEvent,
 } from '@taptana/shared';
-import { currentPath } from './session.js';
+import { currentPath, withBase } from './session.js';
 
 const KEY_STATE = 'taptana:study';
 const KEY_DATA = 'taptana:studyData';
@@ -196,7 +196,7 @@ export class StudyController {
       startPath = this.study.variants?.find((v) => v.id === this.state.variantId)?.startPath;
     }
     if (startPath && !samePath(startPath, currentPath())) {
-      location.assign(startPath);
+      location.assign(withBase(startPath));
       return;
     }
     this.renderTask();

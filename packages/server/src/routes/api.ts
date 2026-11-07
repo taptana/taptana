@@ -2,7 +2,8 @@
  * API bajo /api/v1. Responde CORS para que un recorder en otro origen pueda enviar lotes.
  */
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
+import { randomBytes } from 'node:crypto';
 import { cors } from 'hono/cors';
 import QRCode from 'qrcode';
 import {
@@ -12,6 +13,9 @@ import {
   type ApiError,
   type EventBatchResponse,
   type PrototypePagesResponse,
+  type Prototype,
+  type PrototypeListResponse,
+  UPLOADED_PATH,
   type ServerInfo,
   type SessionExport,
   type SessionListResponse,
@@ -20,6 +24,14 @@ import {
 } from '@taptana/shared';
 import type { ListSessionsFilter, Store } from '../store/store.js';
 import { listPrototypePages } from '../prototype-pages.js';
+import { extractUpload, MAX_UPLOAD_BYTES, prototypeDir as uploadedDir, removePrototypeFiles, UploadError } from '../uploads.js';
+
+const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+function newPrototypeId(): string {
+  let out = '';
+  for (const b of randomBytes(8)) out += ALPHABET[b % ALPHABET.length];
+  return `pr_${out}`;
+}
 
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
 
@@ -27,11 +39,13 @@ export interface ApiOptions {
   store: Store;
   /** Carpeta del prototipo local, para listar sus páginas. */
   prototypeDir?: string;
+  /** Carpeta de datos: los prototipos subidos viven en <dataDir>/prototypes/<id>/. */
+  dataDir?: string;
   /** Datos del servidor para el panel (link del participante, nombre del prototipo). */
   info?: ServerInfo;
 }
 
-export function apiRoutes({ store, prototypeDir, info }: ApiOptions): Hono {
+export function apiRoutes({ store, prototypeDir, dataDir, info }: ApiOptions): Hono {
   const api = new Hono();
 
   api.use('*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], maxAge: 86400 }));
@@ -168,9 +182,81 @@ export function apiRoutes({ store, prototypeDir, info }: ApiOptions): Hono {
   });
 
   // ── Prototipos ───────────────────────────────────────────────────────
+  const withUrl = (p: Prototype): Prototype => ({ ...p, url: p.source === 'upload' ? `${UPLOADED_PATH}/${p.id}/` : '/' });
+
+  /** Carpeta en disco de un prototipo, o null si no tiene archivos. */
+  const dirFor = (id: string): string | null => {
+    if (id === LOCAL_PROTOTYPE_ID) return prototypeDir ?? null;
+    if (!dataDir || !/^pr_[A-Za-z0-9]+$/.test(id)) return null;
+    return uploadedDir(dataDir, id);
+  };
+
+  api.get('/prototypes', (c) => {
+    const prototypes = store
+      .listPrototypes()
+      // Solo los que se pueden abrir: la carpeta local (si hay) y los subidos.
+      .filter((p) => (p.id === LOCAL_PROTOTYPE_ID ? !!prototypeDir : p.source === 'upload'))
+      .map(withUrl);
+    return c.json<PrototypeListResponse>({ prototypes });
+  });
+
+  /** Sube un .html o .zip (multipart, campo "file"; opcional "name"). Con :id reemplaza los archivos. */
+  const upload = async (c: Context, existing: Prototype | null) => {
+    if (!dataDir) return c.json<ApiError>({ error: 'uploads are disabled' }, 400);
+    const length = Number(c.req.header('content-length') ?? 0);
+    if (length > MAX_UPLOAD_BYTES + 1024 * 1024) return c.json<ApiError>({ error: 'El archivo pesa más de 50 MB.' }, 413);
+    let form: Record<string, string | File | (string | File)[]>;
+    try {
+      form = await c.req.parseBody();
+    } catch {
+      return c.json<ApiError>({ error: 'Envía el archivo como multipart/form-data.' }, 400);
+    }
+    const file = form['file'];
+    if (!(file instanceof File)) return c.json<ApiError>({ error: 'Falta el archivo.' }, 400);
+    const rawName = typeof form['name'] === 'string' ? form['name'].trim() : '';
+    const id = existing?.id ?? newPrototypeId();
+    try {
+      const { entryPath } = extractUpload(file.name, new Uint8Array(await file.arrayBuffer()), uploadedDir(dataDir, id));
+      const name = rawName || existing?.name || file.name.replace(/\.(zip|html?)$/i, '') || 'Prototipo';
+      const saved = store.savePrototype({ id, name, createdAt: existing?.createdAt ?? Date.now(), source: 'upload', entryPath });
+      return c.json(withUrl(saved), existing ? 200 : 201);
+    } catch (err) {
+      if (!existing) removePrototypeFiles(dataDir, id);
+      if (err instanceof UploadError) return c.json<ApiError>({ error: err.message }, 400);
+      throw err;
+    }
+  };
+
+  api.post('/prototypes', (c) => upload(c, null));
+
+  api.put('/prototypes/:id', (c) => {
+    const existing = store.getPrototype(c.req.param('id'));
+    if (!existing || existing.source !== 'upload') return c.json<ApiError>({ error: 'not found' }, 404);
+    return upload(c, existing);
+  });
+
+  /** Renombrar. */
+  api.patch('/prototypes/:id', async (c) => {
+    const existing = store.getPrototype(c.req.param('id'));
+    if (!existing) return c.json<ApiError>({ error: 'not found' }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as { name?: unknown };
+    if (typeof body.name !== 'string' || !body.name.trim()) return c.json<ApiError>({ error: 'name is required' }, 400);
+    return c.json(withUrl(store.savePrototype({ ...existing, name: body.name.trim() })));
+  });
+
+  api.delete('/prototypes/:id', (c) => {
+    const id = c.req.param('id');
+    const existing = store.getPrototype(id);
+    if (!existing || existing.source !== 'upload') return c.json<ApiError>({ error: 'Solo se pueden borrar prototipos subidos.' }, 400);
+    store.deletePrototype(id);
+    if (dataDir) removePrototypeFiles(dataDir, id);
+    return c.json({ ok: true });
+  });
+
   api.get('/prototypes/:id/pages', async (c) => {
-    if (c.req.param('id') !== LOCAL_PROTOTYPE_ID || !prototypeDir) return c.json<PrototypePagesResponse>({ pages: [] });
-    return c.json<PrototypePagesResponse>({ pages: await listPrototypePages(prototypeDir) });
+    const dir = dirFor(c.req.param('id'));
+    if (!dir) return c.json<PrototypePagesResponse>({ pages: [] });
+    return c.json<PrototypePagesResponse>({ pages: await listPrototypePages(dir) });
   });
 
   // ── QR ───────────────────────────────────────────────────────────────

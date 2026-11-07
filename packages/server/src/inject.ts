@@ -9,11 +9,14 @@ export interface InjectOptions {
   transport?: 'http' | 'local';
   /** Ruta del script. Por defecto RECORDER_PATH (mismo origen). */
   src?: string;
+  /** Prefijo donde se sirve el prototipo ("/p/pr_abc"). */
+  base?: string;
 }
 
 export function recorderTag(opts: InjectOptions): string {
   const attrs = [`src="${opts.src ?? RECORDER_PATH}"`, `data-prototype="${escapeAttr(opts.prototypeId)}"`];
   if (opts.transport) attrs.push(`data-transport="${opts.transport}"`);
+  if (opts.base) attrs.push(`data-base="${escapeAttr(opts.base)}"`);
   return `<script ${attrs.join(' ')}></script>`;
 }
 

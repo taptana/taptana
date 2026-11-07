@@ -20,6 +20,7 @@ const VERSION = (JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.me
 const HELP = `taptana · pruebas de usabilidad para prototipos HTML
 
 Uso:
+  taptana dev                  Abre el panel para subir prototipos (.html o .zip)
   taptana dev <carpeta>        Sirve la carpeta e inyecta el recorder en cada HTML
   taptana seed [archivo.json]  Importa sesiones de ejemplo (por defecto, las del paquete)
 
@@ -61,57 +62,67 @@ async function main(argv: string[]): Promise<void> {
     qr: values.qr,
   };
 
-  if (command === 'dev') return dev(rest[0] ?? '.', flags);
+  if (command === 'dev') return dev(rest[0], flags);
   if (command === 'seed') return seed(rest, flags);
   process.stderr.write(`Comando desconocido: ${command}\n\n${HELP}`);
   process.exit(1);
 }
 
-async function dev(dir: string, flags: Parameters<typeof resolveConfig>[1]): Promise<void> {
-  const config = resolveConfig(dir, flags);
-  if (!existsSync(config.prototypeDir) || !statSync(config.prototypeDir).isDirectory()) {
-    process.stderr.write(`No existe la carpeta: ${config.prototypeDir}\n`);
+/**
+ * `taptana dev ./carpeta` sirve esa carpeta como prototipo "local".
+ * `taptana dev` sin carpeta solo abre el panel: los prototipos se suben desde ahí (.html o .zip).
+ */
+async function dev(dir: string | undefined, flags: Parameters<typeof resolveConfig>[1]): Promise<void> {
+  const config = resolveConfig(dir ?? '.', flags);
+  const folder = dir === undefined ? undefined : config.prototypeDir;
+  if (folder && (!existsSync(folder) || !statSync(folder).isDirectory())) {
+    process.stderr.write(`No existe la carpeta: ${folder}\n`);
     process.exit(1);
   }
 
   const store = new SqliteStore(join(config.dataDir, 'taptana.db'));
-  store.ensurePrototype({ id: LOCAL_PROTOTYPE_ID, name: basename(config.prototypeDir), createdAt: Date.now() });
+  if (folder) store.savePrototype({ id: LOCAL_PROTOTYPE_ID, name: basename(folder), createdAt: Date.now(), source: 'folder', entryPath: '/' });
 
   const ips = config.host === '0.0.0.0' || config.host === '::' ? localAddresses() : [config.host];
   const primary = ips[0] ?? 'localhost';
-  const participantUrl = `http://${primary}:${config.port}/`;
+  const baseUrl = `http://${primary}:${config.port}`;
+  const panelUrl = `${baseUrl}${PANEL_PATH}`;
+  const participantUrl = folder ? `${baseUrl}/` : `${panelUrl}/prototypes`;
 
   const app = createApp({
     store,
-    prototypeDir: config.prototypeDir,
+    ...(folder && { prototypeDir: folder }),
+    dataDir: config.dataDir,
     prototypeId: LOCAL_PROTOTYPE_ID,
     recordSelf: config.recordSelf,
     info: {
       version: VERSION,
-      participantUrl,
-      prototypeId: LOCAL_PROTOTYPE_ID,
-      prototypeName: basename(config.prototypeDir),
+      participantUrl: `${baseUrl}/`,
+      prototypeId: folder ? LOCAL_PROTOTYPE_ID : '',
+      prototypeName: folder ? basename(folder) : '',
     },
   });
 
   serve({ fetch: app.fetch, port: config.port, hostname: config.host }, async (info) => {
     const lines = [
       '',
-      `  Taptana · sirviendo ${config.prototypeDir}`,
+      folder ? `  Taptana · sirviendo ${folder}` : '  Taptana · sube tus prototipos (.html o .zip) desde el panel',
       '',
-      `  Participante (celular en la misma Wi-Fi):  ${participantUrl}`,
-      ...ips.slice(1).map((ip) => `                                             http://${ip}:${info.port}/`),
-      `  Sesiones:                                  http://${primary}:${info.port}${PANEL_PATH}`,
-      `  Local:                                     http://localhost:${info.port}/`,
+      folder ? `  Participante (celular en la misma Wi-Fi):  ${participantUrl}` : '',
+      ...(folder ? ips.slice(1).map((ip) => `                                             http://${ip}:${info.port}/`) : []),
+      `  Panel:                                     ${panelUrl}`,
+      `  Local:                                     http://localhost:${info.port}${folder ? '/' : PANEL_PATH}`,
       '',
-      `  Datos: ${join(config.dataDir, 'taptana.db')}`,
+      `  Datos: ${config.dataDir}  (todo queda en esta computadora)`,
       config.recordSelf ? '  Grabando también el panel (--record-self)' : '',
       '',
     ];
     process.stdout.write(lines.filter((l) => l !== '').join('\n') + '\n');
-    if (config.qr) {
+    if (config.qr && folder) {
       process.stdout.write(await renderQr(participantUrl));
       process.stdout.write('\n  Escanea el QR con el celular para abrir el prototipo.\n\n');
+    } else if (!folder) {
+      process.stdout.write('\n  Abre el panel, sube tu prototipo y escanea su QR con el celular.\n\n');
     }
   });
 

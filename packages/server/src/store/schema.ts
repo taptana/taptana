@@ -72,4 +72,6 @@ export const MIGRATIONS: Array<[string, string, string]> = [
   ['sessions', 'study_id', 'TEXT'],
   ['sessions', 'variant_id', 'TEXT'],
   ['sessions', 'manual_results', 'TEXT'],
+  ['prototypes', 'source', "TEXT NOT NULL DEFAULT 'folder'"],
+  ['prototypes', 'entry_path', 'TEXT'],
 ];

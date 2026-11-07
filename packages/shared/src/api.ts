@@ -3,12 +3,14 @@
  */
 
 import type { TaptanaEvent } from './events.js';
-import type { DeviceInfo, PageInfo, SessionPage, SessionSummary } from './session.js';
+import type { DeviceInfo, PageInfo, Prototype, SessionPage, SessionSummary } from './session.js';
 import type { ManualResults, StudyRecord } from './study.js';
 
 export const API_PREFIX = '/api/v1';
 export const RECORDER_PATH = '/__taptana/recorder.js';
 export const PANEL_PATH = '/sessions';
+/** Prototipos subidos se sirven en /p/<id>/. */
+export const UPLOADED_PATH = '/p';
 export const DEFAULT_PORT = 4321;
 export const DEFAULT_HOST = '0.0.0.0';
 
@@ -53,6 +55,10 @@ export interface SessionEventsResponse {
 
 export interface StudyListResponse {
   studies: StudyRecord[];
+}
+
+export interface PrototypeListResponse {
+  prototypes: Prototype[];
 }
 
 /** Páginas HTML del prototipo, para los desplegables del constructor. */

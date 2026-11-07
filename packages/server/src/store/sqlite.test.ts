@@ -150,3 +150,22 @@ test('studies: save, list, update, delete; sessions link to them and get task re
   assert.equal(store.getStudy(saved.id), null);
   store.close();
 });
+
+test('prototypes: save, list with session count, delete cascades', () => {
+  const store = new SqliteStore(':memory:');
+  store.savePrototype({ id: 'pr_1', name: 'Onboarding', createdAt: 5, source: 'upload', entryPath: '/home.html' });
+  store.ingestBatch(batch({ prototypeId: 'pr_1', events: [{ kind: 'rrweb', t: 1, data: {} }] }));
+  store.saveStudy({ v: 1, name: 'S', prototypeId: 'pr_1', tasks: [{ id: 't1', title: 'T', instruction: 'I', success: { type: 'manual' } }] });
+  const [p] = store.listPrototypes();
+  assert.equal(p?.name, 'Onboarding');
+  assert.equal(p?.source, 'upload');
+  assert.equal(p?.entryPath, '/home.html');
+  assert.equal(p?.sessionCount, 1);
+  store.savePrototype({ id: 'pr_1', name: 'Onboarding v2', createdAt: 5, source: 'upload', entryPath: '/index.html' });
+  assert.equal(store.getPrototype('pr_1')?.name, 'Onboarding v2');
+  assert.equal(store.deletePrototype('pr_1'), true);
+  assert.equal(store.getPrototype('pr_1'), null);
+  assert.equal(store.listSessions().length, 0);
+  assert.equal(store.listStudies().length, 0);
+  store.close();
+});

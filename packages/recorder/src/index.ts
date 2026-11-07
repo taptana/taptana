@@ -7,7 +7,7 @@
 
 import type { NavigationEvent, TaptanaEvent } from '@taptana/shared';
 import { readConfig, VERSION } from './config.js';
-import { startSession } from './session.js';
+import { setBasePath, startSession } from './session.js';
 import { HttpTransport, LocalTransport, type Transport } from './transport.js';
 import { Batcher } from './batcher.js';
 import { startRrweb } from './rrweb.js';
@@ -39,6 +39,7 @@ function main(): void {
   if (window.top !== window.self && !document.currentScript) return;
 
   const config = readConfig();
+  setBasePath(config.base);
   const ctx = startSession();
   const studyState = detectStudy();
   // Con estudio y sin consentimiento, nada sale del celular hasta que el participante acepte.

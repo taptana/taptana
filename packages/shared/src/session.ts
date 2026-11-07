@@ -38,6 +38,14 @@ export interface Prototype {
   id: string;
   name: string;
   createdAt: number;
+  /** 'folder': la carpeta de `taptana dev`. 'upload': subido desde el panel. */
+  source?: 'folder' | 'upload';
+  /** Página de entrada, relativa al prototipo ("/index.html"). */
+  entryPath?: string;
+  /** Ruta donde se sirve ("/" o "/p/pr_abc/"). La pone el servidor al listar. */
+  url?: string;
+  /** Sesiones grabadas. La pone el servidor al listar. */
+  sessionCount?: number;
 }
 
 /** Resumen de sesión tal como lo muestra la lista del panel. */

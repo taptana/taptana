@@ -128,3 +128,46 @@ test('manual results through PATCH', async () => {
   const invalid = await app.request('/api/v1/sessions/s_9', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ manual: { t1: 'maybe' } }) });
   assert.equal(invalid.status, 400);
 });
+
+test('upload a zip, serve it under /p/<id>/ with the recorder and base, replace and delete it', async () => {
+  const { zipSync, strToU8 } = await import('fflate');
+  const dataDir = mkdtempSync(join(tmpdir(), 'taptana-data-'));
+  const store = new SqliteStore(':memory:');
+  const app = createApp({ store, prototypeId: 'local', publicDir: pub, dataDir });
+
+  assert.equal((await app.request('/')).headers.get('location'), '/sessions/prototypes');
+
+  const zip = zipSync({ 'onb/home.html': strToU8('<html><body>home</body></html>'), 'onb/img/a.svg': strToU8('<svg/>') });
+  const form = new FormData();
+  form.append('file', new File([zip], 'Onboarding.zip'));
+  const res = await app.request('/api/v1/prototypes', { method: 'POST', body: form });
+  assert.equal(res.status, 201);
+  const proto = (await res.json()) as { id: string; name: string; url: string; entryPath: string };
+  assert.equal(proto.name, 'Onboarding');
+  assert.equal(proto.entryPath, '/home.html');
+  assert.equal(proto.url, `/p/${proto.id}/`);
+
+  const html = await (await app.request(`/p/${proto.id}/`)).text();
+  assert.match(html, new RegExp(`data-prototype="${proto.id}" data-base="/p/${proto.id}"`));
+  assert.equal((await app.request(`/p/${proto.id}/img/a.svg`)).headers.get('content-type'), 'image/svg+xml');
+  assert.equal((await app.request(`/p/${proto.id}`)).status, 301);
+  assert.equal((await app.request('/p/pr_nope/')).status, 404);
+
+  const pages = (await (await app.request(`/api/v1/prototypes/${proto.id}/pages`)).json()) as { pages: Array<{ path: string }> };
+  assert.deepEqual(pages.pages.map((p) => p.path), ['/home.html']);
+  const list = (await (await app.request('/api/v1/prototypes')).json()) as { prototypes: Array<{ id: string }> };
+  assert.deepEqual(list.prototypes.map((p) => p.id), [proto.id]);
+
+  const again = new FormData();
+  again.append('file', new File([strToU8('<p>v2</p>')], 'v2.html'));
+  const put = await app.request(`/api/v1/prototypes/${proto.id}`, { method: 'PUT', body: again });
+  assert.equal(((await put.json()) as { name: string }).name, 'Onboarding');
+  assert.match(await (await app.request(`/p/${proto.id}/`)).text(), /v2/);
+
+  const bad = new FormData();
+  bad.append('file', new File([strToU8('x')], 'x.pdf'));
+  assert.equal((await app.request('/api/v1/prototypes', { method: 'POST', body: bad })).status, 400);
+
+  assert.equal((await app.request(`/api/v1/prototypes/${proto.id}`, { method: 'DELETE' })).status, 200);
+  assert.equal((await app.request(`/p/${proto.id}/`)).status, 404);
+});

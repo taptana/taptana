@@ -22,6 +22,12 @@ export interface ListSessionsFilter {
 export interface Store {
   /** Crea el prototipo si no existe. */
   ensurePrototype(prototype: Prototype): void;
+  /** Crea o actualiza (nombre, origen, entrada) un prototipo. */
+  savePrototype(prototype: Prototype): Prototype;
+  listPrototypes(): Prototype[];
+  getPrototype(id: string): Prototype | null;
+  /** Borra el prototipo con sus sesiones y estudios. */
+  deletePrototype(id: string): boolean;
   /** Guarda un lote de eventos. Crea la sesión y la página si hacen falta. */
   ingestBatch(batch: EventBatch): { received: number };
   listSessions(filter?: ListSessionsFilter): SessionSummary[];

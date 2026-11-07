@@ -17,6 +17,8 @@ export interface RecorderConfig {
   endpoint: string;
   prototypeId: string;
   transport: TransportKind;
+  /** Prefijo donde vive el prototipo ("/p/pr_abc"). Las rutas se registran sin él. */
+  base: string;
 }
 
 declare const __TAPTANA_VERSION__: string;
@@ -42,5 +44,6 @@ export function readConfig(): RecorderConfig {
     endpoint,
     prototypeId: data['prototype'] || LOCAL_PROTOTYPE_ID,
     transport,
+    base: (data['base'] ?? '').replace(/\/+$/, ''),
   };
 }

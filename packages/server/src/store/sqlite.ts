@@ -41,6 +41,27 @@ interface SessionRow {
   tap_count: number;
 }
 
+interface PrototypeRow {
+  id: string;
+  name: string;
+  created_at: number;
+  source: string | null;
+  entry_path: string | null;
+  session_count: number;
+}
+
+function rowToPrototype(row: PrototypeRow): Prototype {
+  const p: Prototype = {
+    id: row.id,
+    name: row.name,
+    createdAt: row.created_at,
+    source: row.source === 'upload' ? 'upload' : 'folder',
+    sessionCount: Number(row.session_count),
+  };
+  if (row.entry_path) p.entryPath = row.entry_path;
+  return p;
+}
+
 interface StudyRow {
   id: string;
   data: string;
@@ -122,6 +143,47 @@ export class SqliteStore implements Store {
     this.db
       .prepare('INSERT OR IGNORE INTO prototypes (id, name, created_at) VALUES (?, ?, ?)')
       .run(prototype.id, prototype.name, prototype.createdAt);
+  }
+
+  savePrototype(p: Prototype): Prototype {
+    this.db
+      .prepare(
+        `INSERT INTO prototypes (id, name, created_at, source, entry_path) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name, source = excluded.source, entry_path = excluded.entry_path`,
+      )
+      .run(p.id, p.name, p.createdAt, p.source ?? 'folder', p.entryPath ?? null);
+    return this.getPrototype(p.id)!;
+  }
+
+  listPrototypes(): Prototype[] {
+    const rows = this.db
+      .prepare(
+        `SELECT p.*, (SELECT COUNT(*) FROM sessions s WHERE s.prototype_id = p.id) AS session_count
+         FROM prototypes p ORDER BY p.created_at DESC`,
+      )
+      .all() as unknown as PrototypeRow[];
+    return rows.map(rowToPrototype);
+  }
+
+  getPrototype(id: string): Prototype | null {
+    const row = this.db
+      .prepare(`SELECT p.*, (SELECT COUNT(*) FROM sessions s WHERE s.prototype_id = p.id) AS session_count FROM prototypes p WHERE p.id = ?`)
+      .get(id) as unknown as PrototypeRow | undefined;
+    return row ? rowToPrototype(row) : null;
+  }
+
+  deletePrototype(id: string): boolean {
+    this.db.exec('BEGIN');
+    try {
+      this.db.prepare('DELETE FROM sessions WHERE prototype_id = ?').run(id);
+      this.db.prepare('DELETE FROM studies WHERE prototype_id = ?').run(id);
+      const result = this.db.prepare('DELETE FROM prototypes WHERE id = ?').run(id);
+      this.db.exec('COMMIT');
+      return Number(result.changes) > 0;
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 
   ingestBatch(batch: EventBatch): { received: number } {

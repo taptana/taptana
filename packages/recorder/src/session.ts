@@ -38,8 +38,22 @@ function safeSet(key: string, value: string): void {
   }
 }
 
-/** Ruta actual con query, sin el parámetro `study` (es de Taptana, no del prototipo). */
+let basePath = '';
+
+/** Prefijo bajo el que se sirve el prototipo ("/p/pr_abc"). Se quita de las rutas registradas. */
+export function setBasePath(base: string): void {
+  basePath = base;
+}
+
+/** Convierte una ruta del prototipo ("/gracias.html") en una URL real ("/p/pr_abc/gracias.html"). */
+export function withBase(path: string): string {
+  return basePath + (path.startsWith('/') ? path : `/${path}`);
+}
+
+/** Ruta actual con query, sin el prefijo del prototipo ni el parámetro `study`. */
 export function currentPath(): string {
+  let pathname = location.pathname;
+  if (basePath && pathname.startsWith(basePath)) pathname = pathname.slice(basePath.length) || '/';
   let search = location.search;
   if (search.includes('study=')) {
     const params = new URLSearchParams(search);
@@ -47,7 +61,7 @@ export function currentPath(): string {
     const rest = params.toString();
     search = rest ? `?${rest}` : '';
   }
-  return location.pathname + search;
+  return pathname + search;
 }
 
 export function collectDevice(): DeviceInfo {

@@ -11,7 +11,8 @@ import { Hono } from 'hono';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { API_PREFIX, PANEL_PATH, RECORDER_PATH, type ServerInfo } from '@taptana/shared';
+import { API_PREFIX, PANEL_PATH, RECORDER_PATH, UPLOADED_PATH, type ServerInfo } from '@taptana/shared';
+import { prototypeDir as uploadedDir } from './uploads.js';
 import { injectRecorder } from './inject.js';
 import { apiRoutes } from './routes/api.js';
 import { mimeFor, readFile, resolveFile } from './static.js';
@@ -19,8 +20,11 @@ import type { Store } from './store/store.js';
 
 export interface AppOptions {
   store: Store;
-  prototypeDir: string;
+  /** Carpeta de `taptana dev <carpeta>`. Sin ella, solo se usan prototipos subidos. */
+  prototypeDir?: string;
   prototypeId: string;
+  /** Carpeta de datos. Habilita subir prototipos (<dataDir>/prototypes/<id>/). */
+  dataDir?: string;
   recordSelf?: boolean;
   /** Carpeta public/ con recorder.js y panel/. Por defecto la del paquete. */
   publicDir?: string;
@@ -51,7 +55,37 @@ export function createApp(opts: AppOptions): Hono {
   });
 
   // ── API ────────────────────────────────────────────────────────────
-  app.route(API_PREFIX, apiRoutes({ store: opts.store, prototypeDir: opts.prototypeDir, ...(opts.info && { info: opts.info }) }));
+  app.route(
+    API_PREFIX,
+    apiRoutes({
+      store: opts.store,
+      ...(opts.prototypeDir && { prototypeDir: opts.prototypeDir }),
+      ...(opts.dataDir && { dataDir: opts.dataDir }),
+      ...(opts.info && { info: opts.info }),
+    }),
+  );
+
+  // ── Prototipos subidos: /p/<id>/... ─────────────────────────────────
+  if (opts.dataDir) {
+    const dataDir = opts.dataDir;
+    app.get(`${UPLOADED_PATH}/:id`, (c) => c.redirect(`${UPLOADED_PATH}/${c.req.param('id')}/${new URL(c.req.url).search}`, 301));
+    app.get(`${UPLOADED_PATH}/:id/*`, async (c) => {
+      const id = c.req.param('id');
+      const proto = /^pr_[A-Za-z0-9]+$/.test(id) ? opts.store.getPrototype(id) : null;
+      if (!proto || proto.source !== 'upload') return c.text('No existe este prototipo', 404);
+      const base = `${UPLOADED_PATH}/${id}`;
+      const rel = c.req.path.slice(base.length) || '/';
+      const file = await resolveFile(uploadedDir(dataDir, id), rel === '/' ? (proto.entryPath ?? '/') : rel);
+      if (!file) return c.text('No encontrado', 404);
+      c.header('cache-control', 'no-cache');
+      if (file.isHtml) {
+        c.header('content-type', 'text/html; charset=utf-8');
+        return c.body(injectRecorder(readFileSync(file.absolute, 'utf8'), { prototypeId: id, base }));
+      }
+      c.header('content-type', mimeFor(file.absolute));
+      return c.body(await readFile(file.absolute));
+    });
+  }
 
   // ── Panel ──────────────────────────────────────────────────────────
   if (opts.recordSelf) {
@@ -80,6 +114,8 @@ export function createApp(opts: AppOptions): Hono {
 
   // ── Prototipo ──────────────────────────────────────────────────────
   app.get('/*', async (c) => {
+    // Sin carpeta local: la raíz lleva al panel, a subir un prototipo.
+    if (!opts.prototypeDir) return c.req.path === '/' ? c.redirect(`${PANEL_PATH}/prototypes`) : c.text('No encontrado', 404);
     const file = await resolveFile(opts.prototypeDir, c.req.path);
     if (!file) return c.text('No encontrado', 404);
     c.header('cache-control', 'no-cache');
