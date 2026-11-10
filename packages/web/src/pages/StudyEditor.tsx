@@ -6,8 +6,9 @@
  * el borrador es válido. Mientras haya cambios sin guardar, salir pide confirmación.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, BarChart3, CircleAlert, CircleCheck, Copy, Crosshair, Download, Ellipsis, LoaderCircle, PencilRuler, Play, Plus, Share2, Sparkles, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BarChart3, CircleAlert, CircleCheck, Copy, Crosshair, Download, Ellipsis, FileArchive, LayoutList, ListChecks, LoaderCircle, PencilRuler, Play, Plus, Share2, Smartphone, Sparkles, TriangleAlert } from 'lucide-react';
 import {
+  STUDY_LIMITS,
   sameScreen,
   screenId,
   screenLabel,
@@ -50,18 +51,20 @@ import {
 } from '@/components/builder/draft';
 import { KIND_INFO, ShowErrorsContext } from '@/components/builder/fields';
 import { PhoneFrame, type PhoneHandle, type PickMessage } from '@/components/builder/PhoneFrame';
-import { ErrorState, Layout, PageHeader, PageSkeleton, RouteTabs } from '@/components/layout';
+import { ErrorState, Layout, Notice, PageHeader, PageSkeleton, RouteTabs } from '@/components/layout';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from '@/components/ui/toast';
 import { downloadText } from '@/lib/download';
 import { friendlyError } from '@/lib/errors';
 import { plural } from '@/lib/format';
 import { participantUrl } from '@/lib/links';
 import { liveTitleIsStable } from '@/lib/screens';
+import { cn } from '@/lib/utils';
 import { Link, useNavigationBlocker, useRouter } from '@/router';
 
 type PhoneMode = { type: 'record'; blockId: string; steps: DemoStep[] } | { type: 'pick'; blockId: string } | null;
@@ -123,7 +126,11 @@ export function StudyEditorPage({ id }: { id: string | null }) {
   const [leave, setLeave] = useState<(() => void) | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const wide = useMediaQuery('(min-width: 1280px)');
+  // Con tres columnas el teléfono va a la derecha; más angosto, aparece con «Ver prototipo».
+  const wide = useMediaQuery('(min-width: 1400px)');
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  /** Estudio nuevo: primero tres preguntas cortas (prototipo, nombre, cómo empezar); null = constructor. */
+  const [setup, setSetup] = useState<0 | 1 | 2 | null>(id === null ? 0 : null);
   const phone = useRef<PhoneHandle>(null);
   const phoneBox = useRef<HTMLDivElement>(null);
   const editorBox = useRef<HTMLDivElement>(null);
@@ -359,6 +366,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
   }, [picking]);
 
   const showPhone = (): void => {
+    setPhoneOpen(true);
     window.setTimeout(() => phoneBox.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 0);
   };
 
@@ -581,13 +589,11 @@ export function StudyEditorPage({ id }: { id: string | null }) {
             {record && draft.closed && <Badge variant="secondary">Cerrado</Badge>}
           </span>
         }
-        description={record ? status : 'Arma el estudio bloque por bloque. Puedes probarlo en el teléfono de la derecha antes de crearlo.'}
+        description={record ? status : setup !== null ? 'Tres pasos cortos y después lo armas bloque por bloque.' : 'Arma el estudio bloque por bloque y pruébalo antes de crearlo.'}
         actions={
+          setup !== null && !record ? undefined : (
           <>
-            <Button variant="outline" onClick={() => setAiOpen(true)}>
-              <Sparkles /> Armar con IA
-            </Button>
-            <Button variant="outline" onClick={() => openTryout()} disabled={draft.blocks.length === 0}>
+            <Button variant="ghost" onClick={() => openTryout()} disabled={draft.blocks.length === 0}>
               <Play /> Probar estudio
             </Button>
             {record ? (
@@ -606,6 +612,10 @@ export function StudyEditorPage({ id }: { id: string | null }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setAiOpen(true)}>
+                  <Sparkles /> Armar con IA
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={exportJson}>
                   <Download /> Exportar study.json
                 </DropdownMenuItem>
@@ -617,6 +627,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
               </DropdownMenuContent>
             </DropdownMenu>
           </>
+          )
         }
       />
 
@@ -630,37 +641,43 @@ export function StudyEditorPage({ id }: { id: string | null }) {
       )}
 
       {record && sessionCount > 0 && (
-        <Alert variant="warning">
-          <TriangleAlert />
-          <AlertTitle>Este estudio ya tiene {plural(sessionCount, 'sesión', 'sesiones')}</AlertTitle>
-          <AlertDescription>
-            <p>Cambiar las tareas afecta los resultados que ya tienes. Si quieres probar otra versión, mejor duplica el estudio y edita la copia.</p>
-            <Button size="sm" variant="outline" className="mt-1" disabled={busy} onClick={() => void duplicateStudy()}>
+        <Notice
+          tone="warning"
+          icon={<TriangleAlert />}
+          title={`Este estudio ya tiene ${plural(sessionCount, 'sesión', 'sesiones')}`}
+          action={
+            <Button size="sm" variant="outline" className="bg-background" disabled={busy} onClick={() => void duplicateStudy()}>
               <Copy /> Duplicar estudio
             </Button>
-          </AlertDescription>
-        </Alert>
+          }
+        >
+          <p>Cambiar las tareas afecta los resultados que ya tienes. Si quieres probar otra versión, mejor duplica el estudio y edita la copia.</p>
+        </Notice>
       )}
 
       {needsRoot && (
-        <Alert variant="warning" data-testid="needs-root">
-          <TriangleAlert />
-          <AlertTitle>Este prototipo parece una app con rutas propias</AlertTitle>
-          <AlertDescription>
+        <div data-testid="needs-root">
+          <Notice
+            tone="warning"
+            icon={<TriangleAlert />}
+            title="Este prototipo parece una app con rutas propias"
+            action={
+              client.canServeAtRoot ? (
+                <Button size="sm" variant="outline" className="bg-background" disabled={busy} onClick={() => void openAtRoot()}>
+                  Abrir en la raíz
+                </Button>
+              ) : undefined
+            }
+          >
             <p>
               Taptana lo sirve dentro de una subcarpeta ({proto?.url}) y ahí su navegación puede volver siempre a la pantalla de inicio. Si en el teléfono no cambia de pantalla, ábrelo en la raíz
               {client.canServeAtRoot ? '. Solo un prototipo puede estar en la raíz a la vez: si había otro, se desactiva.' : ': eso solo se puede cuando corres Taptana en tu computadora con «pnpm start».'}
             </p>
-            {client.canServeAtRoot && (
-              <Button size="sm" variant="outline" className="mt-1" disabled={busy} onClick={() => void openAtRoot()}>
-                Abrir en la raíz
-              </Button>
-            )}
-          </AlertDescription>
-        </Alert>
+          </Notice>
+        </div>
       )}
 
-      {errors.length > 0 && (
+      {errors.length > 0 && setup === null && (
         <Alert variant={record ? 'warning' : 'default'} id="create-missing">
           <CircleAlert />
           <AlertTitle>{record ? `${errors.length === 1 ? 'Hay 1 cosa por corregir' : `Hay ${errors.length} cosas por corregir`}. Los cambios se guardan cuando esté resuelto.` : 'Para crear el estudio falta:'}</AlertTitle>
@@ -685,7 +702,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
           </AlertDescription>
         </Alert>
       )}
-      {!record && valid && firstError === undefined && (
+      {!record && valid && firstError === undefined && setup === null && (
         <Alert variant="success">
           <CircleCheck />
           <AlertTitle>Todo listo</AlertTitle>
@@ -693,9 +710,33 @@ export function StudyEditorPage({ id }: { id: string | null }) {
         </Alert>
       )}
 
+      {setup !== null && !record ? (
+        <SetupSteps
+          step={setup}
+          onStep={setSetup}
+          name={draft.name}
+          onName={(name) => update({ ...draft, name })}
+          prototypeId={draft.prototypeId}
+          onPrototype={(prototypeId) => update({ ...draft, prototypeId })}
+          protos={protos}
+          onTask={() => {
+            setSetup(null);
+            addBlock('task');
+          }}
+          onAdd={(kind) => {
+            setSetup(null);
+            addBlock(kind);
+          }}
+          onAi={() => {
+            setSetup(null);
+            setAiOpen(true);
+          }}
+          onSkip={() => setSetup(null)}
+        />
+      ) : (
       <ShowErrorsContext.Provider value={showAllErrors}>
-        <div className="grid items-start gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[17rem_minmax(0,1fr)_23rem]">
-          <div className="lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:p-1 lg:-m-1">
+        <div className="grid items-start gap-8 lg:grid-cols-[15rem_minmax(0,1fr)] studio:grid-cols-[15rem_minmax(0,1fr)_22rem]">
+          <div className="min-w-0 max-lg:order-1 lg:row-span-2 studio:row-span-1 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:p-1 lg:-m-1">
             <BlockList
               blocks={draft.blocks}
               selection={current}
@@ -708,7 +749,14 @@ export function StudyEditorPage({ id }: { id: string | null }) {
             />
           </div>
 
-          <div ref={editorBox} className="min-w-0 scroll-mt-4 space-y-4" key={current}>
+          <div ref={editorBox} className="max-lg:order-3 min-w-0 scroll-mt-4 space-y-4 lg:col-start-2 lg:row-start-2 studio:row-start-1" key={current}>
+            {!wide && (
+              <div className="flex justify-end">
+                <Button type="button" variant="outline" size="sm" aria-expanded={phoneOpen || mode !== null} onClick={() => (phoneOpen ? setPhoneOpen(false) : showPhone())} disabled={mode !== null}>
+                  <Smartphone /> {phoneOpen || mode !== null ? 'Ocultar prototipo' : 'Ver prototipo'}
+                </Button>
+              </div>
+            )}
             {wide && recordPanel && <div className="sticky top-6 z-10">{recordPanel}</div>}
             {current === 'settings' && (
               <>
@@ -738,7 +786,13 @@ export function StudyEditorPage({ id }: { id: string | null }) {
             {selected && !isDraftTask(selected) && selected.kind !== 'context' && <QuestionEditor block={selected as QuestionBlock} index={blockIndex} onChange={updateBlock} errors={errors} />}
           </div>
 
-          <div ref={phoneBox} className="scroll-mt-4 space-y-3 lg:col-span-2 xl:sticky xl:top-6 xl:col-span-1">
+          <div
+            ref={phoneBox}
+            className={cn(
+              'min-w-0 max-lg:order-2 scroll-mt-4 space-y-3 lg:col-start-2 lg:row-start-1 studio:col-start-3 studio:sticky studio:top-6',
+              !wide && !phoneOpen && mode === null && 'hidden',
+            )}
+          >
             {!wide && recordPanel}
             <PhoneFrame
               ref={phone}
@@ -763,6 +817,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
           </div>
         </div>
       </ShowErrorsContext.Provider>
+      )}
 
       <ShareDialog
         open={shareOpen}
@@ -801,5 +856,153 @@ export function StudyEditorPage({ id }: { id: string | null }) {
         }}
       />
     </Layout>
+  );
+}
+
+/**
+ * Estudio nuevo, una decisión por pantalla: qué prototipo, cómo se llama y cómo empezar.
+ * Después se abre el constructor con todo lo demás.
+ */
+function SetupSteps({
+  step,
+  onStep,
+  name,
+  onName,
+  prototypeId,
+  onPrototype,
+  protos,
+  onTask,
+  onAdd,
+  onAi,
+  onSkip,
+}: {
+  step: 0 | 1 | 2;
+  onStep: (step: 0 | 1 | 2) => void;
+  name: string;
+  onName: (name: string) => void;
+  prototypeId: string;
+  onPrototype: (id: string) => void;
+  protos: readonly Prototype[];
+  onTask: () => void;
+  onAdd: (kind: BlockKind) => void;
+  onAi: () => void;
+  onSkip: () => void;
+}) {
+  const known = protos.some((p) => p.id === prototypeId);
+  const sorted = [...protos].sort((a, b) => b.createdAt - a.createdAt);
+  const titles = ['¿Qué prototipo vas a probar?', '¿Cómo se llama el estudio?', '¿Cómo quieres empezar?'];
+  return (
+    <section aria-labelledby="setup-title" className="mx-auto w-full max-w-xl space-y-8 py-2 sm:py-6">
+      <div className="space-y-3">
+        <ol className="flex gap-2" aria-label={`Paso ${step + 1} de 3`}>
+          {[0, 1, 2].map((i) => (
+            <li key={i} className={cn('h-1.5 flex-1 rounded-full', i <= step ? 'bg-primary' : 'bg-muted')} />
+          ))}
+        </ol>
+        <p className="text-sm text-muted-foreground">Paso {step + 1} de 3</p>
+        <h2 id="setup-title" className="text-2xl font-semibold tracking-tight">
+          {titles[step]}
+        </h2>
+      </div>
+
+      {step === 0 &&
+        (protos.length === 0 ? (
+          <div className="space-y-4 rounded-2xl border border-dashed bg-background p-(--card-pad)">
+            <p className="text-muted-foreground">Todavía no hay prototipos. Sube tu archivo .html o .zip y vuelve aquí.</p>
+            <Button asChild>
+              <Link to={{ name: 'prototypes' }}>
+                <FileArchive /> Ir a Prototipos
+              </Link>
+            </Button>
+          </div>
+        ) : (
+          <div role="radiogroup" aria-label="Prototipo" className="space-y-3">
+            {sorted.map((p) => {
+              const checked = p.id === prototypeId;
+              return (
+                <label
+                  key={p.id}
+                  className={cn(
+                    'flex min-h-16 cursor-pointer items-center gap-4 rounded-2xl border bg-background px-5 py-4 transition-colors',
+                    checked ? 'border-primary ring-1 ring-primary' : 'border-border/70 hover:border-foreground/30',
+                  )}
+                >
+                  <input type="radio" name="setup-proto" className="size-4 shrink-0 accent-[var(--primary)]" checked={checked} onChange={() => onPrototype(p.id)} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{p.name}</span>
+                    <span className="block truncate text-sm text-muted-foreground">{p.url}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        ))}
+
+      {step === 1 && (
+        <div className="space-y-2">
+          <label htmlFor="setup-name" className="sr-only">
+            Nombre del estudio
+          </label>
+          <Input
+            id="setup-name"
+            autoFocus
+            className="h-12 text-base"
+            value={name}
+            maxLength={STUDY_LIMITS.name}
+            placeholder="Compra de una planta"
+            onChange={(e) => onName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && name.trim()) onStep(2);
+            }}
+          />
+          <p className="text-sm text-muted-foreground">Solo lo ve tu equipo y aparece en la bienvenida.</p>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-3">
+          <SetupChoice icon={<ListChecks />} title="Con una tarea" hint="Lo más común: le pides algo y ves si lo logra." onClick={onTask} />
+          <SetupChoice icon={<Sparkles />} title="Armar con IA" hint="Pega lo que una IA escribió y se arman los bloques." onClick={onAi} />
+          <AddBlockMenu onAdd={onAdd}>
+            <SetupChoice icon={<LayoutList />} title="Con otro tipo de bloque" hint="Una pregunta, un primer clic o una pantalla de contexto." />
+          </AddBlockMenu>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-6">
+        <div className="flex gap-2">
+          {step > 0 && (
+            <Button variant="ghost" onClick={() => onStep((step - 1) as 0 | 1)}>
+              <ArrowLeft /> Atrás
+            </Button>
+          )}
+          <Button variant="link" className="text-muted-foreground" onClick={onSkip}>
+            Saltar y armarlo a mano
+          </Button>
+        </div>
+        {step < 2 && (
+          <Button onClick={() => onStep((step + 1) as 1 | 2)} disabled={step === 0 ? !known : !name.trim()}>
+            Siguiente <ArrowRight />
+          </Button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SetupChoice({ icon, title, hint, ...rest }: { icon: React.ReactNode; title: string; hint: string } & React.ComponentProps<'button'>) {
+  return (
+    <button
+      type="button"
+      {...rest}
+      className="flex min-h-16 w-full cursor-pointer items-center gap-4 rounded-2xl border border-border/70 bg-background px-5 py-4 text-left outline-none transition-colors hover:border-foreground/30 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+    >
+      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground [&_svg]:size-5">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium">{title}</span>
+        <span className="block text-sm text-muted-foreground">{hint}</span>
+      </span>
+      <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+    </button>
   );
 }

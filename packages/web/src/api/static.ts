@@ -484,7 +484,9 @@ export class StaticClient implements ApiClient {
   async getStudyReport(id: string, filter?: ReportFilter): Promise<StudyReport | null> {
     const study = await this.getStudy(id);
     if (!study) return null;
-    return computeStudyReport(study, await this.reportSessions(id), filter);
+    // Los mismos nombres de pantalla que el constructor, igual que hace el servidor.
+    const screens = await this.listPrototypeScreens(study.prototypeId);
+    return computeStudyReport(study, await this.reportSessions(id), filter, { screens });
   }
 
   async exportStudyCsv(id: string): Promise<string | null> {

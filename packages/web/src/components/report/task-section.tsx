@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Flame, PlayCircle, Route as RouteIcon, Users } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ArrowRight, PlayCircle } from 'lucide-react';
 import { OUTCOME_LABELS, tapMatches, taskBlocks, type ScreenReport, type SuccessRule, type TaskBlock, type TaskOutcomeCounts, type TaskReport, type TaskReportRow } from '@taptana/shared';
 import { getClient } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -91,15 +91,17 @@ function Funnel({ task }: { task: TaskReport }) {
   if (steps.length < 2) return null;
   const worst = biggestDrop(steps);
   return (
-    <div className="space-y-3" data-print="keep">
-      <div>
-        <h4 className="font-medium">Embudo del camino esperado</h4>
-        <p className="text-sm text-muted-foreground">
+    <TaskSection
+      title="Embudo del camino esperado"
+      description={
+        <>
           Cuántas personas llegaron a cada paso, en orden.
           {task.expectedPathInferred && ' Esta tarea no tiene camino esperado: se usa el más común de quienes lo lograron.'}
-        </p>
-      </div>
-      <ol className="space-y-1.5">
+        </>
+      }
+      keep
+    >
+      <ol className="space-y-2">
         {steps.map((step, i) => (
           <li key={`${step.path}-${i}`}>
             {step.note && (
@@ -123,7 +125,7 @@ function Funnel({ task }: { task: TaskReport }) {
           </li>
         ))}
       </ol>
-    </div>
+    </TaskSection>
   );
 }
 
@@ -132,8 +134,8 @@ function VariantTable({ task }: { task: TaskReport }) {
   if (task.byVariant.length === 0) return null;
   const name = (id: string): string => study.variants?.find((v) => v.id === id)?.name ?? id;
   return (
-    <div className="space-y-2" data-print="keep">
-      <h4 className="font-medium">Por variante (A/B)</h4>
+    <div className="space-y-3" data-print="keep">
+      <h3 className="text-base font-semibold" data-print="heading">Por variante (A/B)</h3>
       <div className="grid gap-3 sm:grid-cols-2">
         {task.byVariant.map((v) => (
           <div key={v.variantId} className="rounded-lg border p-3 space-y-2">
@@ -257,12 +259,15 @@ function ScreensPanel({ task, focusScreen, limit }: { task: TaskReport; focusScr
     return task.screens.filter((s) => top.has(s));
   }, [task.screens, limit]);
   const [mode, setMode] = useState<HeatMode>('heat');
+  const [all, setAll] = useState(false);
   const anchor = (i: number): string => `pantalla-${task.taskId}-${i}`;
+  const visible = limit || all ? shown : shown.slice(0, COLLAPSED);
 
   useEffect(() => {
     if (!focusScreen) return;
     const i = task.screens.findIndex((s) => s.path === focusScreen);
     if (i < 0) return;
+    if (i >= COLLAPSED) setAll(true);
     const timer = setTimeout(() => document.getElementById(anchor(i))?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -274,7 +279,6 @@ function ScreensPanel({ task, focusScreen, limit }: { task: TaskReport; focusScr
     <div className="space-y-4">
       {firstClick ? (
         <div className="space-y-1">
-          <h4 className="font-medium">Dónde cayó el primer toque</h4>
           <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
               <span className="size-3 rounded-full bg-emerald-600" aria-hidden="true" /> Acertó ({task.outcomes.direct + task.outcomes.indirect})
@@ -310,17 +314,47 @@ function ScreensPanel({ task, focusScreen, limit }: { task: TaskReport; focusScr
           </p>
         </div>
       )}
-      <div className="tt-screens grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(18.5rem,100%),1fr))]">
-        {shown.map((s) => (
+      <div className="tt-screens grid gap-5 grid-cols-[repeat(auto-fill,minmax(min(18.5rem,100%),1fr))]">
+        {visible.map((s) => (
           <ScreenCard key={s.path} screen={s} task={task} mode={firstClick ? 'first-click' : mode} anchor={anchor(task.screens.indexOf(s))} highlighted={focusScreen === s.path} />
         ))}
       </div>
+      {!limit && <ShowAll total={shown.length} open={all} onToggle={() => setAll((v) => !v)} noun="pantallas" />}
       {shown.length < task.screens.length && (
         <p className="text-xs text-muted-foreground">
           Se muestran las {shown.length} pantallas con más toques, de {task.screens.length}. El resto está en el reporte en pantalla.
         </p>
       )}
     </div>
+  );
+}
+
+/** Cuántos elementos de una lista larga se ven antes de «Ver todos». */
+const COLLAPSED = 5;
+
+/** Botón «Ver todos (N)» / «Ver menos» para las listas largas del reporte. */
+function ShowAll({ total, open, onToggle, noun }: { total: number; open: boolean; onToggle: () => void; noun: string }) {
+  if (total <= COLLAPSED) return null;
+  return (
+    <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onToggle} data-print="hide">
+      {open ? 'Ver menos' : `Ver todos los ${noun} (${total})`}
+    </Button>
+  );
+}
+
+/** Una sección dentro de una tarea: título, una línea de ayuda opcional y su contenido. */
+export function TaskSection({ title, description, aside, keep, children }: { title: ReactNode; description?: ReactNode; aside?: ReactNode; keep?: boolean; children: ReactNode }) {
+  return (
+    <section className="space-y-4 min-w-0" {...(keep ? { 'data-print': 'keep' } : {})}>
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2" data-print="heading">
+        <div className="min-w-0 space-y-1">
+          <h3 className="text-base font-semibold">{title}</h3>
+          {description && <p className="max-w-prose text-sm text-muted-foreground leading-relaxed">{description}</p>}
+        </div>
+        {aside}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -345,7 +379,8 @@ function PathChips({ pages }: { pages: string[] }) {
 
 function PathsPanel({ task, limit }: { task: TaskReport; limit?: number }) {
   const ctx = useReport();
-  const paths = limit ? task.paths.slice(0, limit) : task.paths;
+  const [all, setAll] = useState(false);
+  const paths = limit ? task.paths.slice(0, limit) : all ? task.paths : task.paths.slice(0, COLLAPSED);
   const [pending, setPending] = useState<string[] | null>(null);
   const canSet = task.kind === 'task';
 
@@ -369,9 +404,9 @@ function PathsPanel({ task, limit }: { task: TaskReport; limit?: number }) {
   if (task.paths.length === 0) return <p className="text-sm text-muted-foreground">Todavía no hay caminos recorridos en esta tarea.</p>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {task.expectedPath.length > 0 && (
-        <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5" data-print="keep">
+        <div className="rounded-xl bg-muted/60 p-4 space-y-2" data-print="keep">
           <p className="text-sm font-medium">
             Camino esperado{' '}
             {task.expectedPathInferred && <span className="font-normal text-muted-foreground">(deducido: el más común de quienes lo lograron)</span>}
@@ -383,7 +418,7 @@ function PathsPanel({ task, limit }: { task: TaskReport; limit?: number }) {
         {paths.map((p, i) => {
           const isExpected = samePages(p.pages, task.expectedPath);
           return (
-            <li key={i} className="rounded-lg border bg-background p-3 space-y-2" data-print="keep">
+            <li key={i} className="rounded-xl border border-border/70 bg-background p-4 space-y-2.5" data-print="keep">
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span>
                   <span className="font-medium">{plural(p.count, 'persona', 'personas')}</span>
@@ -406,7 +441,8 @@ function PathsPanel({ task, limit }: { task: TaskReport; limit?: number }) {
           );
         })}
       </ul>
-      {paths.length < task.paths.length && (
+      {!limit && <ShowAll total={task.paths.length} open={all} onToggle={() => setAll((v) => !v)} noun="caminos" />}
+      {limit !== undefined && paths.length < task.paths.length && (
         <p className="text-xs text-muted-foreground">
           Se muestran los {paths.length} caminos más comunes, de {task.paths.length}.
         </p>
@@ -436,15 +472,18 @@ function ParticipantsPanel({ task }: { task: TaskReport }) {
   const variantName = (id: string | undefined): string | undefined => (id ? (ctx.study.variants?.find((v) => v.id === id)?.name ?? id) : undefined);
   const who = (r: TaskReportRow): string => ctx.names.get(r.sessionId) ?? r.who ?? 'Participante';
 
+  const [all, setAll] = useState(false);
   if (task.results.length === 0) return <p className="text-sm text-muted-foreground">Nadie empezó esta tarea todavía.</p>;
+  const rows = all ? task.results : task.results.slice(0, COLLAPSED);
 
   return (
-    <ul className="divide-y rounded-lg border bg-background">
-      {task.results.map((r) => {
+    <div className="space-y-3">
+    <ul className="divide-y rounded-xl border border-border/70 bg-background">
+      {rows.map((r) => {
         const session = ctx.sessions.get(r.sessionId);
         const variant = variantName(r.variantId);
         return (
-          <li key={r.sessionId} className="grid gap-x-4 gap-y-2 p-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] sm:items-center" data-print="keep">
+          <li key={r.sessionId} className="grid min-h-16 gap-x-4 gap-y-2 px-4 py-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] sm:items-center" data-print="keep">
             <div className="min-w-0">
               <div className="font-medium truncate">{who(r)}</div>
               <div className="text-xs text-muted-foreground truncate">
@@ -478,6 +517,8 @@ function ParticipantsPanel({ task }: { task: TaskReport }) {
         );
       })}
     </ul>
+    <ShowAll total={task.results.length} open={all} onToggle={() => setAll((v) => !v)} noun="participantes" />
+    </div>
   );
 }
 
@@ -518,19 +559,15 @@ function useElementText(task: TaskReport, rule: SuccessRule | undefined): string
   return text;
 }
 
-type TabId = 'screens' | 'paths' | 'people';
-
-/** Todo lo de una tarea o primer clic: resultados, números, embudo y pestañas de detalle. */
+/**
+ * Todo lo de una tarea o primer clic, una sección tras otra: números, embudo, mapas de calor,
+ * caminos y participantes.
+ */
 export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block: TaskBlock | undefined; focusScreen: string | undefined }) {
   const { printing, screenName } = useReport();
   const elementText = useElementText(task, block?.success);
   const selector = ruleSelector(block?.success);
-  const [tab, setTab] = useState<TabId>('screens');
   const firstClick = task.kind === 'first-click';
-
-  useEffect(() => {
-    if (focusScreen) setTab('screens');
-  }, [focusScreen]);
 
   if (task.participants === 0) {
     return (
@@ -541,16 +578,8 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
     );
   }
 
-  const tabs: Array<{ id: TabId; label: string; icon: React.ReactNode; count: number }> = [
-    { id: 'screens', label: firstClick ? 'Dónde tocaron' : 'Pantallas y mapas de calor', icon: <Flame className="size-3.5" />, count: task.screens.length },
-    { id: 'paths', label: 'Caminos', icon: <RouteIcon className="size-3.5" />, count: task.paths.length },
-    { id: 'people', label: 'Participantes', icon: <Users className="size-3.5" />, count: task.results.length },
-  ];
-  const visibleTabs = firstClick ? tabs.filter((t) => t.id !== 'paths') : tabs;
-  const panel = (id: TabId): React.ReactNode => (id === 'screens' ? <ScreensPanel task={task} focusScreen={focusScreen} /> : id === 'paths' ? <PathsPanel task={task} /> : <ParticipantsPanel task={task} />);
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       {(block?.instruction || block?.success) && (
         <div className="space-y-1">
           {block.instruction && <p className="text-muted-foreground">“{block.instruction}”</p>}
@@ -568,14 +597,15 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
         </div>
       )}
 
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-print="keep">
-        <div className="rounded-lg border p-3">
+      <TaskSection title="Resultado" keep>
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl bg-muted/60 p-4 space-y-1">
           <dt className="text-xs text-muted-foreground">Puntaje</dt>
           <dd className="text-2xl">
             <ScoreChip score={task.score} />
           </dd>
         </div>
-        <div className="rounded-lg border p-3">
+        <div className="rounded-xl bg-muted/60 p-4 space-y-1">
           <dt className="text-xs text-muted-foreground">{firstClick ? 'Acertaron' : 'Lo lograron'}</dt>
           <dd className="text-2xl font-semibold tabular-nums">{task.decided ? pct(task.successRate) : '—'}</dd>
           <dd className="text-xs text-muted-foreground">
@@ -585,12 +615,12 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
             {task.outcomes.review > 0 && ` · ${task.outcomes.review} por revisar`}
           </dd>
         </div>
-        <div className="rounded-lg border p-3">
+        <div className="rounded-xl bg-muted/60 p-4 space-y-1">
           <dt className="text-xs text-muted-foreground">Tiempo mediano</dt>
           <dd className="text-2xl font-semibold tabular-nums">{seconds(task.medianTimeMs)}</dd>
           <dd className="text-xs text-muted-foreground">{firstClick ? 'Hasta el primer toque, de quienes acertaron' : 'De quienes lo lograron'}</dd>
         </div>
-        <div className="rounded-lg border p-3">
+        <div className="rounded-xl bg-muted/60 p-4 space-y-1">
           <dt className="text-xs text-muted-foreground">Misclicks</dt>
           <dd className="text-2xl font-semibold tabular-nums">{task.tapCount > 0 ? pct(task.misclickRate) : '—'}</dd>
           <dd className="text-xs text-muted-foreground">
@@ -598,8 +628,8 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
           </dd>
         </div>
       </dl>
-
       <OutcomeBar task={task} />
+      </TaskSection>
       {!firstClick && <Funnel task={task} />}
       <VariantTable task={task} />
 
@@ -622,32 +652,19 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
           )}
         </div>
       ) : (
-        <div className="space-y-4">
-          <div role="tablist" aria-label="Detalle de la tarea" className="flex w-fit max-w-full flex-wrap rounded-lg bg-muted p-1 gap-1">
-            {visibleTabs.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                id={`tab-${task.taskId}-${t.id}`}
-                aria-selected={tab === t.id}
-                aria-controls={`panel-${task.taskId}`}
-                onClick={() => setTab(t.id)}
-                className={cn(
-                  'inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                  tab === t.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {t.icon}
-                <span className="truncate">{t.label}</span>
-                <span className="text-xs text-muted-foreground tabular-nums">{t.count}</span>
-              </button>
-            ))}
-          </div>
-          <div role="tabpanel" id={`panel-${task.taskId}`} aria-labelledby={`tab-${task.taskId}-${firstClick && tab === 'paths' ? 'screens' : tab}`}>
-            {panel(firstClick && tab === 'paths' ? 'screens' : tab)}
-          </div>
-        </div>
+        <>
+          <TaskSection title={firstClick ? 'Dónde tocaron' : 'Pantallas y mapas de calor'} description={`${plural(task.screens.length, 'pantalla', 'pantallas')} con toques en esta tarea.`}>
+            <ScreensPanel task={task} focusScreen={focusScreen} />
+          </TaskSection>
+          {!firstClick && (
+            <TaskSection title="Caminos" description="Por dónde pasó cada persona, del más común al menos común.">
+              <PathsPanel task={task} />
+            </TaskSection>
+          )}
+          <TaskSection title="Participantes" description="Cómo le fue a cada persona en esta tarea, con su grabación.">
+            <ParticipantsPanel task={task} />
+          </TaskSection>
+        </>
       )}
     </div>
   );

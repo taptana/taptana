@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { CircleAlert, Compass, FileArchive, FlaskConical, House, PlayCircle, ShieldCheck } from 'lucide-react';
+import { useId, useState, type ReactNode } from 'react';
+import { ChevronDown, CircleAlert, Compass, FileArchive, FlaskConical, House, PlayCircle, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IS_DEMO } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ const NAV: Array<{ to: Route; label: string; hint: string; icon: typeof FileArch
   { to: { name: 'recordings' }, label: 'Sesiones', hint: 'Paso a paso', icon: PlayCircle, match: (r) => r === 'recordings' || r === 'player' },
 ];
 
-const WIDTHS = { default: 'max-w-5xl', wide: 'max-w-7xl', full: 'max-w-none' } as const;
+const WIDTHS = { default: 'max-w-[1040px]', wide: 'max-w-[1280px]', full: 'max-w-none' } as const;
 
 /**
  * Estructura del panel: menú lateral fijo en pantallas grandes; en celular, una barra arriba
@@ -66,25 +66,58 @@ export function Layout({ children, wide = false, width }: { children: ReactNode;
         </div>
       </aside>
       <main id="contenido" className="flex-1 min-w-0">
-        <div className={cn('mx-auto px-4 py-6 sm:px-8 sm:py-10 space-y-8', WIDTHS[width ?? (wide ? 'wide' : 'default')])}>{children}</div>
+        <div className={cn('mx-auto px-4 pt-6 pb-16 sm:px-8 sm:pt-10 lg:px-12 lg:pt-12 space-y-10 sm:space-y-12', WIDTHS[width ?? (wide ? 'wide' : 'default')])}>{children}</div>
       </main>
     </div>
   );
 }
 
-/** Encabezado de página: título grande, descripción y acciones a la derecha. */
+/**
+ * Encabezado de página: título, una línea de descripción y, a la derecha, como mucho un botón
+ * principal (las acciones secundarias van en un menú «⋯»).
+ */
 export function PageHeader({ title, description, actions, back }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; back?: ReactNode }) {
   return (
-    <header className="flex flex-wrap items-start justify-between gap-4">
+    <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
       <div className="flex items-start gap-3 min-w-0">
         {back}
-        <div className="min-w-0 space-y-1.5">
+        <div className="min-w-0 space-y-2">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight break-words">{title}</h1>
-          {description && <div className="text-muted-foreground">{description}</div>}
+          {description && <div className="text-muted-foreground max-w-prose leading-relaxed">{description}</div>}
         </div>
       </div>
-      {actions && <div className="flex flex-wrap gap-2 print:hidden">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>}
     </header>
+  );
+}
+
+/** Una sección de página con título, una línea opcional de ayuda y su contenido. */
+export function Section({
+  title,
+  description,
+  actions,
+  children,
+  className,
+  id,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  id?: string;
+}) {
+  return (
+    <section id={id} className={cn('space-y-5 sm:space-y-6', className)}>
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-lg sm:text-xl font-semibold tracking-tight">{title}</h2>
+          {description && <p className="text-sm text-muted-foreground max-w-prose leading-relaxed">{description}</p>}
+        </div>
+        {actions && <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -113,7 +146,7 @@ export function RouteTabs({ tabs }: { tabs: Array<{ label: string; to: Route; ac
 /** Estado vacío con ícono, título, texto y una acción principal. */
 export function EmptyState({ icon, title, children, action }: { icon: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed bg-background px-6 py-14 text-center flex flex-col items-center gap-3">
+    <div className="rounded-2xl border border-dashed bg-background px-6 py-16 sm:py-20 text-center flex flex-col items-center gap-3">
       <div className="size-12 rounded-full bg-muted grid place-items-center text-muted-foreground">{icon}</div>
       <h2 className="text-lg font-semibold">{title}</h2>
       {children && <div className="text-muted-foreground max-w-md text-sm space-y-2">{children}</div>}
@@ -196,9 +229,9 @@ export function ListSkeleton({ variant = 'rows', count = 4 }: { variant?: 'rows'
     );
   }
   return (
-    <div className="space-y-2" aria-busy="true" aria-label="Cargando">
+    <div className="space-y-3" aria-busy="true" aria-label="Cargando">
       {Array.from({ length: count }, (_, i) => (
-        <Skeleton key={i} className="h-14 rounded-lg" />
+        <Skeleton key={i} className="h-16 rounded-xl" />
       ))}
     </div>
   );
@@ -220,5 +253,66 @@ export function NotFound() {
         <p>Puede que el link esté incompleto o que lo que buscabas se haya borrado.</p>
       </EmptyState>
     </Layout>
+  );
+}
+
+const NOTICE_TONES = {
+  info: 'bg-sky-500/[0.06] text-foreground [&_[data-slot=notice-icon]]:text-sky-600 dark:[&_[data-slot=notice-icon]]:text-sky-400',
+  warning: 'bg-amber-500/[0.08] text-foreground [&_[data-slot=notice-icon]]:text-amber-600 dark:[&_[data-slot=notice-icon]]:text-amber-400',
+  neutral: 'bg-muted/70 text-foreground [&_[data-slot=notice-icon]]:text-muted-foreground',
+} as const;
+
+/**
+ * Aviso compacto de una línea. Lo largo queda detrás de «Saber más» para no cargar la pantalla.
+ * `action` es un botón opcional a la derecha (por ejemplo, «Duplicar estudio»).
+ */
+export function Notice({
+  icon,
+  title,
+  children,
+  action,
+  tone = 'info',
+  className,
+}: {
+  icon?: ReactNode;
+  title: ReactNode;
+  children?: ReactNode;
+  action?: ReactNode;
+  tone?: keyof typeof NOTICE_TONES;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <div role="status" className={cn('rounded-xl px-4 py-3 text-sm', NOTICE_TONES[tone], className)}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {icon && (
+          <span data-slot="notice-icon" className="shrink-0 [&_svg]:size-4" aria-hidden>
+            {icon}
+          </span>
+        )}
+        <p className="min-w-[min(100%,14rem)] flex-1 font-medium leading-snug">{title}</p>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 print:hidden">
+          {children && (
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-controls={id}
+              onClick={() => setOpen((v) => !v)}
+              className="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              {open ? 'Ocultar' : 'Saber más'}
+              <ChevronDown className={cn('size-3.5 transition-transform', open && 'rotate-180')} />
+            </button>
+          )}
+          {action}
+        </div>
+      </div>
+      {children && open && (
+        <div id={id} className={cn('mt-2 max-w-prose space-y-2 leading-relaxed text-muted-foreground', icon && 'sm:pl-7')}>
+          {children}
+        </div>
+      )}
+    </div>
   );
 }

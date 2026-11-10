@@ -31,7 +31,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label, Textarea } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/toast';
-import { EmptyState, ErrorState, Layout, PageSkeleton } from '@/components/layout';
+import { EmptyState, ErrorState, Layout, PageSkeleton, Section } from '@/components/layout';
 import { downloadText } from '@/lib/download';
 import { friendlyError } from '@/lib/errors';
 import { plural, seconds } from '@/lib/format';
@@ -331,58 +331,24 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
 
   return (
     <Layout wide>
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-2 min-w-0">
-          <Button variant="ghost" size="icon" asChild className="shrink-0">
-            <Link to={session.studyId ? { name: 'recordings', study: session.studyId } : { name: 'recordings' }} aria-label="Volver a las sesiones">
-              <ArrowLeft />
-            </Link>
-          </Button>
-          <div className="min-w-0 space-y-1">
-            <LabelEditor size="lg" session={session} onSave={async (label) => void (await patch({ label }, 'No se pudo guardar la etiqueta.'))} />
-            {/* Cada dato va entero en su renglón: sin puntos sueltos al inicio de una línea en celulares. */}
-            <p className="text-muted-foreground text-sm flex items-center gap-x-3 gap-y-1 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                {session.touch ? <Smartphone className="size-4" aria-hidden /> : <Monitor className="size-4" aria-hidden />}
-                {formatDate(session.startedAt)}
-              </span>
-              <span>{session.deviceLabel}</span>
-              <span className="whitespace-nowrap">
-                {session.viewport.width}×{session.viewport.height}
-              </span>
-              <span className="whitespace-nowrap">Duró {formatDuration(session.durationMs)}</span>
-              {session.label && session.participant && <span>Alias: {session.participant}</span>}
-              {study && (
-                <Badge variant="secondary" className="max-w-full">
-                  <span className="truncate">
-                    {study.name}
-                    {session.variantId ? ` · variante ${session.variantId}` : ''}
-                  </span>
-                </Badge>
-              )}
-              {session.excluded && <Badge variant="outline">Excluida del reporte</Badge>}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <div className="flex items-center gap-2">
-            <Switch
-              id="excluir"
-              checked={session.excluded === true}
-              onCheckedChange={(excluded) => void patch({ excluded }, 'No se pudo cambiar la sesión.').then((ok) => ok && toast(excluded ? 'La sesión ya no cuenta en el reporte.' : 'La sesión vuelve a contar en el reporte.'))}
-            />
-            <Label htmlFor="excluir" className="mb-0 font-normal" title="Para pruebas internas o sesiones que no valen: se conserva la grabación, pero no cuenta en los resultados.">
-              Excluir del reporte
-            </Label>
-          </div>
-          <Button variant="outline" size="sm" onClick={onExport}>
-            <Download /> Exportar sesión
-          </Button>
+      <header className="flex items-start gap-3 min-w-0">
+        <Button variant="ghost" size="icon" asChild className="shrink-0 mt-0.5">
+          <Link to={session.studyId ? { name: 'recordings', study: session.studyId } : { name: 'recordings' }} aria-label="Volver a las sesiones">
+            <ArrowLeft />
+          </Link>
+        </Button>
+        <div className="min-w-0 space-y-1.5">
+          <LabelEditor size="lg" session={session} onSave={async (label) => void (await patch({ label }, 'No se pudo guardar la etiqueta.'))} />
+          <p className="text-muted-foreground text-sm flex items-center gap-x-3 gap-y-1 flex-wrap">
+            <span className="whitespace-nowrap">{formatDate(session.startedAt)}</span>
+            <span className="whitespace-nowrap">Duró {formatDuration(session.durationMs)}</span>
+            {session.excluded && <Badge variant="outline">Excluida del reporte</Badge>}
+          </p>
         </div>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-4 min-w-0">
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-12">
+        <div className="space-y-12 min-w-0">
           <Card className="py-4">
             <CardContent className="px-2 sm:px-4">
               {canPlay ? (
@@ -396,14 +362,15 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
           </Card>
 
           {study && studyRows.length > 0 && (
-            <Card className="py-4 gap-3">
-              <CardHeader className="px-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <ListChecks className="size-4" /> Tareas y respuestas
-                </CardTitle>
-                <CardDescription>Toca una tarea para ir al momento en que empezó. Si viste otra cosa en la grabación, corrige el resultado; «Quitar marca» lo deja como estaba.</CardDescription>
-              </CardHeader>
-              <CardContent className="px-4">
+            <Section
+              title={
+                <span className="flex items-center gap-2">
+                  <ListChecks className="size-4.5 text-muted-foreground" /> Resultado de tareas
+                </span>
+              }
+              description="Toca una tarea para ir a su inicio. Si viste otra cosa en la grabación, corrige el resultado."
+            >
+              <div className="rounded-2xl border border-border/70 bg-card px-(--card-pad) py-1">
                 <ol className="divide-y">
                   {studyRows.map((b, i) =>
                     isTaskBlock(b) ? (
@@ -420,21 +387,71 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
                     ) : null,
                   )}
                 </ol>
-              </CardContent>
-            </Card>
+              </div>
+            </Section>
           )}
 
           <NotesCard key={session.id} notes={session.notes ?? ''} onSave={(notes) => patch({ notes }, 'No se pudieron guardar las notas.')} />
         </div>
 
-        <Card className="py-4 gap-3 lg:max-h-[calc(100dvh-8rem)] lg:sticky lg:top-6 overflow-hidden flex flex-col self-start w-full">
-          <CardHeader className="px-4">
-            <CardTitle className="text-base">Qué hizo</CardTitle>
-            <CardDescription>
-              {plural(screens, 'pantalla', 'pantallas')} · {plural(session.tapCount, 'toque', 'toques')}.{canPlay ? ' Toca un paso para ir a ese momento.' : ''}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-2 overflow-y-auto max-h-[60vh] lg:max-h-none">
+        <aside className="space-y-10 min-w-0 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100dvh-3rem)] lg:flex lg:flex-col">
+          <section className="space-y-4" aria-labelledby="participante">
+            <h2 id="participante" className="text-lg font-semibold tracking-tight">
+              Participante
+            </h2>
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
+              <dt className="text-muted-foreground">Dispositivo</dt>
+              <dd className="inline-flex items-center gap-1.5 min-w-0">
+                {session.touch ? <Smartphone className="size-4 shrink-0" aria-hidden /> : <Monitor className="size-4 shrink-0" aria-hidden />}
+                <span className="break-words">{session.deviceLabel}</span>
+              </dd>
+              <dt className="text-muted-foreground">Pantalla</dt>
+              <dd className="tabular-nums">
+                {session.viewport.width}×{session.viewport.height}
+              </dd>
+              {session.label && session.participant && (
+                <>
+                  <dt className="text-muted-foreground">Alias</dt>
+                  <dd className="break-words">{session.participant}</dd>
+                </>
+              )}
+              {study && (
+                <>
+                  <dt className="text-muted-foreground">Estudio</dt>
+                  <dd className="break-words">
+                    {study.name}
+                    {session.variantId ? ` · variante ${session.variantId}` : ''}
+                  </dd>
+                </>
+              )}
+            </dl>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-3 pt-1">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="excluir"
+                  checked={session.excluded === true}
+                  onCheckedChange={(excluded) => void patch({ excluded }, 'No se pudo cambiar la sesión.').then((ok) => ok && toast(excluded ? 'La sesión ya no cuenta en el reporte.' : 'La sesión vuelve a contar en el reporte.'))}
+                />
+                <Label htmlFor="excluir" className="mb-0 font-normal" title="Para pruebas internas o sesiones que no valen: se conserva la grabación, pero no cuenta en los resultados.">
+                  Excluir del reporte
+                </Label>
+              </div>
+              <Button variant="outline" size="sm" onClick={onExport}>
+                <Download /> Exportar sesión
+              </Button>
+            </div>
+          </section>
+
+          <section className="space-y-4 min-h-0 lg:flex lg:flex-col" aria-labelledby="pasos-sesion">
+            <div className="space-y-1">
+              <h2 id="pasos-sesion" className="text-lg font-semibold tracking-tight">
+                Pasos
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {plural(screens, 'pantalla', 'pantallas')} · {plural(session.tapCount, 'toque', 'toques')}.{canPlay ? ' Toca un paso para ir a ese momento.' : ''}
+              </p>
+            </div>
+            <div className="-mx-2 overflow-y-auto max-h-[60vh] lg:max-h-none lg:min-h-0">
             {steps.length === 0 ? (
               <p className="px-2 py-4 text-sm text-muted-foreground">Esta sesión no registró toques ni cambios de pantalla.</p>
             ) : (
@@ -466,8 +483,9 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
                 })}
               </ol>
             )}
-          </CardContent>
-        </Card>
+            </div>
+          </section>
+        </aside>
       </div>
     </Layout>
   );
@@ -608,20 +626,20 @@ function NotesCard({ notes, onSave }: { notes: string; onSave: (notes: string) =
   );
 
   return (
-    <Card className="py-4 gap-3">
-      <CardHeader className="px-4">
-        <CardTitle className="text-base flex items-center gap-2">
-          <NotebookPen className="size-4" /> <label htmlFor="notas">Tus notas</label>
-        </CardTitle>
-        <CardDescription>Lo que observaste o lo que la persona dijo en voz alta. Solo las ves tú.</CardDescription>
-      </CardHeader>
-      <CardContent className="px-4 space-y-1.5">
+    <section className="space-y-4" aria-labelledby="notas-titulo">
+      <div className="space-y-1">
+        <h2 id="notas-titulo" className="text-lg font-semibold tracking-tight flex items-center gap-2">
+          <NotebookPen className="size-4.5 text-muted-foreground" /> <label htmlFor="notas">Notas</label>
+        </h2>
+        <p className="text-sm text-muted-foreground">Lo que observaste o lo que la persona dijo en voz alta. Solo las ves tú.</p>
+      </div>
+      <div className="space-y-1.5">
         <Textarea
           id="notas"
           value={value}
           maxLength={SESSION_LIMITS.notes}
           placeholder="Por ejemplo: dudó entre «Carrito» y «Mis pedidos»; dijo que esperaba ver el costo de envío antes."
-          className="min-h-24"
+          className="min-h-28 bg-background"
           onChange={(e) => {
             latest.current = e.target.value;
             setValue(e.target.value);
@@ -632,7 +650,7 @@ function NotesCard({ notes, onSave }: { notes: string; onSave: (notes: string) =
         <p className="text-xs text-muted-foreground h-4" aria-live="polite">
           {state === 'saving' || state === 'dirty' ? 'Guardando…' : state === 'saved' ? 'Guardado' : state === 'error' ? 'No se pudo guardar. Se intentará de nuevo cuando sigas escribiendo.' : ''}
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

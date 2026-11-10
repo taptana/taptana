@@ -4,7 +4,7 @@
  * uno nuevo o se importa un study.json (archivo o JSON pegado).
  */
 import { useEffect, useState } from 'react';
-import { BarChart3, ChevronDown, Copy, Download, FlaskConical, PencilRuler, Plus, Trash2, TriangleAlert, Upload } from 'lucide-react';
+import { BarChart3, Copy, Download, Ellipsis, FlaskConical, PencilRuler, Plus, Trash2, TriangleAlert, Upload } from 'lucide-react';
 import { isQuestionBlock, isTaskBlock, studyBlocks, type Prototype, type SessionSummary, type Study, type StudyRecord, type StudyReport } from '@taptana/shared';
 import { getClient } from '@/api/client';
 import { ImportDialog } from '@/components/builder/dialogs';
@@ -12,7 +12,6 @@ import { studyFileName, toDraft } from '@/components/builder/draft';
 import { EmptyState, ErrorState, Layout, ListSkeleton, PageHeader } from '@/components/layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from '@/components/ui/toast';
@@ -107,26 +106,35 @@ export function StudiesPage() {
 
   const actions = (
     <>
-      <Button variant="outline" onClick={() => setImportOpen(true)}>
-        <Upload /> Importar estudio
-      </Button>
       <Button asChild>
         <Link to={{ name: 'study', id: null }}>
           <Plus /> Nuevo estudio
         </Link>
       </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="icon" aria-label="Más acciones">
+            <Ellipsis />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+            <Upload /> Importar estudio
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </>
   );
   const deleteCount = toDelete ? sessions.filter((s) => s.studyId === toDelete.id).length : 0;
 
   return (
     <Layout>
-      <PageHeader title="Estudios" description="Un estudio es una lista de tareas y preguntas sobre tu prototipo. Lo compartes con un link y ves cómo le fue a cada participante." actions={actions} />
+      <PageHeader title="Estudios" description="Tareas y preguntas sobre tu prototipo. Compartes un link y ves cómo le fue a cada persona." actions={actions} />
 
       {error ? (
         <ErrorState message={error} onRetry={() => void load()} />
       ) : studies === null ? (
-        <ListSkeleton variant="cards" />
+        <ListSkeleton />
       ) : studies.length === 0 ? (
         <EmptyState
           icon={<FlaskConical className="size-6" />}
@@ -148,17 +156,20 @@ export function StudiesPage() {
           {protos.length === 0 && <p>Antes necesitas un prototipo: súbelo en la sección Prototipos.</p>}
         </EmptyState>
       ) : (
-        <ul className="grid gap-5 sm:grid-cols-2" aria-label="Estudios">
+        <ul className="space-y-3" aria-label="Estudios">
           {studies.map((s) => {
             const proto = protos.find((p) => p.id === s.prototypeId);
             const report = reports[s.id] ?? null;
             const participants = report?.participants ?? sessions.filter((x) => x.studyId === s.id).length;
             const score = report?.score ?? null;
             return (
-              <li key={s.id} className="min-w-0">
-                <Card className="h-full gap-5 py-6 transition-shadow hover:shadow-md">
-                  <CardHeader>
-                    <div className="flex flex-wrap items-center gap-2">
+              <li key={s.id} className="min-w-0 rounded-2xl border border-border/70 bg-card px-(--card-pad) py-5 transition-colors hover:border-foreground/20">
+                <div className="flex flex-col gap-5 md:flex-row md:items-center md:gap-8">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                      <Link to={{ name: 'study', id: s.id }} className="text-lg font-semibold leading-snug break-words hover:underline underline-offset-4">
+                        {s.name}
+                      </Link>
                       {s.closed ? (
                         <Badge variant="secondary">Cerrado</Badge>
                       ) : (
@@ -168,12 +179,9 @@ export function StudiesPage() {
                       )}
                       {s.variants?.length ? <Badge variant="outline">A/B</Badge> : null}
                     </div>
-                    <CardTitle className="mt-1 text-lg leading-snug break-words">{s.name}</CardTitle>
-                    <CardDescription className="line-clamp-2">{s.description || contents(s)}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-1 flex-col gap-5">
+                    {s.description && <p className="line-clamp-1 max-w-prose text-sm text-muted-foreground">{s.description}</p>}
                     <p className="text-sm text-muted-foreground">
-                      {s.description ? `${contents(s)} · ` : ''}
+                      {contents(s)} ·{' '}
                       {proto ? (
                         <>
                           Prototipo: <span className="text-foreground">{proto.name}</span>
@@ -182,55 +190,55 @@ export function StudiesPage() {
                         <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400">
                           <TriangleAlert className="size-3.5" /> Su prototipo ya no está: elige otro en Diseño
                         </span>
-                      )}
+                      )}{' '}
+                      · Actualizado {formatRelative(s.updatedAt)}
                     </p>
-                    <dl className="grid grid-cols-2 gap-3">
-                      <div className="rounded-lg bg-muted/60 p-3">
-                        <dd className="text-2xl font-semibold tabular-nums">{participants}</dd>
-                        <dt className="text-xs text-muted-foreground">{participants === 1 ? 'participante' : 'participantes'}</dt>
-                      </div>
-                      <div className="rounded-lg bg-muted/60 p-3">
-                        <dd className={`text-2xl font-semibold tabular-nums ${score === null ? '' : scoreTone(score)}`}>
-                          {score === null ? '—' : score}
-                          {score !== null && <span className="text-sm font-normal text-muted-foreground"> / 100</span>}
-                        </dd>
-                        <dt className="text-xs text-muted-foreground">{score === null ? (participants > 0 ? 'puntaje: faltan resultados' : 'puntaje de usabilidad') : 'puntaje de usabilidad'}</dt>
-                      </div>
-                    </dl>
-                    <div className="mt-auto flex flex-wrap items-center gap-2">
-                      <Button className="min-w-36 flex-1" asChild>
-                        <Link to={{ name: 'report', id: s.id }}>
-                          <BarChart3 /> Ver resultados
-                        </Link>
-                      </Button>
-                      <Button variant="outline" asChild>
-                        <Link to={{ name: 'study', id: s.id }}>
-                          <PencilRuler /> Diseño
-                        </Link>
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" disabled={busyId === s.id} aria-label={`Más acciones de "${s.name}"`}>
-                            Más <ChevronDown />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => void onDuplicate(s)}>
-                            <Copy /> Duplicar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => onExport(s)}>
-                            <Download /> Exportar study.json
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem destructive onSelect={() => setToDelete(s)}>
-                            <Trash2 /> Borrar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                  </div>
+                  <dl className="flex shrink-0 gap-8">
+                    <div>
+                      <dd className="text-2xl font-semibold tabular-nums">{participants}</dd>
+                      <dt className="text-xs text-muted-foreground">{participants === 1 ? 'participante' : 'participantes'}</dt>
                     </div>
-                    <p className="text-xs text-muted-foreground">Actualizado {formatRelative(s.updatedAt)}</p>
-                  </CardContent>
-                </Card>
+                    <div>
+                      <dd className={`text-2xl font-semibold tabular-nums ${score === null ? '' : scoreTone(score)}`}>
+                        {score === null ? '—' : score}
+                        {score !== null && <span className="text-sm font-normal text-muted-foreground"> / 100</span>}
+                      </dd>
+                      <dt className="text-xs text-muted-foreground">{score === null && participants > 0 ? 'puntaje: faltan resultados' : 'puntaje'}</dt>
+                    </div>
+                  </dl>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button className="flex-1 md:flex-none" asChild>
+                      <Link to={{ name: 'report', id: s.id }}>
+                        <BarChart3 /> Ver resultados
+                      </Link>
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" disabled={busyId === s.id} aria-label={`Más acciones de "${s.name}"`}>
+                          <Ellipsis />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link to={{ name: 'study', id: s.id }}>
+                            <PencilRuler /> Diseño
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => void onDuplicate(s)}>
+                          <Copy /> Duplicar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => onExport(s)}>
+                          <Download /> Exportar study.json
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem destructive onSelect={() => setToDelete(s)}>
+                          <Trash2 /> Borrar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
               </li>
             );
           })}

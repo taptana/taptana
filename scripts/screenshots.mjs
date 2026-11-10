@@ -50,8 +50,10 @@ try {
   await page.waitForTimeout(1200);
   await shot('reporte');
 
-  // 4. Una tarea del reporte, y su mapa de calor sobre lo que vio el participante
+  // 4. Una tarea del reporte (pestaña Tareas), y su mapa de calor sobre lo que vio el participante
+  await page.goto(`${panel}/studies/${studyId}/report?tab=tareas&tarea=t1`);
   const task = page.locator('#bloque-t1');
+  await task.waitFor({ timeout: 15000 });
   await task.evaluate((el) => el.scrollIntoView({ block: 'start' }));
   await page.evaluate(() => window.scrollBy(0, -16));
   await page.waitForTimeout(800);

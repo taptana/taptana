@@ -20,6 +20,10 @@ function Dot({ label }: { label: string }) {
   );
 }
 
+function GroupHeading({ children }: { children: ReactNode }) {
+  return <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{children}</p>;
+}
+
 function FixedItem({ icon: Icon, label, hint, active, incomplete, onSelect }: { icon: LucideIcon; label: string; hint: string; active: boolean; incomplete: boolean; onSelect: () => void }) {
   return (
     <button
@@ -27,7 +31,7 @@ function FixedItem({ icon: Icon, label, hint, active, incomplete, onSelect }: { 
       aria-current={active ? 'true' : undefined}
       onClick={onSelect}
       className={cn(
-        'flex w-full cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        'flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
         active ? 'border-primary bg-background ring-1 ring-primary' : 'border-transparent hover:bg-accent/60',
       )}
     >
@@ -88,11 +92,16 @@ export function BlockList({
   const [over, setOver] = useState<number | null>(null);
 
   return (
-    <nav aria-label="Partes del estudio" className="space-y-1.5">
+    <nav aria-label="Partes del estudio" className="space-y-8">
+      <div className="space-y-1.5">
+      <GroupHeading>Antes</GroupHeading>
       <FixedItem icon={Settings2} label="Ajustes del estudio" hint="Nombre, prototipo y opciones" active={selection === 'settings'} incomplete={incomplete.has('settings')} onSelect={() => onSelect('settings')} />
       <FixedItem icon={Hand} label="Bienvenida" hint="Saludo y consentimiento" active={selection === 'welcome'} incomplete={incomplete.has('welcome')} onSelect={() => onSelect('welcome')} />
+      </div>
 
-      <ol className="space-y-1.5" aria-label="Bloques, en el orden en que los ve el participante">
+      <div className="space-y-2">
+      <GroupHeading>Bloques</GroupHeading>
+      <ol className="space-y-2" aria-label="Bloques, en el orden en que los ve el participante">
         {blocks.map((block, index) => {
           const kind = blockKind(block as Parameters<typeof blockKind>[0]);
           const info = KIND_INFO[kind];
@@ -125,7 +134,7 @@ export function BlockList({
                 setOver(null);
               }}
               className={cn(
-                'group flex items-stretch rounded-lg border bg-background transition-colors',
+                'group flex items-stretch rounded-xl border border-border/70 bg-background transition-colors',
                 active ? 'border-primary ring-1 ring-primary' : 'hover:border-foreground/30',
                 dragging === index && 'opacity-50',
                 over === index && dragging !== null && dragging !== index && (dragging < index ? 'border-b-primary border-b-2' : 'border-t-primary border-t-2'),
@@ -149,7 +158,7 @@ export function BlockList({
                     onMove(index, index + 1);
                   }
                 }}
-                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2.5 text-left text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl px-2.5 py-3 text-left text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
                 <span className="grid size-7 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
                   <Icon className="size-4" />
@@ -195,8 +204,12 @@ export function BlockList({
         </Button>
       </AddBlockMenu>
       {blocks.length > 1 && <p className="hidden px-1 text-xs text-muted-foreground sm:block">Arrastra para reordenar, o usa Alt + ↑ ↓ sobre un bloque.</p>}
+      </div>
 
+      <div className="space-y-1.5">
+      <GroupHeading>Al final</GroupHeading>
       <FixedItem icon={PartyPopper} label="Gracias" hint="Pantalla final" active={selection === 'thanks'} incomplete={incomplete.has('thanks')} onSelect={() => onSelect('thanks')} />
+      </div>
     </nav>
   );
 }

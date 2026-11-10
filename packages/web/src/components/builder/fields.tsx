@@ -52,7 +52,7 @@ export function Field({
   const shown = error && (showAll || touched) ? error : undefined;
   const describedBy = [help ? `${id}-help` : '', shown ? `${id}-error` : ''].filter(Boolean).join(' ') || undefined;
   return (
-    <div className={cn('space-y-1.5', className)} onBlur={() => setTouched(true)}>
+    <div className={cn('space-y-2', className)} onBlur={() => setTouched(true)}>
       <label htmlFor={id} className="flex items-baseline gap-2 text-sm font-medium">
         {label}
         {optional && <span className="text-xs font-normal text-muted-foreground">opcional</span>}
@@ -64,7 +64,7 @@ export function Field({
         </p>
       )}
       {help && (
-        <p id={`${id}-help`} className="text-xs leading-relaxed text-muted-foreground">
+        <p id={`${id}-help`} className="max-w-prose text-xs leading-relaxed text-muted-foreground">
           {help}
         </p>
       )}

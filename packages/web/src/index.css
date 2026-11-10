@@ -5,6 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* Relleno de tarjetas: 20px en celular, 28px desde tablet. */
+  --card-pad: 1.25rem;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -24,6 +26,12 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --card-pad: 1.75rem;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,6 +55,11 @@
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.556 0 0);
   }
+}
+
+/* Constructor a tres columnas (lista, editor, teléfono) desde 1400px. */
+@theme {
+  --breakpoint-studio: 87.5rem;
 }
 
 @theme inline {
@@ -80,6 +93,13 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  @media (min-width: 640px) {
+    body {
+      font-size: 16px;
+    }
   }
 }
 

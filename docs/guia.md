@@ -38,12 +38,14 @@ computadora y te muestra las pantallas que encontró. Si tu prototipo usa direcc
 empiezan con `/` (pasa con algunas apps hechas con IA), el panel te sugiere activar
 **Abrir en la raíz**.
 
-Cuando cambies el prototipo, sube la **nueva versión** sobre el mismo: los estudios siguen
+Cuando cambies el prototipo, sube la **nueva versión** sobre el mismo (menú "⋯" del prototipo): los estudios siguen
 apuntando a él.
 
 ## 3. Arma el estudio
 
-**Estudios → Nuevo estudio.** El estudio es una lista de bloques que la persona recorre en orden.
+**Estudios → Nuevo estudio.** Primero eliges el prototipo, le pones nombre y decides cómo
+empezar (con una tarea, con otro bloque o "Armar con IA"). Después se abre el constructor: el
+estudio es una lista de bloques que la persona recorre en orden.
 
 ![El constructor](img/constructor.png)
 
@@ -53,9 +55,11 @@ apuntando a él.
    - **Tarea**: algo que debe lograr en el prototipo.
    - **Primer clic**: "¿Dónde tocarías para…?". Solo cuenta el primer toque.
    - **Preguntas**: escala del 1 al 5, opción múltiple, sí o no, abierta.
-3. En cada tarea, toca **Grabar el camino correcto** y haz tú la tarea en el teléfono de la
-   derecha. Al terminar, **Usar este camino** llena solo la pantalla de inicio, el camino
-   esperado y la regla de éxito.
+3. Cada tarea se arma en tres pasos: **Qué le pides**, **Dónde empieza** y **Cuándo se logra**.
+   El camino esperado está en **Opciones avanzadas**. Lo más rápido: toca **Grabar el camino
+   correcto** y haz tú la tarea en el teléfono (a la derecha en pantallas anchas; en las más
+   angostas, con **Ver prototipo**). Al terminar, **Usar este camino** llena solo la pantalla de
+   inicio, el camino esperado y la regla de éxito.
 4. **Probar estudio**: lo recorres como participante, sin que se grabe nada.
 
 Se guarda solo. Si prefieres que una IA te proponga el estudio: [Estudios con IA](estudios-con-ia.md).
@@ -122,8 +126,11 @@ En el estudio, pestaña **Resultados**.
 
 ![El reporte](img/reporte.png)
 
-Arriba está el puntaje y **Lo más importante**: un resumen, hecho con reglas fijas (sin IA),
-de qué arreglar primero y qué salió bien. Abajo, una sección por bloque.
+El reporte tiene tres pestañas. **Resumen**: el puntaje y **Lo más importante**, un resumen
+hecho con reglas fijas (sin IA) de qué arreglar primero y qué salió bien; cada frase tiene un
+"Ver" que te lleva a su tarea. **Tareas**: una tarea a la vez (la eliges arriba), con sus
+números, el embudo, los mapas de calor, los caminos y los participantes. **Preguntas**: las
+respuestas de cada pregunta. La pestaña queda en el link, así que puedes compartirlo tal cual.
 
 ![Una tarea](img/reporte-tarea.png)
 
@@ -137,8 +144,8 @@ Antes de sacar conclusiones:
 
 ![Mapas de calor](img/mapa-de-calor.png)
 
-**Exportar CSV** baja una fila por participante para tu hoja de cálculo. **Imprimir / PDF**
-arma el reporte para compartir.
+En el menú **Exportar**: **Exportar CSV** baja una fila por participante para tu hoja de
+cálculo, e **Imprimir / PDF** arma el reporte completo (todas las pestañas) para compartir.
 
 ### Qué significa cada número
 

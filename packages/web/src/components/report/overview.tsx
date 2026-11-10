@@ -37,13 +37,13 @@ export function ScoreChip({ score, className }: { score: number | null; classNam
 
 function Kpi({ icon, label, value, sub }: { icon: ReactNode; label: string; value: string; sub: ReactNode }) {
   return (
-    <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-1.5 min-w-0" data-print="keep">
+    <div className="rounded-2xl border border-border/70 bg-card p-5 sm:p-6 space-y-2 min-w-0" data-print="keep">
       <div className="flex items-center gap-2 text-muted-foreground text-sm [&_svg]:size-4 [&_svg]:shrink-0">
         {icon}
         <span className="truncate">{label}</span>
       </div>
       <div className="text-2xl sm:text-3xl font-semibold tabular-nums">{value}</div>
-      <div className="text-xs text-muted-foreground">{sub}</div>
+      <div className="text-xs text-muted-foreground leading-relaxed">{sub}</div>
     </div>
   );
 }
@@ -56,7 +56,7 @@ export function Overview({ report }: { report: StudyReport }) {
   const band = scoreBand(report.score);
   const withData = report.tasks.filter((t) => t.decided > 0).length;
   return (
-    <section aria-label="Resumen del estudio" className="grid gap-4 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+    <section aria-label="Resumen del estudio" className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
       <Card data-print="keep">
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between gap-2">
@@ -84,7 +84,7 @@ export function Overview({ report }: { report: StudyReport }) {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 grid-cols-2">
+      <div className="grid gap-4 sm:gap-5 grid-cols-2">
         <Kpi
           icon={<Users />}
           label="Participantes"

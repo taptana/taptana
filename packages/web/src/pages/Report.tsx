@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ClipboardCheck, Copy, Download, Pencil, Printer, Users } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ClipboardCheck, Copy, Download, Pencil, Printer, Users } from 'lucide-react';
 import {
   BLOCK_KIND_LABELS,
   blockTitle,
@@ -16,10 +16,12 @@ import {
 import { getClient, IS_DEMO } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label, NativeSelect } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/toast';
-import { EmptyState, ErrorState, Layout, PageHeader, PageSkeleton } from '@/components/layout';
-import { BlockIndex, blockAnchor, type IndexEntry } from '@/components/report/block-index';
+import { EmptyState, ErrorState, Layout, Notice, PageHeader, PageSkeleton } from '@/components/layout';
+import { BlockPicker, blockAnchor, type IndexEntry } from '@/components/report/block-index';
 import { ReportContext, type ReportContextValue } from '@/components/report/context';
 import { InsightsCard, Overview, ScoreChip, VariantsCard } from '@/components/report/overview';
 import { QuestionBody } from '@/components/report/question-section';
@@ -46,6 +48,16 @@ interface Base {
   sessions: SessionSummary[];
   /** Pantallas del prototipo según la API: de aquí sale el nombre de cada pantalla. */
   screens: ScreenInfo[];
+}
+
+/** Pestañas del reporte. Van en la dirección (`?tab=`) para que un link o una recarga vuelvan al mismo lugar. */
+type ReportTab = 'resumen' | 'tareas' | 'preguntas';
+const REPORT_TABS: ReportTab[] = ['resumen', 'tareas', 'preguntas'];
+
+function readTabParams(): { tab: ReportTab; task: string | null } {
+  const q = new URLSearchParams(location.search);
+  const raw = q.get('tab');
+  return { tab: REPORT_TABS.includes(raw as ReportTab) ? (raw as ReportTab) : 'resumen', task: q.get('tarea') };
 }
 
 /** true mientras se imprime (o se emula la impresión): el reporte dibuja todo. */
@@ -79,6 +91,8 @@ export function ReportPage({ id }: { id: string }) {
   const [focus, setFocus] = useState<{ blockId: string; screen?: string; n: number } | null>(null);
   const [printing, setPrinting] = usePrinting();
   const [preparingPrint, setPreparingPrint] = useState(false);
+  const [tab, setTab] = useState<ReportTab>(() => readTabParams().tab);
+  const [taskId, setTaskId] = useState<string | null>(() => readTabParams().task);
   const filterRef = useRef(filter);
   filterRef.current = filter;
   const request = useRef(0);
@@ -173,10 +187,33 @@ export function ReportPage({ id }: { id: string }) {
     return out;
   }, [base, report]);
 
-  const jump = useCallback((blockId: string, screen?: string): void => {
-    setFocus((f) => ({ blockId, ...(screen ? { screen } : {}), n: (f?.n ?? 0) + 1 }));
-    document.getElementById(blockAnchor(blockId))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
+  const taskEntries = useMemo(() => entries.filter((e) => report?.tasks.some((t) => t.taskId === e.id)), [entries, report]);
+  const questionEntries = useMemo(() => entries.filter((e) => report?.questions.some((q) => q.blockId === e.id)), [entries, report]);
+
+  // La pestaña y la tarea elegida quedan en la dirección, sin agregar pasos al historial.
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    if (tab === 'resumen') q.delete('tab');
+    else q.set('tab', tab);
+    if (tab === 'tareas' && taskId) q.set('tarea', taskId);
+    else q.delete('tarea');
+    const search = q.toString();
+    const next = `${location.pathname}${search ? `?${search}` : ''}`;
+    if (next !== `${location.pathname}${location.search}`) history.replaceState(history.state, '', next);
+  }, [tab, taskId]);
+
+  /** Lleva a un bloque (desde «Lo más importante»): cambia a su pestaña y lo muestra. */
+  const jump = useCallback(
+    (blockId: string, screen?: string): void => {
+      setFocus((f) => ({ blockId, ...(screen ? { screen } : {}), n: (f?.n ?? 0) + 1 }));
+      if (report?.tasks.some((t) => t.taskId === blockId)) {
+        setTab('tareas');
+        setTaskId(blockId);
+      } else setTab('preguntas');
+      setTimeout(() => document.getElementById(blockAnchor(blockId))?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    },
+    [report],
+  );
 
   if (error) {
     return (
@@ -238,6 +275,148 @@ export function ReportPage({ id }: { id: string }) {
     if (!window.matchMedia('print').matches) setPrinting(false);
   };
 
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-3" data-print="hide">
+      {(study.variants?.length ?? 0) > 0 && (
+        <div className="flex items-center gap-2">
+          <Label htmlFor="filtro-variante" className="mb-0 text-muted-foreground font-normal">
+            Variante
+          </Label>
+          <NativeSelect
+            id="filtro-variante"
+            className="w-36"
+            value={filter.variantId ?? ''}
+            onChange={(e) => changeFilter({ ...(e.target.value ? { variantId: e.target.value } : {}), ...(filter.device ? { device: filter.device } : {}) })}
+          >
+            <option value="">Todas</option>
+            {study.variants?.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <Label htmlFor="filtro-dispositivo" className="mb-0 text-muted-foreground font-normal">
+          Dispositivo
+        </Label>
+        <NativeSelect
+          id="filtro-dispositivo"
+          className="w-48"
+          value={filter.device ?? ''}
+          onChange={(e) => {
+            const device = e.target.value as '' | 'touch' | 'desktop';
+            changeFilter({ ...(filter.variantId ? { variantId: filter.variantId } : {}), ...(device ? { device } : {}) });
+          }}
+        >
+          <option value="">Todos ({report.devices.touch + report.devices.desktop})</option>
+          <option value="touch">Celular o tablet ({report.devices.touch})</option>
+          <option value="desktop">Escritorio ({report.devices.desktop})</option>
+        </NativeSelect>
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" disabled={preparingPrint}>
+            <Download />
+            {preparingPrint ? 'Preparando…' : 'Exportar'}
+            <ChevronDown className="opacity-60" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => void exportCsv()} disabled={report.participants === 0 && !filtered}>
+            <Download />
+            Exportar CSV
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => void print()} disabled={report.participants === 0}>
+            <Printer />
+            Imprimir / PDF
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+
+  /** Un bloque del reporte (tarea o pregunta) con su encabezado. */
+  const renderBlock = (entry: IndexEntry): React.ReactNode => {
+    const task = report.tasks.find((t) => t.taskId === entry.id);
+    const question = report.questions.find((q) => q.blockId === entry.id);
+    return (
+      <section
+        key={entry.id}
+        id={blockAnchor(entry.id)}
+        data-report-block
+        aria-labelledby={`titulo-${entry.id}`}
+        className={cn('scroll-mt-6 min-w-0', printing ? 'rounded-xl border bg-card p-4 sm:p-6 space-y-5' : 'space-y-8')}
+      >
+        <header className="flex items-start gap-4" data-print="heading">
+          <span className="size-9 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-sm font-semibold tabular-nums">{entry.number}</span>
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{entry.kindLabel}</p>
+            <h2 id={`titulo-${entry.id}`} className="text-xl sm:text-2xl font-semibold tracking-tight break-words">
+              {entry.title}
+            </h2>
+          </div>
+          {task && task.participants > 0 && (
+            <div className="text-right shrink-0">
+              <ScoreChip score={task.score} className="text-2xl" />
+              <p className="text-xs text-muted-foreground">{plural(task.participants, 'participante', 'participantes')}</p>
+            </div>
+          )}
+        </header>
+        {task && <TaskBody task={task} block={tasks.find((b) => b.id === task.taskId)} focusScreen={focus?.blockId === task.taskId ? focus.screen : undefined} />}
+        {question && <QuestionBody question={question} />}
+      </section>
+    );
+  };
+
+  const summary = (
+    <>
+      <Overview report={report} />
+      {report.pendingReview > 0 && (
+        <div data-print="keep">
+          <Notice
+            icon={<ClipboardCheck />}
+            title={`${plural(report.pendingReview, 'resultado por revisar', 'resultados por revisar')}.`}
+            action={
+              <Button size="sm" onClick={() => setReviewOpen(true)} data-print="hide">
+                Revisar pendientes
+              </Button>
+            }
+          >
+            <p>Son tareas que decides tú; no cuentan en el éxito ni en el puntaje hasta que las marques.</p>
+          </Notice>
+        </div>
+      )}
+      <InsightsCard insights={report.insights} onJump={jump} />
+      <VariantsCard report={report} />
+    </>
+  );
+
+  const noBlocks = (
+    <EmptyState
+      icon={<Pencil className="size-5" />}
+      title="Este estudio no tiene tareas ni preguntas"
+      action={
+        <Button asChild>
+          <Link to={{ name: 'study', id }}>Ir a Diseño</Link>
+        </Button>
+      }
+    >
+      Agrega bloques en Diseño para ver resultados aquí.
+    </EmptyState>
+  );
+  const sessionsLink = (
+    <p className="text-sm text-muted-foreground" data-print="hide">
+      ¿Buscas una grabación completa?{' '}
+      <Link to={{ name: 'recordings', study: id }} className="underline underline-offset-4 hover:text-foreground">
+        Ver las sesiones de este estudio
+      </Link>
+    </p>
+  );
+  const selectedTask = taskEntries.find((e) => e.id === taskId) ?? taskEntries[0];
+  const activeTab: ReportTab = tab === 'preguntas' && questionEntries.length === 0 ? 'resumen' : tab;
+
   return (
     <ReportContext.Provider value={context}>
       <Layout wide>
@@ -261,55 +440,6 @@ export function ReportPage({ id }: { id: string }) {
           actions={<StudyTabs id={id} active="report" />}
         />
 
-        <div className="flex flex-wrap items-end justify-between gap-3" data-print="hide">
-          <div className="flex flex-wrap items-end gap-3">
-            {(study.variants?.length ?? 0) > 0 && (
-              <div className="space-y-1.5">
-                <Label htmlFor="filtro-variante">Variante</Label>
-                <NativeSelect
-                  id="filtro-variante"
-                  className="w-44"
-                  value={filter.variantId ?? ''}
-                  onChange={(e) => changeFilter({ ...(e.target.value ? { variantId: e.target.value } : {}), ...(filter.device ? { device: filter.device } : {}) })}
-                >
-                  <option value="">Todas</option>
-                  {study.variants?.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <Label htmlFor="filtro-dispositivo">Dispositivo</Label>
-              <NativeSelect
-                id="filtro-dispositivo"
-                className="w-52"
-                value={filter.device ?? ''}
-                onChange={(e) => {
-                  const device = e.target.value as '' | 'touch' | 'desktop';
-                  changeFilter({ ...(filter.variantId ? { variantId: filter.variantId } : {}), ...(device ? { device } : {}) });
-                }}
-              >
-                <option value="">Todos ({report.devices.touch + report.devices.desktop})</option>
-                <option value="touch">Celular o tablet ({report.devices.touch})</option>
-                <option value="desktop">Escritorio ({report.devices.desktop})</option>
-              </NativeSelect>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => void exportCsv()} disabled={report.participants === 0 && !filtered}>
-              <Download />
-              Exportar CSV
-            </Button>
-            <Button variant="outline" onClick={() => void print()} disabled={preparingPrint || report.participants === 0}>
-              <Printer />
-              {preparingPrint ? 'Preparando…' : 'Imprimir / PDF'}
-            </Button>
-          </div>
-        </div>
-
         {filtered && (
           <p className="hidden print:block text-sm text-muted-foreground">
             Filtro: {[variantName && `variante ${variantName}`, filter.device === 'touch' && 'celular o tablet', filter.device === 'desktop' && 'escritorio'].filter(Boolean).join(' · ')}
@@ -317,99 +447,77 @@ export function ReportPage({ id }: { id: string }) {
         )}
 
         {report.participants === 0 ? (
-          filtered ? (
-            <EmptyState
-              icon={<Users className="size-5" />}
-              title="Nadie coincide con este filtro"
-              action={
-                <Button variant="outline" onClick={() => changeFilter({})}>
-                  Quitar filtros
-                </Button>
-              }
-            >
-              Prueba con otra variante u otro dispositivo.
-            </EmptyState>
-          ) : (
-            <NoParticipants base={base} excluded={report.excluded} />
-          )
-        ) : (
-          <div className={cn('space-y-8 transition-opacity', refreshing && 'opacity-60')} aria-busy={refreshing}>
-            <Overview report={report} />
-
-            {report.pendingReview > 0 && (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-600/30 bg-sky-500/10 px-4 py-3" data-print="keep">
-                <p className="flex items-start gap-2.5 text-sm min-w-0">
-                  <ClipboardCheck className="size-4.5 mt-0.5 shrink-0 text-sky-700 dark:text-sky-400" />
-                  <span>
-                    <span className="font-medium">{plural(report.pendingReview, 'resultado por revisar', 'resultados por revisar')}.</span> Son tareas que decides tú; no cuentan en el éxito ni en el puntaje
-                    hasta que las marques.
-                  </span>
-                </p>
-                <Button size="sm" onClick={() => setReviewOpen(true)} data-print="hide">
-                  Revisar pendientes
-                </Button>
-              </div>
+          <>
+            {toolbar}
+            {filtered ? (
+              <EmptyState
+                icon={<Users className="size-5" />}
+                title="Nadie coincide con este filtro"
+                action={
+                  <Button variant="outline" onClick={() => changeFilter({})}>
+                    Quitar filtros
+                  </Button>
+                }
+              >
+                Prueba con otra variante u otro dispositivo.
+              </EmptyState>
+            ) : (
+              <NoParticipants base={base} excluded={report.excluded} />
             )}
-
-            <InsightsCard insights={report.insights} onJump={jump} />
-            <VariantsCard report={report} />
-
-            <BlockIndex entries={entries} onJump={jump} variant="bar" />
-            <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_15rem] xl:gap-8 print:block">
-              <div className="space-y-8 min-w-0">
-                {entries.map((entry) => {
-                  const task = report.tasks.find((t) => t.taskId === entry.id);
-                  const question = report.questions.find((q) => q.blockId === entry.id);
-                  return (
-                    <section
-                      key={entry.id}
-                      id={blockAnchor(entry.id)}
-                      data-report-block
-                      aria-labelledby={`titulo-${entry.id}`}
-                      className="scroll-mt-16 xl:scroll-mt-6 rounded-xl border bg-card p-4 sm:p-6 space-y-5 min-w-0"
-                    >
-                      <header className="flex items-start gap-3" data-print="heading">
-                        <span className="size-8 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-sm font-semibold tabular-nums">{entry.number}</span>
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{entry.kindLabel}</p>
-                          <h2 id={`titulo-${entry.id}`} className="text-xl font-semibold tracking-tight break-words">
-                            {entry.title}
-                          </h2>
-                        </div>
-                        {task && task.participants > 0 && (
-                          <div className="text-right shrink-0">
-                            <ScoreChip score={task.score} className="text-2xl" />
-                            <p className="text-xs text-muted-foreground">{plural(task.participants, 'participante', 'participantes')}</p>
-                          </div>
-                        )}
-                      </header>
-                      {task && <TaskBody task={task} block={tasks.find((b) => b.id === task.taskId)} focusScreen={focus?.blockId === task.taskId ? focus.screen : undefined} />}
-                      {question && <QuestionBody question={question} />}
-                    </section>
-                  );
-                })}
-                {entries.length === 0 && (
-                  <EmptyState
-                    icon={<Pencil className="size-5" />}
-                    title="Este estudio no tiene tareas ni preguntas"
-                    action={
-                      <Button asChild>
-                        <Link to={{ name: 'study', id }}>Ir a Diseño</Link>
-                      </Button>
-                    }
-                  >
-                    Agrega bloques en Diseño para ver resultados aquí.
-                  </EmptyState>
-                )}
-                <p className="text-sm text-muted-foreground" data-print="hide">
-                  ¿Buscas una grabación completa?{' '}
-                  <Link to={{ name: 'recordings', study: id }} className="underline underline-offset-4 hover:text-foreground">
-                    Ver las sesiones de este estudio
-                  </Link>
-                </p>
+          </>
+        ) : (
+          <div className={cn('transition-opacity', refreshing && 'opacity-60')} aria-busy={refreshing}>
+            {printing ? (
+              // Al imprimir va todo el reporte, todas las pestañas una tras otra.
+              <div className="space-y-8">
+                {summary}
+                {entries.map(renderBlock)}
+                {entries.length === 0 && noBlocks}
               </div>
-              <BlockIndex entries={entries} onJump={jump} variant="side" />
-            </div>
+            ) : (
+              <Tabs value={activeTab} onValueChange={(v) => setTab(v as ReportTab)} className="gap-10">
+                <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 border-b">
+                  <TabsList aria-label="Partes del reporte" className="h-auto -mb-px gap-6 rounded-none bg-transparent p-0">
+                    {(
+                      [
+                        { id: 'resumen', label: 'Resumen', count: null },
+                        { id: 'tareas', label: 'Tareas', count: taskEntries.length },
+                        ...(questionEntries.length > 0 ? [{ id: 'preguntas', label: 'Preguntas', count: questionEntries.length }] : []),
+                      ] as Array<{ id: ReportTab; label: string; count: number | null }>
+                    ).map((t) => (
+                      <TabsTrigger
+                        key={t.id}
+                        value={t.id}
+                        className="rounded-none border-b-2 border-transparent px-0.5 pt-1 pb-3 text-[15px] data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                      >
+                        {t.label}
+                        {t.count !== null && <span className="text-xs font-normal text-muted-foreground tabular-nums">{t.count}</span>}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  <div className="order-first w-full pb-1 lg:order-none lg:w-auto lg:pb-3">{toolbar}</div>
+                </div>
+
+                <TabsContent value="resumen" className="space-y-10 sm:space-y-12">
+                  {summary}
+                  {sessionsLink}
+                </TabsContent>
+
+                <TabsContent value="tareas" className="space-y-10">
+                  <BlockPicker entries={taskEntries} current={selectedTask?.id} onSelect={(blockId) => setTaskId(blockId)} label="Tareas del estudio" />
+                  {selectedTask ? renderBlock(selectedTask) : entries.length === 0 ? noBlocks : <p className="text-muted-foreground">Este estudio no tiene tareas, solo preguntas.</p>}
+                  {sessionsLink}
+                </TabsContent>
+
+                <TabsContent value="preguntas" className="space-y-12">
+                  {questionEntries.map((entry, i) => (
+                    <div key={entry.id} className={cn(i > 0 && 'border-t pt-12')}>
+                      {renderBlock(entry)}
+                    </div>
+                  ))}
+                </TabsContent>
+              </Tabs>
+            )}
             <ReviewDialog report={report} open={reviewOpen} onOpenChange={setReviewOpen} />
           </div>
         )}

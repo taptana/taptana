@@ -13,7 +13,8 @@ IA puede escribir, y lo importa. Así el servidor sigue simple, local y sin llav
 
 Para cualquier chat de IA, sin instalar nada.
 
-1. En el panel, abre o crea un estudio y toca **Armar con IA**.
+1. En el panel, abre un estudio y toca **Armar con IA** en el menú "⋯" de arriba (al crear uno
+   nuevo, aparece como opción en el último paso).
 2. Escribe en una línea qué quieres averiguar (opcional) y toca **Copiar prompt para IA**. El prompt ya
    lleva el nombre de tu prototipo, sus pantallas y el formato exacto.
 3. Pégalo en tu IA. Te responde con un JSON.
@@ -29,7 +30,7 @@ Para Claude Code, Cursor y similares, que pueden leer la carpeta de tu prototipo
 La skill es un archivo de instrucciones: [`skills/taptana-study/SKILL.md`](../skills/taptana-study/SKILL.md).
 Cópiala a las skills de tu asistente (o pásale el archivo) y pide: "usa la skill de Taptana
 para armar un estudio de este prototipo". El asistente lee los HTML, escribe un `study.json` y
-tú lo importas en Estudios → **Importar** (archivo o pegando el JSON). Si el prototipo que
+tú lo importas en Estudios → menú "⋯" → **Importar estudio** (archivo o pegando el JSON). Si el prototipo que
 nombra el archivo no existe en tu Taptana, el panel te pregunta cuál usar.
 
 ## El formato (v2, por bloques)

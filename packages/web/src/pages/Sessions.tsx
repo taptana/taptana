@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, EllipsisVertical, EyeOff, Eye, Monitor, Pencil, Play, PlayCircle, RefreshCw, Smartphone, Trash2, Upload, X } from 'lucide-react';
+import { Check, Ellipsis, EllipsisVertical, EyeOff, Eye, Monitor, Pencil, Play, PlayCircle, RefreshCw, Smartphone, Trash2, Upload, X } from 'lucide-react';
 import { needsReview, SESSION_LIMITS, studyBlocks, type SessionExport, type SessionSummary, type StudyRecord } from '@taptana/shared';
 import { getClient, IS_DEMO, parseSessionFile } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -140,9 +140,18 @@ export function SessionsPage({ study: initialStudy }: { study?: string }) {
             <Button variant="outline" size="sm" disabled={refreshing} onClick={() => void load()}>
               <RefreshCw className={cn(refreshing && 'animate-spin')} /> Actualizar
             </Button>
-            <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()}>
-              <Upload /> Importar sesión
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="size-8" aria-label="Más acciones">
+                  <Ellipsis />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
+                  <Upload /> Importar sesión
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <input
               ref={fileInput}
               type="file"
@@ -162,7 +171,7 @@ export function SessionsPage({ study: initialStudy }: { study?: string }) {
       {error && <InlineError onDismiss={() => setError(null)}>{error}</InlineError>}
 
       {showChips && (
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar sesiones">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar sesiones">
           <FilterChip active={filter === ''} onClick={() => setFilter('')}>
             Todas ({all.length})
           </FilterChip>
@@ -223,7 +232,7 @@ export function SessionsPage({ study: initialStudy }: { study?: string }) {
           </ul>
           {/* Pantallas grandes: tabla */}
           <Card className="py-0 gap-0 overflow-hidden hidden md:block">
-            <Table>
+            <Table className="[&_td]:py-4 [&_th]:h-12">
               <TableHeader>
                 <TableRow>
                   <TableHead className="pl-4">Sesión</TableHead>

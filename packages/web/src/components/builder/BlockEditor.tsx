@@ -37,23 +37,55 @@ import { Field, KIND_INFO, OptionCards, ScreenName, ScreenPicker } from './field
 
 export function EditorCard({ icon, kicker, title, children, actions }: { icon?: ReactNode; kicker: string; title: string; children: ReactNode; actions?: ReactNode }) {
   return (
-    <section className="rounded-xl border bg-background shadow-xs">
-      <header className="flex flex-wrap items-center gap-3 border-b px-5 py-4 sm:px-6">
-        {icon && <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">{icon}</span>}
+    <section className="rounded-2xl border border-border/70 bg-background">
+      <header className="flex flex-wrap items-center gap-3 border-b border-border/70 px-(--card-pad) py-5">
+        {icon && <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">{icon}</span>}
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{kicker}</p>
           <h2 className="truncate text-lg font-semibold">{title}</h2>
         </div>
         {actions}
       </header>
-      <div className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">{children}</div>
+      <div className="divide-y divide-border/70 px-(--card-pad)">{children}</div>
     </section>
+  );
+}
+
+/**
+ * Un paso del editor: número, título corto y sus campos, con aire alrededor. Así cada bloque se
+ * lee como una serie de decisiones, una a la vez.
+ */
+function Step({ n, title, hint, children }: { n?: number; title: string; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="space-y-5 py-8 first:pt-7 last:pb-7">
+      <header className="space-y-1">
+        <h3 className="flex items-center gap-2.5 text-base font-semibold">
+          {n !== undefined && <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground tabular-nums">{n}</span>}
+          {title}
+        </h3>
+        {hint && <p className={cn('max-w-prose text-sm leading-relaxed text-muted-foreground', n !== undefined && 'pl-8.5')}>{hint}</p>}
+      </header>
+      <div className={cn('space-y-6', n !== undefined && 'sm:pl-8.5')}>{children}</div>
+    </section>
+  );
+}
+
+/** «Opciones avanzadas» al final del editor: cerrado salvo que ya tenga algo. */
+function AdvancedStep({ children, defaultOpen = false, label = 'Opciones avanzadas' }: { children: ReactNode; defaultOpen?: boolean; label?: string }) {
+  return (
+    <details className="group py-6" open={defaultOpen || undefined}>
+      <summary className="flex w-fit cursor-pointer list-none items-center gap-2 rounded-md text-sm font-medium text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
+        {label}
+      </summary>
+      <div className="space-y-6 pt-6 sm:pl-6">{children}</div>
+    </details>
   );
 }
 
 function SwitchRow({ label, hint, checked, onChange }: { label: string; hint?: ReactNode; checked: boolean; onChange: (checked: boolean) => void }) {
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-4 rounded-lg border bg-background p-3">
+    <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl bg-muted/50 px-4 py-3.5">
       <span className="min-w-0 text-sm">
         <span className="block font-medium">{label}</span>
         {hint && <span className="block text-xs leading-relaxed text-muted-foreground">{hint}</span>}
@@ -65,25 +97,27 @@ function SwitchRow({ label, hint, checked, onChange }: { label: string; hint?: R
 
 function Advanced({ label = 'Avanzado', children, defaultOpen = false }: { label?: string; children: ReactNode; defaultOpen?: boolean }) {
   return (
-    <details className="group rounded-lg border bg-muted/30" open={defaultOpen || undefined}>
+    <details className="group rounded-xl bg-muted/40" open={defaultOpen || undefined}>
       <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
         <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
         {label}
       </summary>
-      <div className="space-y-4 px-3 pt-1 pb-4">{children}</div>
+      <div className="space-y-4 px-4 pt-1 pb-4">{children}</div>
     </details>
   );
 }
 
+/** Consejos plegados: se abren solo si se quieren leer. */
 function Tips({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="flex gap-3 rounded-lg bg-muted/50 px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
-      <Lightbulb className="mt-0.5 size-4 shrink-0" />
-      <div className="space-y-1">
-        <p className="font-medium text-foreground">{title}</p>
-        {children}
-      </div>
-    </div>
+    <details className="group text-sm">
+      <summary className="flex w-fit cursor-pointer list-none items-center gap-2 rounded-md text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+        <Lightbulb className="size-4 shrink-0" />
+        {title}
+        <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
+      </summary>
+      <div className="mt-3 max-w-prose space-y-1.5 rounded-xl bg-muted/50 px-4 py-3 text-xs leading-relaxed text-muted-foreground">{children}</div>
+    </details>
   );
 }
 
@@ -129,6 +163,7 @@ export function SettingsEditor({
 
   return (
     <EditorCard kicker="Estudio" title="Ajustes del estudio">
+      <Step n={1} title="Lo básico">
       <Field label="Nombre del estudio" error={fieldError(errors, undefined, 'name')} help="Solo lo ve tu equipo y aparece en la bienvenida.">
         {(p) => <Input {...p} value={draft.name} maxLength={STUDY_LIMITS.name} placeholder="Compra de una planta" onChange={(e) => onChange({ ...draft, name: e.target.value })} />}
       </Field>
@@ -149,7 +184,9 @@ export function SettingsEditor({
           </NativeSelect>
         )}
       </Field>
+      </Step>
 
+      <Step n={2} title="Cómo avanza">
       <fieldset className="space-y-2">
         <legend className="mb-1.5 text-sm font-medium">Avance al cumplir la tarea</legend>
         <OptionCards
@@ -171,14 +208,15 @@ export function SettingsEditor({
           onChange={(open) => onChange(prune({ ...draft, closed: !open }, ['closed']))}
         />
       )}
+      </Step>
 
-      <Advanced label="Avanzado: comparar dos versiones (A/B)" defaultOpen={variants.length > 0}>
+      <AdvancedStep label="Opciones avanzadas: comparar dos versiones (A/B)" defaultOpen={variants.length > 0}>
         <p className="text-xs leading-relaxed text-muted-foreground">
           Cada participante recibe una variante al azar y su primera tarea empieza en la pantalla de esa variante. El reporte compara los resultados de cada una. Si no lo necesitas, déjalo vacío.
         </p>
         {fieldError(errors, undefined, 'variants') && <p className="text-sm text-destructive">{fieldError(errors, undefined, 'variants')}</p>}
         {variants.map((v, i) => (
-          <div key={v.id} className="space-y-2 rounded-lg border bg-background p-3">
+          <div key={v.id} className="space-y-2 rounded-xl bg-muted/50 p-4">
             <div className="flex items-center gap-2">
               <Input aria-label={`Nombre de la variante ${i + 1}`} value={v.name} maxLength={STUDY_LIMITS.name} placeholder={`Variante ${'ABCDEFGH'[i] ?? i + 1}`} onChange={(e) => setVariants(variants.map((x) => (x.id === v.id ? { ...x, name: e.target.value } : x)))} />
               <Button type="button" variant="ghost" size="icon" aria-label={`Quitar la variante ${v.name || i + 1}`} onClick={() => setVariants(variants.filter((x) => x.id !== v.id))}>
@@ -205,7 +243,7 @@ export function SettingsEditor({
         >
           <Plus /> Agregar variante
         </Button>
-      </Advanced>
+      </AdvancedStep>
     </EditorCard>
   );
 }
@@ -215,7 +253,8 @@ export function SettingsEditor({
 export function WelcomeEditor({ draft, onChange, errors }: { draft: DraftStudy; onChange: (next: DraftStudy) => void; errors: readonly StudyIssue[] }) {
   return (
     <EditorCard kicker="Lo primero que ve el participante" title="Bienvenida">
-      <Field label="Texto de bienvenida" optional error={fieldError(errors, undefined, 'welcome')} help="Cuenta en dos líneas qué va a pasar. Ayuda decir que nada es real y que no hay respuestas incorrectas.">
+      <Step n={1} title="El saludo">
+      <Field label="Texto de bienvenida" optional error={fieldError(errors, undefined, 'welcome')} help="Dos líneas: qué va a pasar y que no hay respuestas incorrectas.">
         {(p) => (
           <Textarea
             {...p}
@@ -226,20 +265,24 @@ export function WelcomeEditor({ draft, onChange, errors }: { draft: DraftStudy; 
           />
         )}
       </Field>
+      </Step>
+      <Step n={2} title="El consentimiento" hint="Hasta que el participante lo acepte no se graba nada.">
       <Field
         label="Consentimiento"
         optional
         error={fieldError(errors, undefined, 'consent')}
-        help="El participante tiene que marcar esta casilla para empezar; hasta entonces no se graba nada. Si lo dejas vacío se usa el texto estándar."
+        help="Si lo dejas vacío se usa el texto estándar."
       >
         {(p) => <Textarea {...p} value={draft.consent ?? ''} maxLength={STUDY_LIMITS.text} placeholder={DEFAULT_CONSENT_TEXT} onChange={(e) => onChange(prune({ ...draft, consent: e.target.value }, ['consent']))} />}
       </Field>
       {!draft.consent && (
-        <div className="rounded-lg border bg-muted/40 px-3.5 py-3 text-sm">
+        <div className="rounded-xl bg-muted/50 px-4 py-3.5 text-sm">
           <p className="mb-1 text-xs font-medium text-muted-foreground">Texto estándar que verá el participante</p>
           <p>{DEFAULT_CONSENT_TEXT}</p>
         </div>
       )}
+      </Step>
+      <AdvancedStep defaultOpen={draft.settings?.askName === true}>
       <SwitchRow
         label="Pedir nombre o alias"
         hint="Agrega el campo «¿Cómo te llamas? (opcional)». Sirve para reconocer cada sesión en los resultados."
@@ -251,6 +294,7 @@ export function WelcomeEditor({ draft, onChange, errors }: { draft: DraftStudy; 
           onChange(next);
         }}
       />
+      </AdvancedStep>
     </EditorCard>
   );
 }
@@ -258,10 +302,11 @@ export function WelcomeEditor({ draft, onChange, errors }: { draft: DraftStudy; 
 export function ThanksEditor({ draft, onChange, errors }: { draft: DraftStudy; onChange: (next: DraftStudy) => void; errors: readonly StudyIssue[] }) {
   return (
     <EditorCard kicker="Lo último que ve el participante" title="Gracias">
+      <Step title="La despedida" hint="Al llegar aquí la grabación se detiene sola.">
       <Field label="Texto de despedida" optional error={fieldError(errors, undefined, 'thanks')} help={`Si lo dejas vacío se usa: "${DEFAULT_THANKS_TEXT}"`}>
         {(p) => <Textarea {...p} value={draft.thanks ?? ''} maxLength={STUDY_LIMITS.text} placeholder={DEFAULT_THANKS_TEXT} onChange={(e) => onChange(prune({ ...draft, thanks: e.target.value }, ['thanks']))} />}
       </Field>
-      <p className="text-sm text-muted-foreground">Al llegar aquí la grabación se detiene sola.</p>
+      </Step>
     </EditorCard>
   );
 }
@@ -411,66 +456,37 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
 
   return (
     <EditorCard icon={<Icon className="size-5" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.title || info.untitled}>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
+      <div className="flex flex-wrap items-center gap-2 py-6">
         {kind === 'first-click' ? (
           // Primer clic: no hay camino que grabar, solo un lugar que tocar. El toque no navega.
-          <button
-            type="button"
-            onClick={tools.picking ? tools.onCancelPick : tools.onPick}
-            aria-pressed={tools.picking}
-            className={cn(
-              'flex cursor-pointer items-start gap-3 rounded-lg border bg-background p-3.5 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring/50',
-              tools.picking && 'border-primary bg-primary/5',
-            )}
-          >
-            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-              <Crosshair className="size-4.5" />
-            </span>
-            <span className="min-w-0 text-sm">
-              <span className="block font-medium">{tools.picking ? 'Esperando tu toque…' : 'Elegir en el prototipo'}</span>
-              <span className="block text-xs leading-relaxed text-muted-foreground">
-                {tools.picking ? 'Toca en el teléfono el lugar correcto. Tu toque no cambia de pantalla. Pulsa aquí para cancelar.' : 'Toca en el teléfono el lugar correcto; Taptana anota el elemento.'}
-              </span>
-            </span>
-          </button>
+          <Button type="button" variant={tools.picking ? 'default' : 'outline'} onClick={tools.picking ? tools.onCancelPick : tools.onPick} aria-pressed={tools.picking}>
+            <Crosshair /> {tools.picking ? 'Esperando tu toque… (cancelar)' : 'Elegir en el prototipo'}
+          </Button>
         ) : (
-          <button
-            type="button"
-            onClick={tools.onRecord}
-            disabled={tools.recording}
-            className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background p-3.5 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:border-primary disabled:bg-primary/5"
-          >
-            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-red-500/10 text-red-600">
-              <Video className="size-4.5" />
-            </span>
-            <span className="min-w-0 text-sm">
-              <span className="block font-medium">{tools.recording ? 'Grabando el camino…' : 'Grabar el camino correcto'}</span>
-              <span className="block text-xs leading-relaxed text-muted-foreground">
-                {tools.recording ? 'Haz la tarea en el teléfono y pulsa "Usar este camino".' : 'Haz la tarea tú en el teléfono y llenamos por ti la pantalla de inicio, el camino y la regla.'}
-              </span>
-            </span>
-          </button>
+          <Button type="button" variant="outline" onClick={tools.onRecord} disabled={tools.recording} className="disabled:opacity-100 disabled:border-primary disabled:bg-primary/5">
+            <Video className="text-red-600" /> {tools.recording ? 'Grabando el camino…' : 'Grabar el camino correcto'}
+          </Button>
         )}
-        <button
-          type="button"
-          onClick={tools.onTryout}
-          className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background p-3.5 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        >
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-            <Play className="size-4.5" />
-          </span>
-          <span className="min-w-0 text-sm">
-            <span className="block font-medium">{kind === 'first-click' ? 'Probar este primer clic' : 'Probar esta tarea'}</span>
-            <span className="block text-xs leading-relaxed text-muted-foreground">{kind === 'first-click' ? 'Míralo como lo verá el participante. No se graba nada.' : 'Mírala como la verá el participante. No se graba nada.'}</span>
-          </span>
-        </button>
+        <Button type="button" variant="ghost" onClick={tools.onTryout}>
+          <Play /> {kind === 'first-click' ? 'Probar este primer clic' : 'Probar esta tarea'}
+        </Button>
+        <p className="w-full max-w-prose text-xs leading-relaxed text-muted-foreground">
+          {kind === 'first-click'
+            ? tools.picking
+              ? 'Toca en el teléfono el lugar correcto. Tu toque no cambia de pantalla.'
+              : 'Toca en el teléfono el lugar correcto y Taptana anota el elemento. Probar no graba nada.'
+            : tools.recording
+              ? 'Haz la tarea en el teléfono y pulsa "Usar este camino".'
+              : 'Haz la tarea tú en el teléfono y llenamos la pantalla de inicio, el camino y la regla. Probar no graba nada.'}
+        </p>
       </div>
 
-      <Field label="Título" error={err('title')} help="Corto y solo para tu equipo: así se llama la tarea en los resultados.">
+      <Step n={1} title="Qué le pides">
+      <Field label="Título" error={err('title')} help="Solo para tu equipo: así se llama en los resultados.">
         {(p) => <Input {...p} value={block.title} maxLength={STUDY_LIMITS.name} placeholder={kind === 'first-click' ? 'Encontrar el carrito' : 'Comprar una planta grande'} onChange={(e) => set({ title: e.target.value })} />}
       </Field>
 
-      <Field label="Instrucción" error={err('instruction')} help="Es lo que lee el participante en su celular.">
+      <Field label="Instrucción" error={err('instruction')} help="Lo que lee el participante en su celular.">
         {(p) => (
           <Textarea
             {...p}
@@ -486,27 +502,31 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
         <p>No uses las palabras que aparecen en la interfaz ("toca Carrito"): le estarías dando la respuesta.</p>
         <p>Una sola meta por tarea, con un final claro.</p>
       </Tips>
+      </Step>
 
+      <Step n={2} title="Dónde empieza">
       <Field
         label="Pantalla de inicio"
         optional={kind !== 'first-click'}
         error={err('startPath')}
         help={
           kind === 'first-click'
-            ? 'La pantalla donde se le hace la pregunta. Revisa en el teléfono que el elemento correcto esté en ella.'
-            : 'El participante empieza la tarea aquí. Si la dejas vacía, sigue donde quedó en el bloque anterior.'
+            ? 'Donde se hace la pregunta. Revisa que el elemento correcto esté en ella.'
+            : 'Si la dejas vacía, sigue donde quedó en el bloque anterior.'
         }
       >
         {(p) => <ScreenPicker {...p} value={block.startPath ?? ''} onChange={(startPath) => set({ startPath })} screens={tools.screens} phoneScreen={tools.phoneScreen} urlOnly />}
       </Field>
       {kind === 'first-click' && !block.startPath && (
-        <p className="-mt-3 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+        <p className="-mt-4 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
           <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
           Sin pantalla de inicio, la pregunta se hace donde el participante haya quedado, y ahí puede no estar lo que buscas.
         </p>
       )}
+      </Step>
 
-      <fieldset className="space-y-3">
+      <Step n={3} title={kind === 'first-click' ? 'Cuál es el toque correcto' : 'Cuándo se logra'}>
+      <fieldset className="space-y-4">
         <legend className="mb-1.5 text-sm font-medium">{kind === 'first-click' ? '¿Cuál es el toque correcto?' : '¿Cómo se sabe que lo logró?'}</legend>
         <OptionCards name={`Regla de éxito de ${block.title || 'la tarea'}`} value={rule?.type} options={ruleOptions} onChange={(type) => type !== rule?.type && set({ success: emptyRule(type) })} />
         {!rule && ruleError && <p className="text-sm text-destructive">{ruleError}</p>}
@@ -517,7 +537,7 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
           </Field>
         )}
         {kind === 'task' && rule?.type === 'reached' && rule.path.trim() && tools.autoAdvance && endsOnGoal(block.expectedPath, rule.path) && (
-          <div className="flex gap-3 rounded-lg bg-muted/50 px-3.5 py-3 text-xs leading-relaxed text-muted-foreground" data-testid="auto-advance-hint">
+          <div className="flex gap-3 rounded-xl bg-muted/50 px-4 py-3.5 text-xs leading-relaxed text-muted-foreground" data-testid="auto-advance-hint">
             <Lightbulb className="mt-0.5 size-4 shrink-0" />
             <div className="space-y-2">
               <p>Al llegar, la tarea termina sola y el participante pasa al siguiente paso sin detenerse en esa pantalla. Si quieres que la vea, elige «espera a que toque Listo».</p>
@@ -532,7 +552,7 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
         {rule?.type === 'tapped' && (
           <div className="space-y-3">
             {rule.selector ? (
-              <div className="space-y-1.5 rounded-lg border bg-muted/40 px-3.5 py-3">
+              <div className="space-y-1.5 rounded-xl bg-muted/50 px-4 py-3.5">
                 <p className="text-sm">
                   Elemento elegido: <code className="rounded bg-background px-1.5 py-0.5 font-mono text-xs break-all">{rule.selector}</code>
                 </p>
@@ -571,19 +591,21 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
         )}
 
         {rule?.type === 'manual' && (
-          <p className="rounded-lg bg-muted/50 px-3.5 py-3 text-sm text-muted-foreground">
+          <p className="rounded-xl bg-muted/50 px-4 py-3.5 text-sm text-muted-foreground">
             Taptana no puede saber sola si lo logró. Cuando el participante toque "Listo", el resultado queda <strong className="font-medium text-foreground">por revisar</strong> hasta que lo marques en la grabación.
           </p>
         )}
       </fieldset>
+      </Step>
 
       {kind === 'task' && (
+        <AdvancedStep defaultOpen={(block.expectedPath?.length ?? 0) > 0 || missed.length > 0 || Boolean(err('expectedPath'))}>
         <fieldset className="space-y-3">
           <legend className="mb-1.5 flex items-center gap-2 text-sm font-medium">
             <RouteIcon className="size-4 text-muted-foreground" /> Camino esperado <span className="text-xs font-normal text-muted-foreground">opcional</span>
           </legend>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Las pantallas del camino ideal, en orden. Quien lo sigue tal cual cuenta como <strong className="font-medium text-foreground">éxito directo</strong>; quien llega por otro lado, como indirecto. Si lo dejas vacío se usa el camino más común de quienes lo lograron.
+          <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
+            Las pantallas del camino ideal, en orden. Seguirlo tal cual cuenta como <strong className="font-medium text-foreground">éxito directo</strong>; vacío, se usa el más común.
           </p>
           {err('expectedPath') && <p className="text-sm text-destructive">{err('expectedPath')}</p>}
           {missed.length > 0 && (
@@ -616,6 +638,7 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
             </Button>
           )}
         </fieldset>
+        </AdvancedStep>
       )}
     </EditorCard>
   );
@@ -705,13 +728,13 @@ export function QuestionEditor({ block, index, onChange, errors }: { block: Ques
   const set = (patch: Partial<QuestionBlock>): void => onChange(prune({ ...block, ...patch } as QuestionBlock, ['description', 'required']));
   return (
     <EditorCard icon={<Icon className="size-5" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.question || info.untitled}>
+      <Step n={1} title="Qué preguntas">
       <Field label="Pregunta" error={err('question')} help="Es lo que lee el participante.">
         {(p) => <Textarea {...p} value={block.question} maxLength={STUDY_LIMITS.question} placeholder={QUESTION_PLACEHOLDER[block.kind]} onChange={(e) => set({ question: e.target.value })} />}
       </Field>
-      <Field label="Aclaración" optional error={err('description')} help="Una línea más pequeña debajo de la pregunta.">
-        {(p) => <Input {...p} value={block.description ?? ''} maxLength={STUDY_LIMITS.question} onChange={(e) => set({ description: e.target.value })} />}
-      </Field>
+      </Step>
 
+      <Step n={2} title="Cómo responde">
       {block.kind === 'scale' && <ScaleEditor block={block} onChange={onChange} errors={errors} />}
       {block.kind === 'choice' && (
         <>
@@ -731,7 +754,14 @@ export function QuestionEditor({ block, index, onChange, errors }: { block: Ques
         </Field>
       )}
 
-      <SwitchRow label="Obligatoria" hint="Encendido, no se puede saltar. Apagado, aparece «Saltar»." checked={block.required === true} onChange={(required) => set({ required })} />
+      </Step>
+
+      <AdvancedStep defaultOpen={Boolean(block.description) || block.required === true || Boolean(err('description'))}>
+        <Field label="Aclaración" optional error={err('description')} help="Una línea más pequeña debajo de la pregunta.">
+          {(p) => <Input {...p} value={block.description ?? ''} maxLength={STUDY_LIMITS.question} onChange={(e) => set({ description: e.target.value })} />}
+        </Field>
+        <SwitchRow label="Obligatoria" hint="Encendido, no se puede saltar. Apagado, aparece «Saltar»." checked={block.required === true} onChange={(required) => set({ required })} />
+      </AdvancedStep>
     </EditorCard>
   );
 }
@@ -743,13 +773,14 @@ export function ContextEditor({ block, index, onChange, errors }: { block: Conte
   const Icon = info.icon;
   return (
     <EditorCard icon={<Icon className="size-5" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.title || info.untitled}>
+      <Step title="Qué lee el participante" hint='Lo lee y toca "Continuar". No se le pide nada.'>
       <Field label="Título" error={fieldError(errors, block.id, 'title')}>
         {(p) => <Input {...p} value={block.title} maxLength={STUDY_LIMITS.name} placeholder="Antes de seguir" onChange={(e) => onChange({ ...block, title: e.target.value })} />}
       </Field>
-      <Field label="Texto" error={fieldError(errors, block.id, 'text')} help='Sirve para poner en situación: "Ahora imagina que ya compraste y quieres saber cuándo llega".'>
+      <Field label="Texto" error={fieldError(errors, block.id, 'text')} help='Pon en situación: "Imagina que ya compraste y quieres saber cuándo llega".'>
         {(p) => <Textarea {...p} value={block.text} maxLength={STUDY_LIMITS.text} onChange={(e) => onChange({ ...block, text: e.target.value })} />}
       </Field>
-      <p className="text-sm text-muted-foreground">El participante lo lee y toca "Continuar". No se le pide nada.</p>
+      </Step>
     </EditorCard>
   );
 }

@@ -2,12 +2,10 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowRight, BarChart3, Check, FileArchive, FlaskConical, Info, Lock, Share2, Smartphone, Sparkles, Code2 } from 'lucide-react';
 import { EXAMPLE_PROTOTYPE_ID, EXAMPLE_STUDY_ID, type Prototype, type SessionSummary, type StudyRecord } from '@taptana/shared';
 import { getClient, IS_DEMO } from '@/api/client';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toast';
-import { ErrorState, Layout } from '@/components/layout';
+import { ErrorState, Layout, Notice } from '@/components/layout';
 import { friendlyError } from '@/lib/errors';
 import { plural } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -131,13 +129,13 @@ export function HomePage() {
 
   return (
     <Layout>
-      <section className="rounded-2xl border bg-background px-6 py-8 sm:px-10 sm:py-12">
+      <section className="pt-2 sm:pt-6 pb-2">
         <p className="text-sm font-medium text-muted-foreground">Pruebas de usabilidad para prototipos HTML</p>
-        <h1 className="mt-2 text-3xl sm:text-4xl font-semibold tracking-tight text-balance">Prueba tu prototipo con personas reales</h1>
-        <p className="mt-3 max-w-2xl text-muted-foreground sm:text-lg">
+        <h1 className="mt-3 max-w-3xl text-3xl sm:text-5xl font-semibold tracking-tight text-balance leading-tight">Prueba tu prototipo con personas reales</h1>
+        <p className="mt-5 max-w-prose text-muted-foreground text-base sm:text-lg leading-relaxed">
           Sube tu prototipo, arma las tareas, comparte un link y mira qué pasó: quién lo logró, dónde se trabó y la grabación de cada sesión.
         </p>
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-8 flex flex-wrap gap-3">
           {next?.action && !next.blocked ? (
             <Button size="lg" asChild>
               <Link to={next.action.to}>
@@ -155,28 +153,22 @@ export function HomePage() {
             <Sparkles /> {loadingExample ? 'Cargando el ejemplo…' : 'Ver un ejemplo'}
           </Button>
         </div>
-        <p className="mt-3 text-sm text-muted-foreground">
+        <p className="mt-4 max-w-prose text-sm text-muted-foreground leading-relaxed">
           El ejemplo es una tienda con un estudio ya hecho y varios participantes, para que veas un reporte completo antes de armar el tuyo.
         </p>
       </section>
 
       {IS_DEMO && (
-        <Alert variant="warning">
-          <Info />
-          <AlertTitle>Estás en la demo: todo vive en este navegador</AlertTitle>
-          <AlertDescription>
-            <p>
-              Puedes subir tu prototipo, armar un estudio, hacerlo tú como participante y ver el reporte. Nada se envía a ningún servidor.
-            </p>
-            <p>
-              Lo que no se puede aquí: compartir el link con otra persona o abrirlo en un celular. Para probar con gente de verdad, instala Taptana en tu
-              computadora (es gratis y de código abierto) y arráncalo con <code className="text-foreground">pnpm start</code>.
-            </p>
-          </AlertDescription>
-        </Alert>
+        <Notice tone="warning" icon={<Info />} title="Estás en la demo: todo vive en este navegador">
+          <p>Puedes subir tu prototipo, armar un estudio, hacerlo tú como participante y ver el reporte. Nada se envía a ningún servidor.</p>
+          <p>
+            Lo que no se puede aquí: compartir el link con otra persona o abrirlo en un celular. Para probar con gente de verdad, instala Taptana en tu
+            computadora (es gratis y de código abierto) y arráncalo con <code className="text-foreground">pnpm start</code>.
+          </p>
+        </Notice>
       )}
 
-      <section aria-labelledby="pasos" className="space-y-4">
+      <section aria-labelledby="pasos" className="space-y-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="pasos" className="text-xl font-semibold tracking-tight">
             Tu primera prueba, en 4 pasos
@@ -188,23 +180,23 @@ export function HomePage() {
         ) : !steps ? (
           <div className="space-y-3" aria-busy="true" aria-label="Cargando">
             {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-24 rounded-xl" />
+              <Skeleton key={i} className={cn('rounded-xl', i === 0 ? 'h-36' : 'h-12')} />
             ))}
           </div>
         ) : (
-          <ol className="space-y-3">
+          <ol className="relative">
             {steps.map((step, i) => (
-              <StepCard key={step.title} step={step} index={i} current={i === current} />
+              <StepItem key={step.title} step={step} index={i} current={i === current} last={i === steps.length - 1} />
             ))}
           </ol>
         )}
       </section>
 
-      <section aria-labelledby="que-es" className="space-y-4">
+      <section aria-labelledby="que-es" className="space-y-6">
         <h2 id="que-es" className="text-xl font-semibold tracking-tight">
           Qué es Taptana
         </h2>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 sm:grid-cols-3">
           <Fact icon={<Code2 className="size-5" />} title="Funciona con tu HTML">
             Prototipos hechos con IA o a mano: varias páginas, una sola página o un solo archivo. Se suben tal cual.
           </Fact>
@@ -222,56 +214,77 @@ export function HomePage() {
   );
 }
 
-function StepCard({ step, index, current }: { step: Step; index: number; current: boolean }) {
+/**
+ * Un paso del recorrido. Solo el paso actual se abre (texto y botón); los hechos muestran una
+ * marca y una línea; los que vienen quedan en gris, en una sola línea.
+ */
+function StepItem({ step, index, current, last }: { step: Step; index: number; current: boolean; last: boolean }) {
   const Icon = step.icon;
+  const future = !step.done && !current;
   return (
-    <li>
-      <Card className={cn('py-0 gap-0 transition-shadow', current && 'border-primary/50 shadow-md')}>
-        <CardContent className="px-5 py-4 flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="flex items-start gap-4 flex-1 min-w-0">
-            <div
-              className={cn(
-                'size-9 shrink-0 rounded-full grid place-items-center text-sm font-semibold',
-                step.done ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : current ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-              )}
-              aria-hidden
-            >
-              {step.done ? <Check className="size-4.5" /> : index + 1}
-            </div>
-            <div className="min-w-0 space-y-1">
-              <h3 className="font-semibold flex flex-wrap items-center gap-2">
-                <Icon className="size-4 text-muted-foreground" aria-hidden />
+    <li className="relative flex gap-4 sm:gap-5">
+      {!last && <span aria-hidden className="absolute left-[17px] top-10 bottom-0 w-px bg-border" />}
+      <div
+        className={cn(
+          'relative z-10 size-9 shrink-0 rounded-full grid place-items-center text-sm font-semibold',
+          step.done ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : current ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+        )}
+        aria-hidden
+      >
+        {step.done ? <Check className="size-4.5" /> : index + 1}
+      </div>
+      <div className={cn('min-w-0 flex-1', last ? 'pb-0' : current ? 'pb-8' : 'pb-6')}>
+        {current ? (
+          <div className="rounded-2xl border bg-background p-(--card-pad) space-y-4 -mt-1">
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold flex flex-wrap items-center gap-2">
+                <Icon className="size-4.5 text-muted-foreground" aria-hidden />
                 <span>
                   <span className="sr-only">Paso {index + 1}: </span>
                   {step.title}
                 </span>
-                {step.done && <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Listo</span>}
-                {current && <span className="text-xs font-medium text-muted-foreground">Sigue aquí</span>}
+                <span className="text-xs font-medium text-muted-foreground">Sigue aquí</span>
               </h3>
-              <p className="text-sm text-muted-foreground">{step.text}</p>
+              <p className="max-w-prose text-muted-foreground leading-relaxed">{step.text}</p>
             </div>
-          </div>
-          <div className="sm:shrink-0 pl-13 sm:pl-0">
             {step.action && !step.blocked ? (
-              <Button variant={current ? 'default' : 'outline'} asChild>
+              <Button asChild>
                 <Link to={step.action.to}>{step.action.label}</Link>
               </Button>
             ) : (
-              <p className="text-sm text-muted-foreground">{step.blocked}</p>
+              step.blocked && <p className="text-sm text-muted-foreground">{step.blocked}</p>
             )}
           </div>
-        </CardContent>
-      </Card>
+        ) : (
+          <div className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1">
+            <h3 className={cn('font-medium', future && 'text-muted-foreground')}>
+              <span className="sr-only">Paso {index + 1}: </span>
+              {step.title}
+            </h3>
+            {step.done && (
+              <>
+                <span className="sr-only">Listo.</span>
+                <span className="min-w-0 truncate text-sm text-muted-foreground">{step.text}</span>
+                {step.action && (
+                  <Link to={step.action.to} className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
+                    {step.action.label}
+                  </Link>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </li>
   );
 }
 
 function Fact({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
   return (
-    <div className="rounded-xl border bg-background p-5 space-y-2">
-      <div className="size-9 rounded-lg bg-muted grid place-items-center text-muted-foreground">{icon}</div>
+    <div className="rounded-2xl bg-muted/60 p-(--card-pad) space-y-3">
+      <div className="size-10 rounded-xl bg-background grid place-items-center text-muted-foreground">{icon}</div>
       <h3 className="font-semibold">{title}</h3>
-      <p className="text-sm text-muted-foreground">{children}</p>
+      <p className="text-sm text-muted-foreground leading-relaxed">{children}</p>
     </div>
   );
 }

@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, ExternalLink, FileArchive, FlaskConical, FolderOpen, Info, Pencil, RefreshCw, Trash2, TriangleAlert, Upload } from 'lucide-react';
+import { Check, ChevronDown, Copy, Ellipsis, ExternalLink, FileArchive, FlaskConical, FolderOpen, Info, Pencil, RefreshCw, Trash2, TriangleAlert, Upload } from 'lucide-react';
 import { EXAMPLE_PROTOTYPE_ID, STUDY_LIMITS, type Prototype, type ScreenInfo, type ServerInfo } from '@taptana/shared';
 import { getClient, IS_DEMO } from '@/api/client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input, Label } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/toast';
-import { EmptyState, ErrorState, InlineError, Layout, ListSkeleton, PageHeader } from '@/components/layout';
+import { EmptyState, ErrorState, InlineError, Layout, ListSkeleton, Notice, PageHeader, Section } from '@/components/layout';
 import { copyText } from '@/lib/download';
 import { friendlyError } from '@/lib/errors';
 import { plural } from '@/lib/format';
@@ -113,16 +113,12 @@ export function PrototypesPage() {
       />
 
       {IS_DEMO && (
-        <Alert variant="warning">
-          <Info />
-          <AlertTitle>Demo: el prototipo que subas vive en este navegador</AlertTitle>
-          <AlertDescription>
-            <p>
-              Puedes armar un estudio y hacerlo tú mismo para ver cómo funciona. El link no abre en otro dispositivo: para probar con celulares, corre Taptana en tu
-              computadora con <code className="text-foreground">pnpm start</code>.
-            </p>
-          </AlertDescription>
-        </Alert>
+        <Notice tone="warning" icon={<Info />} title="Demo: el prototipo que subas vive en este navegador">
+          <p>
+            Puedes armar un estudio y hacerlo tú mismo para ver cómo funciona. El link no abre en otro dispositivo: para probar con celulares, corre Taptana en tu
+            computadora con <code className="text-foreground">pnpm start</code>.
+          </p>
+        </Notice>
       )}
 
       {problem ? (
@@ -134,8 +130,8 @@ export function PrototypesPage() {
           </AlertDescription>
         </Alert>
       ) : (
-        <Card className="py-5 gap-4">
-          <CardContent className="px-5 space-y-4">
+        <Section title="Subir un prototipo">
+          <div className="space-y-5">
             <div
               role="button"
               tabIndex={0}
@@ -160,18 +156,20 @@ export function PrototypesPage() {
                 if (f) void upload(f);
               }}
               className={cn(
-                'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 text-center cursor-pointer transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                dragging ? 'border-primary bg-accent' : 'hover:bg-accent/50',
+                'flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-background px-6 py-12 sm:py-14 text-center cursor-pointer transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                dragging ? 'border-primary bg-accent' : 'hover:border-foreground/30',
                 busy && 'opacity-60 cursor-wait',
               )}
             >
-              <Upload className="size-6 text-muted-foreground" />
+              <span className="grid size-12 place-items-center rounded-full bg-muted text-muted-foreground">
+                <Upload className="size-5" />
+              </span>
               <p className="font-medium">{busy ? 'Subiendo…' : 'Arrastra aquí tu .html o .zip, o haz clic para elegirlo'}</p>
-              <p className="text-muted-foreground text-xs max-w-md">
+              <p className="text-muted-foreground text-sm leading-relaxed max-w-md">
                 Un zip puede traer varias páginas, estilos, scripts e imágenes. Se abre <code>index.html</code>; si no hay, el primer HTML. Hasta 50 MB.
               </p>
             </div>
-            <div className="max-w-sm">
+            <div className="max-w-sm space-y-2">
               <Label htmlFor="proto-name">Nombre (opcional)</Label>
               <Input id="proto-name" value={name} maxLength={STUDY_LIMITS.name} onChange={(e) => setName(e.target.value)} placeholder="Si lo dejas vacío, se usa el nombre del archivo" />
             </div>
@@ -187,8 +185,8 @@ export function PrototypesPage() {
                 e.target.value = '';
               }}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </Section>
       )}
 
       {error && <InlineError onDismiss={() => setError(null)}>{error}</InlineError>}
@@ -196,17 +194,16 @@ export function PrototypesPage() {
       {loadError && protos === null ? (
         <ErrorState message={loadError} onRetry={() => void load()} />
       ) : protos === null || !info ? (
-        <ListSkeleton variant="cards" count={2} />
+        <ListSkeleton count={2} />
       ) : protos.length === 0 ? (
         <EmptyState icon={<FileArchive className="size-6" />} title="Todavía no hay prototipos">
           <p>Sube el tuyo arriba. Si quieres ver primero cómo se ve todo con datos, en Inicio hay un ejemplo listo.</p>
         </EmptyState>
       ) : (
-        <>
-          {!hasOwn && !problem && <p className="text-sm text-muted-foreground">Este es el prototipo de ejemplo. Cuando subas el tuyo aparecerá aquí.</p>}
-          <div className="grid gap-4 md:grid-cols-2 items-start">
+        <Section title="Tus prototipos" description={!hasOwn && !problem ? 'Este es el prototipo de ejemplo. Cuando subas el tuyo aparecerá aquí.' : undefined}>
+          <ul className="space-y-3" aria-label="Tus prototipos">
             {protos.map((p) => (
-              <PrototypeCard
+              <PrototypeRow
                 key={p.id}
                 proto={p}
                 info={info}
@@ -219,8 +216,8 @@ export function PrototypesPage() {
                 onRoot={(root) => void setRoot(p, root)}
               />
             ))}
-          </div>
-        </>
+          </ul>
+        </Section>
       )}
 
       <ConfirmDialog
@@ -309,7 +306,7 @@ function RenameDialog({ proto, onClose, onDone }: { proto: Prototype; onClose: (
   );
 }
 
-function PrototypeCard({
+function PrototypeRow({
   proto,
   info,
   canRoot,
@@ -332,6 +329,7 @@ function PrototypeCard({
 }) {
   const [copied, setCopied] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const replaceInput = useRef<HTMLInputElement>(null);
   const isExample = proto.id === EXAMPLE_PROTOTYPE_ID;
   const uploaded = proto.source === 'upload';
@@ -341,9 +339,9 @@ function PrototypeCard({
   const sessions = proto.sessionCount ?? 0;
 
   useEffect(() => {
-    if (!link) return;
+    if (!link || !open) return;
     void getClient().then((c) => setQr(c.qrImageUrl(link)));
-  }, [link]);
+  }, [link, open]);
 
   const copy = async (): Promise<void> => {
     if (await copyText(link)) {
@@ -352,34 +350,96 @@ function PrototypeCard({
     } else toast.error('No se pudo copiar. Selecciona el link y cópialo a mano.');
   };
 
+  const canDelete = (uploaded || foreign) && !isExample;
   return (
-    <Card className="py-5 gap-4">
-      <CardHeader className="px-5">
-        <CardTitle className="text-base flex items-start gap-2">
-          {uploaded ? <FileArchive className="size-4 mt-0.5 shrink-0" aria-hidden /> : <FolderOpen className="size-4 mt-0.5 shrink-0" aria-hidden />}
-          <span className="min-w-0 break-words leading-snug">{proto.name}</span>
-        </CardTitle>
-        <CardDescription className="flex flex-wrap gap-x-1.5 gap-y-1 items-center">
-          <Badge variant="secondary">{isExample ? 'Ejemplo' : foreign ? 'Importado' : uploaded ? 'Subido' : 'Carpeta local'}</Badge>
-          {proto.root && <Badge variant="outline">En la raíz</Badge>}
-          <span>{plural(sessions, 'sesión', 'sesiones', 'Sin sesiones')}</span>
-          {proto.createdAt > 0 && <span>· subido {formatRelative(proto.createdAt)}</span>}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-5 space-y-4">
+    <li className="rounded-2xl border border-border/70 bg-card">
+      <div className="flex min-h-16 flex-wrap items-center gap-x-4 gap-y-3 px-(--card-pad) py-4">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground" aria-hidden>
+          {uploaded ? <FileArchive className="size-5" /> : <FolderOpen className="size-5" />}
+        </span>
+        <div className="min-w-0 flex-1 basis-48">
+          <h3 className="font-semibold leading-snug break-words">{proto.name}</h3>
+          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+            <Badge variant="secondary">{isExample ? 'Ejemplo' : foreign ? 'Importado' : uploaded ? 'Subido' : 'Carpeta local'}</Badge>
+            {proto.root && <Badge variant="outline">En la raíz</Badge>}
+            <span>{plural(sessions, 'sesión', 'sesiones', 'Sin sesiones')}</span>
+            {proto.createdAt > 0 && <span>· subido {formatRelative(proto.createdAt)}</span>}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {!foreign && (
+            <Button size="sm" asChild>
+              <Link to={{ name: 'study', id: null }}>
+                <FlaskConical /> Crear estudio
+              </Link>
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" aria-expanded={open} aria-controls={`detalles-${proto.id}`} onClick={() => setOpen((o) => !o)}>
+            Detalles <ChevronDown className={cn('transition-transform', open && 'rotate-180')} />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="size-8" aria-label={`Más acciones de «${proto.name}»`}>
+                <Ellipsis />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {!foreign && (
+                <>
+                  <DropdownMenuItem onSelect={() => void copy()}>
+                    <Copy /> Copiar link
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <a href={link} target="_blank" rel="noreferrer">
+                      <ExternalLink /> Abrir
+                    </a>
+                  </DropdownMenuItem>
+                </>
+              )}
+              {uploaded && canReplace && !isExample && (
+                <DropdownMenuItem disabled={busy} onSelect={() => replaceInput.current?.click()} title="Mantiene el mismo link, sus estudios y sesiones">
+                  <RefreshCw /> Subir nueva versión
+                </DropdownMenuItem>
+              )}
+              {uploaded && !isExample && (
+                <DropdownMenuItem onSelect={onRename}>
+                  <Pencil /> Cambiar nombre
+                </DropdownMenuItem>
+              )}
+              {canDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem destructive onSelect={onDelete}>
+                    <Trash2 /> Borrar
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <input
+            ref={replaceInput}
+            type="file"
+            accept={ACCEPT}
+            className="hidden"
+            aria-label={`Nueva versión de ${proto.name}`}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onReplace(f);
+              e.target.value = '';
+            }}
+          />
+        </div>
+      </div>
+      {open && (
+      <div id={`detalles-${proto.id}`} className="space-y-6 border-t border-border/70 px-(--card-pad) py-6">
         {foreign ? (
           <p className="text-sm text-muted-foreground">
             Estas sesiones se importaron de otro lugar y su prototipo no está aquí. Puedes ver las grabaciones en Sesiones.
           </p>
         ) : (
           <>
-            {qr && (
-              <div className="flex justify-center rounded-lg bg-white p-3">
-                <img src={qr} alt={`Código QR para abrir ${proto.name} en un celular`} width={160} height={160} />
-              </div>
-            )}
-            <div className="space-y-1.5">
-              {/* Sin mb-0: en Tailwind v4 `space-y` separa con margen inferior, y mb-0 dejaba la etiqueta pegada al campo. */}
+            <div className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+            <div className="space-y-2">
               <Label htmlFor={`link-${proto.id}`}>Link del prototipo (sin estudio)</Label>
               <Input id={`link-${proto.id}`} readOnly value={link} className="font-mono text-xs" onFocus={(e) => e.target.select()} />
               <div className="flex flex-wrap gap-2 pt-1">
@@ -391,17 +451,18 @@ function PrototypeCard({
                     <ExternalLink /> Abrir
                   </a>
                 </Button>
-                <Button size="sm" asChild>
-                  <Link to={{ name: 'study', id: null }}>
-                    <FlaskConical /> Crear estudio
-                  </Link>
-                </Button>
               </div>
-              <p className="text-xs text-muted-foreground">Quien abra este link usa el prototipo libremente y queda grabado. Para pedir tareas y consentimiento, crea un estudio.</p>
+              <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">Quien abra este link usa el prototipo libremente y queda grabado. Para pedir tareas y consentimiento, crea un estudio.</p>
+            </div>
+            {qr && (
+              <div className="justify-self-center rounded-xl bg-white p-3">
+                <img src={qr} alt={`Código QR para abrir ${proto.name} en un celular`} width={140} height={140} />
+              </div>
+            )}
             </div>
 
             {uploaded && canRoot && (
-              <div className={cn('rounded-lg border p-3 space-y-1.5', proto.absoluteUrls && !proto.root && 'border-amber-500/50 bg-amber-500/5')}>
+              <div className={cn('rounded-xl bg-muted/50 p-4 space-y-1.5', proto.absoluteUrls && !proto.root && 'bg-amber-500/10')}>
                 <div className="flex items-center justify-between gap-3">
                   <Label htmlFor={`root-${proto.id}`} className="mb-0">
                     Abrir en la raíz
@@ -428,38 +489,9 @@ function PrototypeCard({
             <Screens prototypeId={proto.id} />
           </>
         )}
-
-        {(uploaded || foreign) && !isExample && (
-          <div className="flex flex-wrap gap-2 border-t pt-4">
-            {uploaded && canReplace && (
-              <Button variant="outline" size="sm" disabled={busy} onClick={() => replaceInput.current?.click()} title="Mantiene el mismo link, sus estudios y sesiones">
-                <RefreshCw /> Subir nueva versión
-              </Button>
-            )}
-            {uploaded && (
-              <Button variant="outline" size="sm" onClick={onRename}>
-                <Pencil /> Cambiar nombre
-              </Button>
-            )}
-            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive ml-auto" onClick={onDelete}>
-              <Trash2 /> Borrar
-            </Button>
-            <input
-              ref={replaceInput}
-              type="file"
-              accept={ACCEPT}
-              className="hidden"
-              aria-label={`Nueva versión de ${proto.name}`}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) onReplace(f);
-                e.target.value = '';
-              }}
-            />
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+      )}
+    </li>
   );
 }
 
