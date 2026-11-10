@@ -56,19 +56,21 @@ export function topBandBottom(doc: Document = document): number | null {
       break;
     }
   }
-  if (bottom !== null) return Math.round(bottom);
   // 2. Un <header> (o role="banner") pegado arriba.
-  for (const el of Array.from(doc.querySelectorAll('header, [role="banner"]')).slice(0, 8)) {
-    if (ours(el)) continue;
-    const r = box(el);
-    if (r && r.top >= -4 && r.top <= 8 && r.width >= W * 0.5) take(r.bottom);
+  if (bottom === null) {
+    for (const el of Array.from(doc.querySelectorAll('header, [role="banner"]')).slice(0, 8)) {
+      if (ours(el)) continue;
+      const r = box(el);
+      if (r && r.top >= -4 && r.top <= 8 && r.width >= W * 0.5) take(r.bottom);
+    }
   }
-  if (bottom !== null) return Math.round(bottom);
-  // 3. El primer título dentro de la franja de arriba.
+  // 3. El primer título dentro de la franja de arriba, o justo debajo de la barra (donde caería
+  //    la píldora): también se esquiva.
+  const reach = Math.max(TOP_BAND_PX, (bottom ?? 0) + PILL_GAP_PX + 44);
   for (const el of Array.from(doc.querySelectorAll('h1, h2, h3, [role="heading"]')).slice(0, 40)) {
     if (ours(el)) continue;
     const r = box(el);
-    if (!r || r.bottom <= 0 || r.top >= TOP_BAND_PX) continue;
+    if (!r || r.bottom <= (bottom ?? 0) || r.top >= reach) continue;
     take(r.bottom);
     break;
   }

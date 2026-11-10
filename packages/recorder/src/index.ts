@@ -30,7 +30,7 @@ import { getBasePath, lastScreen, saveLastScreen, setBasePath, startSession, url
 import { StudyController, type StudyHost } from './study.js';
 import { freshState, isReturn, openStudy, StudyStore } from './study-state.js';
 import { StudyUi } from './study-ui.js';
-import { shortSelector } from './target.js';
+import { describeTarget, shortSelector } from './target.js';
 import { HttpTransport, LocalTransport, type Transport } from './transport.js';
 import { watchViewport } from './viewport.js';
 
@@ -234,6 +234,47 @@ function runDemo(): void {
     },
   });
   postToPanel({ source: 'taptana', type: 'ready', screen: sensors.tracker.current, title: sensors.tracker.title });
+
+  // "Elegir en el prototipo": el panel pide el próximo toque. Ese toque se avisa (`picked`) y NO
+  // activa el prototipo: ni navega ni abre nada. Se escucha en la ventana y en captura, antes que
+  // cualquier listener del prototipo (y que los sensores, para no avisarlo dos veces).
+  let picking = false;
+  window.addEventListener('message', (e) => {
+    if (window.parent === window || e.source !== window.parent || !isPanelMessage(e.data) || e.data.type !== 'pick') return;
+    picking = e.data.cancel !== true;
+  });
+  const ours = (target: EventTarget | null): boolean => target instanceof Element && target.closest('[data-taptana-ui]') !== null;
+  const swallow = (e: Event): void => {
+    if (!picking || ours(e.target)) return;
+    e.stopImmediatePropagation();
+    // Sin el mousedown, el campo no toma el foco ni se abre un <select>.
+    if (e.type === 'mousedown' && e.cancelable) e.preventDefault();
+  };
+  for (const type of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend']) {
+    window.addEventListener(type, swallow, { capture: true, passive: false });
+  }
+  window.addEventListener(
+    'click',
+    (e) => {
+      if (!picking || ours(e.target)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const element = e.target instanceof Element ? e.target : null;
+      if (!element) return;
+      picking = false;
+      postToPanel({
+        source: 'taptana',
+        type: 'tap',
+        screen: sensors.tracker.current,
+        x: Math.round(e.clientX),
+        y: Math.round(e.clientY),
+        target: describeTarget(element),
+        selector: shortSelector(element),
+        picked: true,
+      });
+    },
+    { capture: true },
+  );
 }
 
 /**
@@ -297,13 +338,21 @@ function runTryout(config: RecorderConfig): void {
 
   // El panel puede mandar el estudio (el borrador) en cualquier momento: la prueba empieza con él.
   window.addEventListener('message', (e) => {
-    if (window.parent === window || e.source !== window.parent || !isPanelMessage(e.data)) return;
+    if (window.parent === window || e.source !== window.parent || !isPanelMessage(e.data) || e.data.type !== 'study') return;
     const study = draftStudy(e.data.study);
     if (!study) return;
     controller ??= new StudyController(host, store, ui, freshState(study.id), study);
     controller.load(study, e.data.startAt);
   });
   postToPanel({ source: 'taptana', type: 'ready', screen: sensors.tracker.current, title: sensors.tracker.title });
+  // Escape dentro del iframe no le llega al panel: se le avisa para que cierre el diálogo.
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key === 'Escape') postToPanel({ source: 'taptana', type: 'tryout', event: 'escape' });
+    },
+    true,
+  );
 
   // Una página siguiente de la misma prueba continúa donde iba.
   const saved = isTryoutEntry() ? null : store.read();
@@ -343,8 +392,9 @@ function main(): void {
     else if (mode === 'tryout') runTryout(config);
     else runRecord(config);
   };
-  // El script suele ir al final del <body>. Si lo pegaron en el <head>, se espera al documento.
-  if (document.body) run();
+  // El script suele ir al final del <body>. Si lo pegaron en el <head>, se espera al documento;
+  // salvo en modo demo, que solo escucha: ahí se empieza ya, para no perder un toque temprano.
+  if (document.body || mode === 'demo') run();
   else document.addEventListener('DOMContentLoaded', run, { once: true });
 }
 

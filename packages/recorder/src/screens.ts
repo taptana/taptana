@@ -15,6 +15,15 @@
  * prototipo multipágina nunca recibe nombres virtuales por tener un `hidden` o un encabezado, y
  * sin una señal clara no se inventan pantallas (un contador, un carrusel o escribir no cuentan).
  *
+ * Excepción, "pantallas con nombre": si en la página que CARGA ya se reconoce un marcador
+ * (`data-screen`) o un grupo claro de hermanos (uno visible, otros parecidos escondidos), todas
+ * sus pantallas llevan su nombre, también la primera ("/index.html~inicio"). Así la pantalla
+ * inicial se llama igual en todas las sesiones, sin depender de cuál estaba a la vista al
+ * cargar, y las reglas coinciden. Si el patrón se reconoce un poco después (la página se dibuja
+ * tarde), se emite una navegación que corrige el nombre. No aplica a prototipos con rutas por
+ * hash ni a páginas que enlazan a otras páginas del sitio (ahí la URL ya dice la pantalla; un
+ * marcador `data-screen` sí vale siempre), ni a grupos dudosos (solo comparten etiqueta).
+ *
  * Un contenedor con `data-taptana-ignore` queda fuera de la detección.
  */
 
@@ -173,7 +182,42 @@ function groupMembers(group: Group): Element[] {
   );
 }
 
-type Found = { name: string; el: Element } | 'unsure' | null;
+/**
+ * `strong`: marcador explícito o hermanos que se parecen de verdad (no solo la misma etiqueta).
+ * `marked`: salió de un marcador (`data-screen`), que es una decisión de quien hizo el prototipo.
+ */
+type Found = { name: string; el: Element; strong: boolean; marked?: boolean } | 'unsure' | null;
+
+/** ¿El prototipo navega con rutas por hash? Ahí la URL ya identifica cada pantalla. */
+function hashRouted(): boolean {
+  if (screenParts(location.href).hash) return true;
+  try {
+    return document.querySelector('a[href^="#/"], a[href^="#!"]') !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * ¿La página enlaza a otras páginas del mismo sitio? En un prototipo multipágina la URL ya dice
+ * la pantalla; un grupo de hermanos ahí suele ser un modal o una pestaña, no "las pantallas".
+ */
+function linksToOtherPages(): boolean {
+  const anchors = document.querySelectorAll<HTMLAnchorElement>('a[href]');
+  for (let i = 0; i < anchors.length && i < 300; i++) {
+    const a = anchors[i] as HTMLAnchorElement;
+    if (isOurs(a)) continue;
+    try {
+      const url = new URL(a.href, location.href);
+      if (url.origin === location.origin && url.pathname !== location.pathname) return true;
+    } catch {
+      /* enlace raro: no cuenta */
+    }
+  }
+  return false;
+}
+
+let baseHintShown = false;
 
 interface Sample {
   t: number;
@@ -231,6 +275,8 @@ export class ScreenTracker {
 
   /** ScreenId de la URL actual, sin nombre virtual. */
   private url = '';
+  /** La URL con la que cargó la página. */
+  private loadedAs = '';
   private observer: MutationObserver | null = null;
   private timer: number | undefined;
   private firstScheduledAt = 0;
@@ -245,6 +291,10 @@ export class ScreenTracker {
   /** Ya se vio un marcador o un grupo en esta URL: la señal del encabezado deja de usarse. */
   private family = false;
   private group: Group | null = null;
+  /** "Pantallas con nombre" en esta URL: todas llevan su nombre, también la inicial. */
+  private named = false;
+  /** La URL con la que cargó la página, si quedó con pantallas con nombre. */
+  private namedUrl: string | null = null;
 
   // Señal (c): encabezado + cambio grande del contenido.
   private accepted: [string, string] = ['', ''];
@@ -263,9 +313,18 @@ export class ScreenTracker {
 
   start(): void {
     this.url = urlScreen();
+    this.loadedAs = this.url;
     this.current = this.url;
-    this.title = this.readTitle(null);
-    const load: NavigationEvent = { kind: 'taptana', type: 'navigation', t: Date.now(), from: this.opts.previous, to: this.url, via: 'load' };
+    // Si el patrón de pantallas ya se reconoce al cargar, la primera sale con su nombre.
+    const first = this.nameable() ? this.detect() : null;
+    if (first && first !== 'unsure' && this.canName(first)) {
+      this.enterNamed();
+      this.current = virtualScreenId(this.url, first.name);
+      this.title = this.readTitle(first.el);
+    } else {
+      this.title = this.readTitle(null);
+    }
+    const load: NavigationEvent = { kind: 'taptana', type: 'navigation', t: Date.now(), from: this.opts.previous, to: this.current, via: 'load' };
     if (this.title) load.title = this.title;
     this.opts.emit(load);
 
@@ -332,6 +391,14 @@ export class ScreenTracker {
       const wrapped = function (this: History, data: unknown, unused: string, url?: string | URL | null): void {
         // Con data-base, una ruta absoluta se queda dentro del prototipo.
         const next = url === undefined || url === null ? url : rebaseUrl(String(url), getBasePath(), location.href);
+        if (!baseHintShown && typeof next === 'string' && next !== String(url)) {
+          // Un router de History que compara `location.pathname` con sus rutas no reconoce el prefijo.
+          baseHintShown = true;
+          console.info(
+            `[Taptana] Este prototipo navega con rutas absolutas ("${String(url)}") y está abierto bajo "${getBasePath()}". ` +
+              'Si al navegar siempre ves la pantalla de inicio, ábrelo en la raíz: Panel → Prototipos → «Abrir en la raíz».',
+          );
+        }
         original.call(this, data, unused, next);
         tracker.urlChanged();
       };
@@ -395,7 +462,41 @@ export class ScreenTracker {
     const found = this.detect();
     // Sin un estado claro (dos capas a la vez), la base será el primer estado claro que aparezca.
     if (found === 'unsure') return;
+    if (found && this.lateNamed(found, Date.now())) return;
     this.fixAlias(found, Date.now());
+  }
+
+  /** ¿Esta URL puede tener "pantallas con nombre"? Solo la de carga, y sin rutas por hash. */
+  private nameable(): boolean {
+    return (this.namedUrl === null || this.namedUrl === this.url) && !hashRouted();
+  }
+
+  /** Un marcador siempre nombra; un grupo de hermanos, solo si es claro y la página no es parte de un sitio multipágina. */
+  private canName(found: { strong: boolean; marked?: boolean }): boolean {
+    return found.marked === true || (found.strong && !linksToOtherPages());
+  }
+
+  private enterNamed(): void {
+    this.named = true;
+    this.namedUrl = this.url;
+    this.family = true;
+    this.alias = null;
+    this.aliasSet = true;
+    this.headingName = null;
+    this.pendingSince = 0;
+  }
+
+  /**
+   * El patrón de pantallas apareció después de cargar, cuando todavía no se había fijado el
+   * estado inicial: se pasa a "pantallas con nombre" y se corrige el nombre de la pantalla actual
+   * con una navegación ("/index.html" → "/index.html~inicio").
+   */
+  private lateNamed(found: { name: string; el: Element; strong: boolean; marked?: boolean }, now: number): boolean {
+    if (this.named || this.aliasSet || this.loadedAs !== this.url || !this.nameable() || !this.canName(found)) return false;
+    this.enterNamed();
+    const id = virtualScreenId(this.url, found.name);
+    if (id !== this.current) this.change(id, 'screen', now, found.el);
+    return true;
   }
 
   private fixAlias(found: { name: string; el: Element } | null, now: number): void {
@@ -417,6 +518,14 @@ export class ScreenTracker {
 
     const url = urlScreen();
     if (url !== this.url) {
+      // El router puede seguir dibujando: se espera a que el DOM se calme (150 ms, hasta 600 ms
+      // desde el cambio de URL) para leer el título de la pantalla NUEVA y no el de la anterior.
+      const since = this.urlChangedAt || now;
+      const quiet = now - this.lastMutationAt;
+      if (quiet < CHECK_WAIT_MS && now - since < CHECK_MAX_WAIT_MS) {
+        this.timer = window.setTimeout(() => this.check(), Math.min(CHECK_WAIT_MS - quiet, CHECK_MAX_WAIT_MS - (now - since)) + 1);
+        return;
+      }
       const via = screenParts(url).path === screenParts(this.url).path ? 'hash' : 'history';
       this.url = url;
       // Otra URL: su estado inicial vuelve a ser "la pantalla de la URL".
@@ -426,7 +535,12 @@ export class ScreenTracker {
       this.family = false;
       this.group = null;
       this.headingName = null;
-      this.change(url, via, this.urlChangedAt || now, null);
+      this.named = false;
+      // De vuelta en la URL de carga, que tenía pantallas con nombre: siguen llevándolo.
+      const back = this.namedUrl === url ? this.detect() : null;
+      if (this.namedUrl === url) this.enterNamed();
+      if (back && back !== 'unsure') this.change(virtualScreenId(url, back.name), via, since, back.el);
+      else this.change(url, via, since, null);
     } else {
       this.checkSameUrl(now);
     }
@@ -439,6 +553,8 @@ export class ScreenTracker {
     if (found === 'unsure') return;
     if (found) this.family = true;
     if (!this.aliasSet) {
+      // La página terminó de dibujarse y ya se reconoce el patrón: pantallas con nombre.
+      if (found && this.lateNamed(found, now)) return;
       // Antes de la primera interacción, lo que haya es el estado inicial (el prototipo puede
       // tardar en dibujarse). Después, el primer estado claro.
       if (this.interacted) this.fixAlias(found, now);
@@ -450,7 +566,7 @@ export class ScreenTracker {
     if (this.family) {
       if (!found) {
         // Sin marcador ni grupo a la vista: no hay señal clara, se queda donde estaba.
-        if (this.alias !== null) return;
+        if (this.alias !== null || this.named) return;
         virtual = null;
       } else {
         virtual = found.name === this.alias ? null : found.name;
@@ -501,7 +617,7 @@ export class ScreenTracker {
     if (!best) return null;
     const raw = best.getAttribute('data-taptana-screen') || best.getAttribute('data-screen') || best.id || headingOf(best)?.textContent || '';
     const name = screenSlug(this.opts.mask(clean(raw)));
-    return name ? { name, el: best } : null;
+    return name ? { name, el: best, strong: true, marked: true } : null;
   }
 
   /** (b) Hermanos parecidos donde solo uno se ve. */
@@ -517,7 +633,7 @@ export class ScreenTracker {
     const only = shown[0];
     // Ninguno o varios a la vez (una transición, una capa encima): no se sabe todavía.
     if (shown.length !== 1 || !only) return 'unsure';
-    return { name: this.memberName(only, members), el: only };
+    return { name: this.memberName(only, members), el: only, strong: group.strong };
   }
 
   private memberName(el: Element, members: readonly Element[]): string {
