@@ -1,7 +1,7 @@
 {
   "name": "@taptana/server",
   "version": "0.1.0",
-  "description": "CLI y servidor de Taptana: sirve el prototipo, graba sesiones en SQLite y muestra el panel.",
+  "description": "CLI y servidor de Taptana: sirve tus prototipos, graba sesiones en SQLite y muestra el panel.",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -10,16 +10,17 @@
   "files": [
     "dist",
     "public",
-    "seed"
+    "seed",
+    "example"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json && node scripts/copy-assets.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --no-warnings=ExperimentalWarning --test \"dist/**/*.test.js\"",
-    "dev": "pnpm build && node --no-warnings=ExperimentalWarning dist/cli.js dev",
-    "start": "node --no-warnings=ExperimentalWarning dist/cli.js dev --data-dir ../../.taptana",
-    "seed": "pnpm build && node --no-warnings=ExperimentalWarning dist/cli.js seed",
-    "clean": "rm -rf dist public/recorder.js public/panel"
+    "dev": "pnpm build && node dist/cli.js dev",
+    "start": "node dist/cli.js start",
+    "seed": "pnpm build && node dist/cli.js seed",
+    "clean": "rm -rf dist public/recorder.js public/recorder.js.map public/panel example"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",

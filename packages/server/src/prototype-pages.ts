@@ -6,7 +6,8 @@
 import { promises as fs } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
-const SKIP_DIRS = new Set(['node_modules', '.git', '.taptana', 'dist']);
+// Las carpetas que empiezan con "." tampoco se recorren (no se sirven: ver static.ts).
+const SKIP_DIRS = new Set(['node_modules']);
 const MAX_PAGES = 200;
 
 export interface PrototypePage {
@@ -25,10 +26,11 @@ export async function listPrototypePages(root: string): Promise<PrototypePage[]>
     }
     for (const entry of entries) {
       if (out.length >= MAX_PAGES) return;
+      if (entry.name.startsWith('.')) continue;
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (!SKIP_DIRS.has(entry.name) && !entry.name.startsWith('.')) await walk(full);
-      } else if (/\.html?$/i.test(entry.name)) {
+        if (!SKIP_DIRS.has(entry.name)) await walk(full);
+      } else if (entry.isFile() && /\.html?$/i.test(entry.name)) {
         const rel = '/' + relative(root, full).split(sep).join('/');
         let title = '';
         try {
