@@ -209,6 +209,18 @@ export interface AnswerResult {
 
 /** Marcas manuales del moderador por tarea, guardadas en la sesión. */
 export type ManualResults = Record<string, 'success' | 'failure'>;
+/** Cambio a las marcas manuales: `null` quita la marca de esa tarea (vuelve a "por revisar"). */
+export type ManualPatch = Record<string, 'success' | 'failure' | null>;
+
+/** Aplica un cambio de marcas sobre las que ya había: las nuevas reemplazan, `null` borra. */
+export function applyManualPatch(current: ManualResults | undefined, patch: ManualPatch | undefined): ManualResults {
+  const out: ManualResults = { ...(current ?? {}) };
+  for (const [taskId, mark] of Object.entries(patch ?? {})) {
+    if (mark === 'success' || mark === 'failure') out[taskId] = mark;
+    else delete out[taskId];
+  }
+  return out;
+}
 
 export const DEFAULT_CONSENT_TEXT =
   'Acepto que esta sesión se grabe (pantalla, toques y navegación) para mejorar este prototipo. Lo que escriba dentro del prototipo no se guarda; mis respuestas a las preguntas del estudio sí.';

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Flame, PlayCircle, Route as RouteIcon, Users } from 'lucide-react';
-import { OUTCOME_LABELS, taskBlocks, type ScreenReport, type TaskBlock, type TaskOutcomeCounts, type TaskReport, type TaskReportRow } from '@taptana/shared';
+import { OUTCOME_LABELS, tapMatches, taskBlocks, type ScreenReport, type SuccessRule, type TaskBlock, type TaskOutcomeCounts, type TaskReport, type TaskReportRow } from '@taptana/shared';
 import { getClient } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,14 +8,14 @@ import { ConfirmDialog } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
 import { HeatCanvas, type HeatMode } from '@/components/heatmap';
 import { friendlyError } from '@/lib/errors';
-import { pct, plural, screenName, seconds } from '@/lib/format';
+import { pct, plural, seconds } from '@/lib/format';
 import { prototypeFrameUrl } from '@/lib/links';
 import { cn } from '@/lib/utils';
 import { Link } from '@/router';
 import { recordingRoute, useReport } from './context.tsx';
-import { biggestDrop, fallbackHeight, funnelSteps, OUTCOME_ORDER, placePoints, ruleText, samePages } from './logic.ts';
+import { biggestDrop, fallbackHeight, funnelSteps, OUTCOME_ORDER, placePoints, ruleSelector, ruleText, samePages } from './logic.ts';
 import { ScoreChip, Stat } from './overview.tsx';
-import { SnapshotView, type Backdrop } from './snapshot-view.tsx';
+import { loadSession, SnapshotView, type Backdrop } from './snapshot-view.tsx';
 
 type OutcomeKey = keyof TaskOutcomeCounts;
 
@@ -86,7 +86,8 @@ function OutcomeBar({ task }: { task: TaskReport }) {
 }
 
 function Funnel({ task }: { task: TaskReport }) {
-  const steps = useMemo(() => funnelSteps(task.funnel, task.participants, screenName), [task]);
+  const { screenName } = useReport();
+  const steps = useMemo(() => funnelSteps(task.funnel, task.participants, screenName), [task, screenName]);
   if (steps.length < 2) return null;
   const worst = biggestDrop(steps);
   return (
@@ -95,7 +96,7 @@ function Funnel({ task }: { task: TaskReport }) {
         <h4 className="font-medium">Embudo del camino esperado</h4>
         <p className="text-sm text-muted-foreground">
           Cuántas personas llegaron a cada paso, en orden.
-          {task.expectedPathInferred && ' Esta tarea no tiene camino esperado: se usa el más corto de quienes lo lograron.'}
+          {task.expectedPathInferred && ' Esta tarea no tiene camino esperado: se usa el más común de quienes lo lograron.'}
         </p>
       </div>
       <ol className="space-y-1.5">
@@ -183,13 +184,13 @@ function ScreenCard({ screen, task, mode, anchor, highlighted }: { screen: Scree
   const left = useMemo(() => placePoints(screen.taps, vw, estimated).left, [screen.taps, vw, estimated]);
   const liveSrc = ctx.proto?.url ? prototypeFrameUrl(ctx.proto, { screen: screen.path, preview: true }) : null;
   const okSessions = useMemo(() => new Set(task.results.filter((r) => r.outcome === 'direct' || r.outcome === 'indirect').map((r) => r.sessionId)), [task.results]);
-  const name = screenName(screen.path);
+  const name = ctx.screenName(screen.path);
   const drawn = screen.taps.length - left;
 
   return (
     <article id={anchor} className={cn('rounded-xl border bg-background p-4 space-y-4 scroll-mt-20 min-w-0', wide && 'col-span-full', highlighted && 'ring-2 ring-primary/60')} data-print="keep">
       <header className="space-y-1">
-        <h5 className="font-medium break-words">{screen.title && screen.title !== name ? `${screen.title}` : name}</h5>
+        <h5 className="font-medium break-words">{name}</h5>
         <p className="text-xs text-muted-foreground break-all">{screen.path}</p>
       </header>
       <dl className="grid grid-cols-3 gap-2 text-sm">
@@ -247,8 +248,14 @@ function ScreenCard({ screen, task, mode, anchor, highlighted }: { screen: Scree
   );
 }
 
-function ScreensPanel({ task, focusScreen }: { task: TaskReport; focusScreen: string | undefined }) {
+function ScreensPanel({ task, focusScreen, limit }: { task: TaskReport; focusScreen: string | undefined; limit?: number }) {
   const firstClick = task.kind === 'first-click';
+  // Al imprimir solo van las pantallas con más toques, en su orden original.
+  const shown = useMemo(() => {
+    if (!limit || task.screens.length <= limit) return task.screens;
+    const top = new Set([...task.screens].sort((a, b) => b.taps.length - a.taps.length).slice(0, limit));
+    return task.screens.filter((s) => top.has(s));
+  }, [task.screens, limit]);
   const [mode, setMode] = useState<HeatMode>('heat');
   const anchor = (i: number): string => `pantalla-${task.taskId}-${i}`;
 
@@ -279,7 +286,7 @@ function ScreensPanel({ task, focusScreen }: { task: TaskReport; focusScreen: st
         </div>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div role="radiogroup" aria-label="Qué mostrar sobre las pantallas" className="inline-flex max-w-full overflow-x-auto rounded-lg bg-muted p-1 gap-1" data-print="hide">
+          <div role="radiogroup" aria-label="Qué mostrar sobre las pantallas" className="flex w-fit max-w-full flex-wrap rounded-lg bg-muted p-1 gap-1" data-print="hide">
             {MODES.map((m) => (
               <button
                 key={m.id}
@@ -304,10 +311,15 @@ function ScreensPanel({ task, focusScreen }: { task: TaskReport; focusScreen: st
         </div>
       )}
       <div className="tt-screens grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(18.5rem,100%),1fr))]">
-        {task.screens.map((s, i) => (
-          <ScreenCard key={s.path} screen={s} task={task} mode={firstClick ? 'first-click' : mode} anchor={anchor(i)} highlighted={focusScreen === s.path} />
+        {shown.map((s) => (
+          <ScreenCard key={s.path} screen={s} task={task} mode={firstClick ? 'first-click' : mode} anchor={anchor(task.screens.indexOf(s))} highlighted={focusScreen === s.path} />
         ))}
       </div>
+      {shown.length < task.screens.length && (
+        <p className="text-xs text-muted-foreground">
+          Se muestran las {shown.length} pantallas con más toques, de {task.screens.length}. El resto está en el reporte en pantalla.
+        </p>
+      )}
     </div>
   );
 }
@@ -315,6 +327,7 @@ function ScreensPanel({ task, focusScreen }: { task: TaskReport; focusScreen: st
 // ── Caminos ──
 
 function PathChips({ pages }: { pages: string[] }) {
+  const { screenName } = useReport();
   return (
     <span className="flex flex-wrap items-center gap-1.5">
       {pages.map((p, i) => (
@@ -330,8 +343,9 @@ function PathChips({ pages }: { pages: string[] }) {
   );
 }
 
-function PathsPanel({ task }: { task: TaskReport }) {
+function PathsPanel({ task, limit }: { task: TaskReport; limit?: number }) {
   const ctx = useReport();
+  const paths = limit ? task.paths.slice(0, limit) : task.paths;
   const [pending, setPending] = useState<string[] | null>(null);
   const canSet = task.kind === 'task';
 
@@ -360,13 +374,13 @@ function PathsPanel({ task }: { task: TaskReport }) {
         <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5" data-print="keep">
           <p className="text-sm font-medium">
             Camino esperado{' '}
-            {task.expectedPathInferred && <span className="font-normal text-muted-foreground">(deducido: el más corto de quienes lo lograron)</span>}
+            {task.expectedPathInferred && <span className="font-normal text-muted-foreground">(deducido: el más común de quienes lo lograron)</span>}
           </p>
           <PathChips pages={task.expectedPath} />
         </div>
       )}
       <ul className="space-y-2">
-        {task.paths.map((p, i) => {
+        {paths.map((p, i) => {
           const isExpected = samePages(p.pages, task.expectedPath);
           return (
             <li key={i} className="rounded-lg border bg-background p-3 space-y-2" data-print="keep">
@@ -392,6 +406,11 @@ function PathsPanel({ task }: { task: TaskReport }) {
           );
         })}
       </ul>
+      {paths.length < task.paths.length && (
+        <p className="text-xs text-muted-foreground">
+          Se muestran los {paths.length} caminos más comunes, de {task.paths.length}.
+        </p>
+      )}
       <ConfirmDialog
         open={pending !== null}
         onOpenChange={(open) => !open && setPending(null)}
@@ -464,11 +483,48 @@ function ParticipantsPanel({ task }: { task: TaskReport }) {
 
 // ── La sección de una tarea ──
 
+/**
+ * El texto del elemento que pide la regla "Toca un elemento" («🛒»), para no mostrar un selector
+ * CSS. Sale de un toque real de alguien que lo logró; null si todavía no se sabe.
+ */
+function useElementText(task: TaskReport, rule: SuccessRule | undefined): string | null {
+  const selector = rule?.type === 'tapped' ? rule.selector : '';
+  const sessionIds = useMemo(
+    () => (selector ? task.results.filter((r) => r.outcome === 'direct' || r.outcome === 'indirect').slice(0, 2).map((r) => r.sessionId) : []),
+    [selector, task.results],
+  );
+  const key = sessionIds.join(',');
+  const [text, setText] = useState<string | null>(null);
+  useEffect(() => {
+    setText(null);
+    if (!selector || sessionIds.length === 0) return;
+    let alive = true;
+    (async () => {
+      for (const id of sessionIds) {
+        const session = await loadSession(id).catch(() => null);
+        if (!alive) return;
+        const tap = session?.taps.find((t) => t.target.text?.trim() && tapMatches(t, selector));
+        if (tap?.target.text) {
+          setText(tap.target.text.trim());
+          return;
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selector, key]);
+  return text;
+}
+
 type TabId = 'screens' | 'paths' | 'people';
 
 /** Todo lo de una tarea o primer clic: resultados, números, embudo y pestañas de detalle. */
 export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block: TaskBlock | undefined; focusScreen: string | undefined }) {
-  const { printing } = useReport();
+  const { printing, screenName } = useReport();
+  const elementText = useElementText(task, block?.success);
+  const selector = ruleSelector(block?.success);
   const [tab, setTab] = useState<TabId>('screens');
   const firstClick = task.kind === 'first-click';
 
@@ -498,7 +554,17 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
       {(block?.instruction || block?.success) && (
         <div className="space-y-1">
           {block.instruction && <p className="text-muted-foreground">“{block.instruction}”</p>}
-          <p className="text-xs text-muted-foreground">{ruleText(block.success, screenName)}</p>
+          <p className="text-xs text-muted-foreground" data-testid="rule-text">
+            <span title={selector ? `Selector: ${selector}` : undefined}>{ruleText(block.success, screenName, elementText)}</span>
+            {selector && !elementText && (
+              <>
+                {' '}
+                <span className="font-mono text-[0.6875rem] opacity-70 break-all" data-print="hide">
+                  ({selector})
+                </span>
+              </>
+            )}
+          </p>
         </div>
       )}
 
@@ -539,18 +605,25 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
 
       {printing ? (
         <div className="space-y-6">
-          {visibleTabs.map((t) => (
-            <div key={t.id} className="space-y-3">
+          {/* Versión compacta para el PDF: lo esencial de cada bloque. La lista de participantes está en el CSV. */}
+          <div className="space-y-3">
+            <h4 className="font-medium" data-print="heading">
+              {firstClick ? 'Dónde tocaron' : 'Pantallas con más toques'}
+            </h4>
+            <ScreensPanel task={task} focusScreen={undefined} limit={2} />
+          </div>
+          {!firstClick && task.paths.length > 0 && (
+            <div className="space-y-3">
               <h4 className="font-medium" data-print="heading">
-                {t.label}
+                Caminos más comunes
               </h4>
-              {panel(t.id)}
+              <PathsPanel task={task} limit={3} />
             </div>
-          ))}
+          )}
         </div>
       ) : (
         <div className="space-y-4">
-          <div role="tablist" aria-label="Detalle de la tarea" className="inline-flex max-w-full overflow-x-auto rounded-lg bg-muted p-1 gap-1">
+          <div role="tablist" aria-label="Detalle de la tarea" className="flex w-fit max-w-full flex-wrap rounded-lg bg-muted p-1 gap-1">
             {visibleTabs.map((t) => (
               <button
                 key={t.id}
@@ -561,12 +634,12 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
                 aria-controls={`panel-${task.taskId}`}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  'inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                  'inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
                   tab === t.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {t.icon}
-                {t.label}
+                <span className="truncate">{t.label}</span>
                 <span className="text-xs text-muted-foreground tabular-nums">{t.count}</span>
               </button>
             ))}

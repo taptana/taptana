@@ -29,7 +29,12 @@ export interface UploadResult {
   /** Página de entrada ("/index.html"). */
   entryPath: string;
   files: number;
-  /** El HTML de entrada usa rutas absolutas ("/css/app.css"): conviene abrirlo en la raíz. */
+  /**
+   * El prototipo navega con la History API (`pushState`/`replaceState` o un router de ese
+   * tipo): sus rutas suponen que vive en "/", así que conviene abrirlo en la raíz. Un sitio de
+   * varias carpetas con rutas absolutas a sus archivos ("/css/app.css") NO lo necesita: bajo
+   * /p/<id>/ esas rutas se resuelven solas.
+   */
   absoluteUrls: boolean;
 }
 
@@ -39,9 +44,58 @@ interface PlannedFile {
   read(): Uint8Array;
 }
 
-/** ¿El HTML carga o enlaza cosas con rutas que empiezan en "/" (y no en "//")? */
-export function hasAbsoluteUrls(html: string): boolean {
-  return /\b(?:src|href|action|poster)\s*=\s*["']?\/(?!\/)/i.test(html) || /url\(\s*["']?\/(?!\/)/i.test(html);
+/** Cuánto se lee de cada archivo, y en total, al buscar un router de History. */
+const ROUTER_SCAN_FILE_BYTES = 2 * 1024 * 1024;
+const ROUTER_SCAN_TOTAL_BYTES = 12 * 1024 * 1024;
+const ROUTER_SCAN_FILES = /\.(?:html?|m?js)$/i;
+
+/**
+ * ¿Este HTML o JavaScript navega con la History API? Busca llamadas a `pushState(` o
+ * `replaceState(` (sobreviven al minificado: son del navegador) y los routers que la usan por
+ * dentro (React Router, Vue Router, la librería history).
+ */
+export function usesHistoryRouter(code: string): boolean {
+  return (
+    /\b(?:pushState|replaceState)\s*\(/.test(code) ||
+    /\b(?:createBrowserRouter|BrowserRouter|createWebHistory|createBrowserHistory)\b/.test(code)
+  );
+}
+
+/** Revisa los .html y .js de una carpeta (con tope de tamaño) buscando un router de History. */
+export async function scanHistoryRouter(dir: string): Promise<boolean> {
+  let budget = ROUTER_SCAN_TOTAL_BYTES;
+  const pending = [dir];
+  while (pending.length > 0 && budget > 0) {
+    const folder = pending.shift() as string;
+    let entries: import('node:fs').Dirent[];
+    try {
+      entries = await fs.readdir(folder, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    // Primero los archivos de esta carpeta (la entrada y sus scripts suelen estar arriba).
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const full = join(folder, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules') pending.push(full);
+        continue;
+      }
+      if (!entry.isFile() || !ROUTER_SCAN_FILES.test(entry.name) || budget <= 0) continue;
+      const length = Math.min(ROUTER_SCAN_FILE_BYTES, budget);
+      let handle: import('node:fs').promises.FileHandle | undefined;
+      try {
+        handle = await fs.open(full, 'r');
+        const { bytesRead, buffer } = await handle.read(Buffer.alloc(length), 0, length, 0);
+        budget -= bytesRead;
+        if (usesHistoryRouter(buffer.subarray(0, bytesRead).toString('utf8'))) return true;
+      } catch {
+        /* archivo ilegible: se salta */
+      } finally {
+        await handle?.close();
+      }
+    }
+  }
+  return false;
 }
 
 /** Basura que traen los zips y que no es parte del prototipo. */
@@ -172,8 +226,8 @@ export async function extractUpload(fileName: string, bytes: Uint8Array, dest: s
         if (NAME_ERRORS.has(code)) throw new UploadError(`No se pudo guardar «${file.path}»: su nombre no es válido en esta computadora.`);
         throw err;
       }
-      if (`/${file.path}` === entryPath) absoluteUrls = hasAbsoluteUrls(Buffer.from(data).toString('utf8'));
     }
+    absoluteUrls = await scanHistoryRouter(tmp);
     await fs.rm(dest, { recursive: true, force: true });
     await fs.mkdir(dirname(resolve(dest)), { recursive: true });
     await fs.rename(tmp, dest);

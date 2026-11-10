@@ -10,7 +10,6 @@
 import {
   validateSessionExport,
   type ExampleResponse,
-  type ManualResults,
   type Prototype,
   type ReportFilter,
   type ScreenInfo,
@@ -24,6 +23,13 @@ import {
   type StudyReport,
 } from '@taptana/shared';
 import { UserError } from '@/lib/errors';
+
+/**
+ * Marcas del moderador que se mandan a la API: 'success', 'failure' o `null` para quitar la marca
+ * (la tarea vuelve a "por revisar"). Más ancho que `ManualResults` de `shared` a propósito, para
+ * compilar igual con o sin la versión de `shared` que ya acepta null.
+ */
+export type ManualMarks = Record<string, 'success' | 'failure' | null>;
 
 /** Página HTML de un prototipo. Queda por compatibilidad: usa `listPrototypeScreens`. */
 export interface PrototypePage {
@@ -53,8 +59,8 @@ export interface ApiClient {
   deleteSession(id: string): Promise<void>;
   /** Etiqueta, notas, exclusión y marcas manuales. Solo cambia lo que viene. */
   patchSession(id: string, patch: SessionPatch): Promise<SessionSummary>;
-  /** Atajo de `patchSession(id, { manual })`. */
-  setManualResults(id: string, manual: ManualResults): Promise<SessionSummary>;
+  /** Atajo de `patchSession(id, { manual })`. Un valor `null` quita la marca de esa tarea. */
+  setManualResults(id: string, manual: ManualMarks): Promise<SessionSummary>;
 
   // ── Estudios ──
   listStudies(): Promise<StudyRecord[]>;

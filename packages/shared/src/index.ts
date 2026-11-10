@@ -80,6 +80,7 @@ export type {
   TaskResult,
   AnswerResult,
   ManualResults,
+  ManualPatch,
 } from './study.js';
 export {
   DEFAULT_CONSENT_TEXT,
@@ -100,6 +101,7 @@ export {
   questionBlocks,
   newBlockId,
   duplicateStudy,
+  applyManualPatch,
 } from './study.js';
 
 export { deviceLabel } from './device.js';
@@ -128,6 +130,8 @@ export {
   maskUrl,
   countScreens,
   knownScreens,
+  screenTitles,
+  screenName,
   screenPath,
   samePath,
 } from './screen.js';
@@ -158,8 +162,9 @@ export type {
   ReportFilter,
   VariantReport,
   StudyReport,
+  ReportOptions,
 } from './report.js';
-export { OUTCOME_LABELS, SIMILAR_WIDTH_RATIO, similarWidth, computeStudyReport, studyCsv } from './report.js';
+export { OUTCOME_LABELS, SIMILAR_WIDTH_RATIO, similarWidth, computeStudyReport, studyCsv, shortSessionId } from './report.js';
 
 export type { RecorderMessage, PanelMessage } from './preview.js';
 export {

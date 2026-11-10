@@ -3,8 +3,12 @@
  *
  * rrweb ya enmascara el valor de los campos. Pero un prototipo puede copiar lo escrito a otro
  * lugar de la pantalla, y eso se grabaría como texto normal. Por eso el recorder recuerda lo que
- * se escribe (3 caracteres o más) y lo tapa en todo texto que graba: nodos de texto de rrweb,
+ * se escribe (4 caracteres o más) y lo tapa en todo texto que graba: nodos de texto de rrweb,
  * el texto del elemento tocado y los títulos de pantalla.
+ *
+ * Solo se tapa cuando lo escrito aparece ENTERO: como palabra o frase completa, con algo que no
+ * sea letra ni número a cada lado. Escribir "ficu" en un buscador no tapa "Ficus" en toda la
+ * tienda; escribir "Ana María" sí tapa "Hola Ana María".
  *
  * La lista vive en memoria y en sessionStorage (para la siguiente página del mismo prototipo:
  * "Gracias, Ana"). Nunca sale del celular. Las contraseñas no se guardan en sessionStorage.
@@ -13,7 +17,7 @@
 import { storageGet, storageSet } from './session.js';
 
 const KEY = 'taptana:typed';
-const MIN_LENGTH = 3;
+const MIN_LENGTH = 4;
 const MAX_REMEMBERED = 120;
 const MAX_VALUE_LENGTH = 400;
 
@@ -34,19 +38,24 @@ export function tokensOf(value: string): string[] {
   return [...out];
 }
 
-/** Una sola expresión que encuentra cualquiera de las cadenas, sin distinguir mayúsculas. */
+/**
+ * Una sola expresión que encuentra cualquiera de las cadenas como palabra o frase completa (sin
+ * letra ni número pegados antes o después; sabe de tildes y de otros alfabetos), sin distinguir
+ * mayúsculas. El grupo 1 es lo que venía justo antes (no se usa "lookbehind": Safari anterior
+ * a 16.4 no lo entiende) y el grupo 2 es lo que hay que tapar.
+ */
 export function buildMask(strings: Iterable<string>): RegExp | null {
   const list = [...new Set(strings)].filter((s) => s.length >= MIN_LENGTH).sort((a, b) => b.length - a.length);
   if (list.length === 0) return null;
-  const escaped = list.map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'));
-  return new RegExp(escaped.join('|'), 'gi');
+  const escaped = list.map((s) => s.replace(/[.*+?^${}()|[\]\\\/-]/g, '\\$&').replace(/ /g, '\\s+'));
+  return new RegExp(`(^|[^\\p{L}\\p{N}])(${escaped.join('|')})(?![\\p{L}\\p{N}])`, 'giu');
 }
 
 /** Reemplaza cada coincidencia por asteriscos del mismo largo. El resto del texto queda igual. */
 export function maskWith(text: string, mask: RegExp | null): string {
   if (!mask || !text) return text;
   mask.lastIndex = 0;
-  return text.replace(mask, (match) => '*'.repeat(match.length));
+  return text.replace(mask, (_match, before: string, typed: string) => before + '*'.repeat(typed.length));
 }
 
 /** Valores que ya no están en un campo pero pudieron quedar repetidos en pantalla. */

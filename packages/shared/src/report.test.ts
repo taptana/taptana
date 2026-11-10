@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OUTCOME_LABELS, computeStudyReport, similarWidth, studyCsv, type ReportSession, type TaskOutcomeCounts } from './report.js';
+import { OUTCOME_LABELS, computeStudyReport, similarWidth, studyCsv, shortSessionId, type ReportSession, type TaskOutcomeCounts } from './report.js';
 import type { TapEvent, TargetInfo, TaptanaEvent } from './events.js';
 import type { SessionSummary } from './session.js';
 import type { Block, StudyRecord, TaskBlock } from './study.js';
@@ -225,11 +225,17 @@ test('participants: study sessions that consented and are not excluded; each tas
   const internal = session('x3', [nav(1, '/'), task(2, 'start'), task(3, 'skip')], { excluded: true });
   const onlyConsent = session('s4', [nav(1, '/')]);
   const r = computeStudyReport(studyOf([buy]), [direct(), other, free, internal, onlyConsent, failed()]);
-  assert.equal(r.participants, 3);
+  assert.equal(r.participants, 2, 'who consented and left without starting anything is not a participant');
+  assert.equal(r.bounced, 1);
   assert.equal(r.excluded, 1);
   assert.equal(r.tasks[0]!.participants, 2, 'the one who never started the task is not in its numbers');
   assert.deepEqual(r.tasks[0]!.outcomes, counts({ direct: 1, failed: 1 }));
-  assert.deepEqual(r.devices, { touch: 3, desktop: 0 });
+  assert.deepEqual(r.devices, { touch: 2, desktop: 0 });
+  // Responder una pregunta también es empezar.
+  const q = studyOf([{ id: 'q', kind: 'yesno', question: '¿Sí?' }]);
+  const answered = computeStudyReport(q, [session('a', [answer(5, 'q', null)]), session('b', [nav(1, '/')])]);
+  assert.equal(answered.participants, 1);
+  assert.equal(answered.bounced, 1);
 });
 
 test('filter by variant and by device; the filter is echoed', () => {
@@ -289,19 +295,27 @@ test('screens: title from navigation events, top misclicks, and a sample to draw
     nav(100, '/', 'Plantas para tu casa'), task(2000, 'start'), tap(2500, false, 100, { tag: 'span', classes: ['brand', 'x'] }),
     nav(6000, '/producto.html', 'Echeveria'), nav(7000, '/producto.html?id=2', 'Monstera'), nav(8000, '/gracias.html'), task(8500, 'done'),
   ], { startedAt: 50 });
-  const t = computeStudyReport(studyOf([buy]), [a, b]).tasks[0]!;
+  const report = computeStudyReport(studyOf([buy]), [a, b]);
+  const t = report.tasks[0]!;
   const [home, product, thanks] = t.screens;
   assert.equal(home!.title, 'Plantas para tu casa');
-  assert.equal(product!.title, 'Monstera', 'the most common title wins');
+  assert.equal(product!.title, undefined, 'a title that changes from visit to visit is not the name of the screen');
   assert.equal(thanks!.title, '¡Gracias!');
+  assert.deepEqual(report.screenNames, { '/index.html': 'Plantas para tu casa', '/producto.html': 'producto', '/gracias.html': '¡Gracias!' });
+  // Con las pantallas conocidas del prototipo, el reporte usa esos nombres (los del constructor).
+  const known = computeStudyReport(studyOf([buy]), [a, b], undefined, {
+    screens: [{ id: '/producto.html', name: 'Producto · Verde' }, { id: '/index.html', label: 'inicio' } as { id: string }],
+  });
+  assert.deepEqual(known.screenNames, { '/index.html': 'inicio', '/producto.html': 'Producto · Verde', '/gracias.html': '¡Gracias!' });
+  assert.equal(known.tasks[0]!.screens[1]!.title, 'Producto · Verde');
   assert.deepEqual(home!.topMisclicks, [
     { label: 'Envío gratis', count: 2 },
     { label: '#logo', count: 1 },
     { label: 'span.brand', count: 1 },
   ]);
   assert.equal(home!.misclicks, 4);
-  // s1 llegó primero (empezó antes): 50 ms antes de su primer toque en la pantalla.
-  assert.deepEqual(home!.sample, { sessionId: 's1', t: 2950, vw: 390 });
+  // s1 es quien más tocó ahí: 50 ms antes de su ÚLTIMO toque en la pantalla.
+  assert.deepEqual(home!.sample, { sessionId: 's1', t: 4450, vw: 390 });
   // Sin toques en la pantalla: 800 ms después de llegar.
   assert.deepEqual(product!.sample, { sessionId: 's1', t: 5800, vw: 390 });
   // Estuvo menos de 800 ms: justo antes de irse (aquí, el final de la tarea).
@@ -455,7 +469,7 @@ test('studyCsv: one row per participant, with tasks first and then questions', (
     nav(1, '/'), task(1000, 'start'), tap(2000, false), nav(13_400, '/gracias.html'), task(14_000, 'done'),
     answer(15_000, 'q1', 4), task(16_000, 'start', 't2'), task(20_000, 'done', 't2'),
     answer(21_000, 'q2', ['Precio', 'Fotos']), answer(22_000, 'q3', true), answer(23_000, 'q4', 'Bien,\n"todo" claro'),
-  ], { label: 'P1 · Ana', variantId: 'A', startedAt: Date.UTC(2026, 10, 10, 15, 30), durationMs: 23_400 });
+  ], { label: 'P1 · Ana', variantId: 'A', startedAt: Date.UTC(2026, 10, 10, 15, 30), durationMs: 23_400, notes: 'Dudó en el envío, luego siguió' });
   const p2 = session('s2', [nav(1, '/'), task(1000, 'start'), task(5000, 'skip'), answer(6000, 'q1', null), answer(7000, 'q3', false), answer(8000, 'q4', '=1+1')], {
     participant: 'beto', deviceLabel: 'Android · Chrome 129', startedAt: Date.UTC(2026, 10, 11, 9, 0), durationMs: 8000,
   });
@@ -470,15 +484,23 @@ test('studyCsv: one row per participant, with tasks first and then questions', (
   assert.equal(csv.slice(1).replace(/\r\n/g, '').includes('\r'), false);
   assert.equal(
     lines[0],
-    'sesión,etiqueta,fecha,dispositivo,variante,duración_s,"Comprar, rápido · resultado","Comprar, rápido · tiempo_s","Comprar, rápido · misclicks",Envío · resultado,Envío · tiempo_s,Envío · misclicks,"¿Qué tan ""fácil"" fue?",¿Qué te faltó?,¿Lo usarías?,¿Algo más?',
+    'participante,sesión,fecha_utc,dispositivo,variante,duración_s,"Comprar, rápido · resultado","Comprar, rápido · tiempo_s","Comprar, rápido · misclicks",Envío · resultado,Envío · tiempo_s,Envío · misclicks,"¿Qué tan ""fácil"" fue?",¿Qué te faltó?,¿Lo usarías?,¿Algo más?,notas',
   );
   assert.equal(
     lines[1],
-    's1,P1 · Ana,2026-11-10T15:30:00.000Z,iPhone · Safari 18,Con fotos,23,éxito directo,12,1,por revisar,4,0,4,Precio | Fotos,Sí,"Bien,\n""todo"" claro"',
+    'P1 · Ana,s1,2026-11-10T15:30:00.000Z,iPhone · Safari 18,Con fotos,23,éxito directo,12,1,por revisar,4,0,4,Precio | Fotos,Sí,"Bien,\n""todo"" claro","Dudó en el envío, luego siguió"',
   );
   assert.equal(
     lines[2],
-    "s2,beto,2026-11-11T09:00:00.000Z,Android · Chrome 129,,8,no pudo,4,0,no empezó,,,,,No,'=1+1",
+    "beto,s2,2026-11-11T09:00:00.000Z,Android · Chrome 129,,8,no pudo,4,0,no empezó,,,,,No,'=1+1,",
+  );
+  // Sin etiqueta ni alias, el participante se nombra con el id corto de la sesión.
+  const anon = studyCsv(s, [session('s_Ab3dEf9hJk', [task(1, 'start')], { startedAt: 0 }), session('s_bounced', [nav(1, '/')])]);
+  const anonLines = anon.slice(1).trim().split('\r\n');
+  assert.equal(anonLines.length, 2, 'who left without starting anything gets no row');
+  assert.equal(anonLines[1]!.startsWith('Ef9hJk,s_Ab3dEf9hJk,1970-01-01T00:00:00.000Z,'), true);
+  assert.equal(shortSessionId('s1'), 's1');
+  assert.equal(shortSessionId('s_demo_estudio_1').length, 6
   );
 });
 
@@ -490,10 +512,9 @@ test('studyCsv: every outcome has its Spanish label', () => {
     session('c', [nav(1, '/'), task(2, 'start'), task(4, 'done')], { startedAt: 3 }),
     session('d', [nav(1, '/'), task(2, 'start'), task(4, 'skip')], { startedAt: 4 }),
     session('e', [nav(1, '/'), task(2, 'start')], { startedAt: 5 }),
-    session('f', [nav(1, '/')], { startedAt: 6 }),
   ]);
   const outcome = csv.slice(1).trim().split('\r\n').slice(1).map((line) => line.split(',')[6]);
-  assert.deepEqual(outcome, ['éxito directo', 'éxito indirecto', 'dijo que terminó', 'no pudo', 'sin terminar', 'no empezó']);
+  assert.deepEqual(outcome, ['éxito directo', 'éxito indirecto', 'dijo que terminó', 'no pudo', 'sin terminar']);
 });
 
 test('every outcome has a label for the panel, the same words the CSV uses', () => {
@@ -503,5 +524,80 @@ test('every outcome has a label for the panel, the same words the CSV uses', () 
 });
 
 test('studyCsv of a study without sessions is just the header', () => {
-  assert.equal(studyCsv(studyOf([buy]), []), '﻿sesión,etiqueta,fecha,dispositivo,variante,duración_s,Comprar · resultado,Comprar · tiempo_s,Comprar · misclicks\r\n');
+  assert.equal(studyCsv(studyOf([buy]), []), '﻿participante,sesión,fecha_utc,dispositivo,variante,duración_s,Comprar · resultado,Comprar · tiempo_s,Comprar · misclicks,notas\r\n');
+});
+
+// ── Ronda de QA 1 ──────────────────────────────────────────────────────────────────
+
+test('inferred expected path: the most common one from the start screen, stable when a session goes away', () => {
+  const via = (id: string, startedAt: number, ...mid: string[]): ReportSession =>
+    session(id, [nav(1, '/'), task(2, 'start'), ...mid.map((p, i) => nav(3 + i, p)), nav(8, '/gracias.html'), task(9, 'done')], { startedAt });
+  // Uno encontró un atajo; otro empezó en otra pantalla (venía de la tarea anterior).
+  const shortcut = via('s1', 1);
+  const elsewhere = session('s0', [nav(1, '/ayuda.html'), task(2, 'start'), nav(8, '/gracias.html'), task(9, 'done')], { startedAt: 0 });
+  const usual = [via('s2', 2, '/producto.html'), via('s3', 3, '/producto.html'), via('s4', 4, '/producto.html')];
+  const all = computeStudyReport(studyOf([buy]), [elsewhere, shortcut, ...usual]).tasks[0]!;
+  assert.deepEqual(all.expectedPath, ['/index.html', '/producto.html', '/gracias.html'], 'not the shortest: the most common');
+  assert.equal(all.expectedPathInferred, true);
+  const outcomes = (sessions: ReportSession[]): Record<string, string> =>
+    Object.fromEntries(computeStudyReport(studyOf([buy]), sessions).tasks[0]!.results.map((r) => [r.sessionId, r.outcome]));
+  assert.deepEqual(outcomes([elsewhere, shortcut, ...usual]), { s0: 'indirect', s1: 'indirect', s2: 'direct', s3: 'direct', s4: 'direct' });
+  // Excluir a uno de los directos no cambia quién es directo.
+  const without = [elsewhere, shortcut, { ...usual[0]!, session: { ...usual[0]!.session, excluded: true } }, usual[1]!, usual[2]!];
+  assert.deepEqual(outcomes(without), { s0: 'indirect', s1: 'indirect', s3: 'direct', s4: 'direct' });
+  // Empate en cantidad: gana el más corto.
+  const tie = computeStudyReport(studyOf([buy]), [shortcut, usual[0]!]).tasks[0]!;
+  assert.deepEqual(tie.expectedPath, ['/index.html', '/gracias.html']);
+  // Nadie lo logró desde la pantalla de inicio: no hay camino que deducir.
+  const none = computeStudyReport(studyOf([{ ...buy, startPath: '/index.html' }]), [elsewhere]).tasks[0]!;
+  assert.deepEqual(none.expectedPath, []);
+});
+
+test('funnel: starts at the start screen with everyone who started the task', () => {
+  // El diseñador escribió el camino sin la pantalla de inicio.
+  const s = studyOf([{ ...buy, expectedPath: ['/producto.html', '/gracias.html'] }]);
+  const t = computeStudyReport(s, [direct(), indirect(), failed()]).tasks[0]!;
+  assert.deepEqual(t.expectedPath, ['/index.html', '/producto.html', '/gracias.html']);
+  assert.equal(t.expectedPathInferred, false);
+  assert.deepEqual(t.funnel, [
+    { path: '/index.html', reached: 3 },
+    { path: '/producto.html', reached: 3 },
+    { path: '/gracias.html', reached: 2 },
+  ]);
+  assert.equal(t.funnel[0]!.reached, t.participants);
+  assert.deepEqual(t.outcomes, counts({ direct: 1, indirect: 1, failed: 1 }));
+  // Con startPath, el primer paso es esa pantalla aunque alguien no haya llegado a ella.
+  const jump = studyOf([{ ...buy, startPath: '/producto.html', expectedPath: ['/gracias.html'] }]);
+  const lost = session('s9', [nav(1, '/'), task(2, 'start'), task(3, 'skip')]);
+  const ok = session('s8', [nav(1, '/'), task(2, 'start'), nav(3, '/producto.html'), nav(4, '/gracias.html'), task(5, 'done')]);
+  const j = computeStudyReport(jump, [ok, lost]).tasks[0]!;
+  assert.deepEqual(j.funnel, [{ path: '/producto.html', reached: 2 }, { path: '/gracias.html', reached: 1 }]);
+  assert.deepEqual(j.results.map((r) => r.outcome), ['direct', 'failed']);
+});
+
+test('heatmap sample: who tapped the most on the screen, right before their last tap there', () => {
+  const few = session('s1', [nav(1000, '/carrito.html'), task(1100, 'start'), tap(2000, true), nav(3000, '/gracias.html')], { startedAt: 1 });
+  const many = session('s2', [nav(1000, '/carrito.html'), task(1100, 'start'), tap(2000, true), tap(4000, true), tap(9000, true), nav(9500, '/gracias.html')], { startedAt: 2 });
+  const s = studyOf([{ ...buy, startPath: '/carrito.html' }]);
+  const cart = computeStudyReport(s, [few, many]).tasks[0]!.screens[0]!;
+  assert.deepEqual(cart.sample, { sessionId: 's2', t: 8950, vw: 390 });
+  // Sesión antigua con visitas de 0 ms: el instante nunca queda pegado a la llegada si el toque vino después.
+  const old = session('s3', [nav(1000, '/'), nav(5000, '/carrito.html'), nav(5000, '/'), nav(5000, '/carrito.html'), task(5000, 'start'), tap(5020, true), nav(7000, '/gracias.html')]);
+  const sample = computeStudyReport(s, [old]).tasks[0]!.screens[0]!.sample!;
+  assert.equal(sample.t, 5020, 'never after the tap itself');
+  const late = session('s4', [nav(1000, '/carrito.html'), task(1000, 'start'), tap(1120, true), nav(7000, '/gracias.html')]);
+  assert.equal(computeStudyReport(s, [late]).tasks[0]!.screens[0]!.sample!.t, 1100, 'at least 100 ms after arriving, when the full snapshot exists');
+});
+
+test('study success rate is pooled over decided attempts, not the mean of the task rates', () => {
+  const second: TaskBlock = { id: 't2', title: 'Volver', instruction: '…', success: { type: 'reached', path: '/index.html' } };
+  const s = studyOf([buy, second], { variants: [{ id: 'A', name: 'A' }] });
+  const both = (id: string): ReportSession =>
+    session(id, [nav(1, '/'), task(2, 'start'), nav(3, '/gracias.html'), task(4, 'done'), task(5, 'start', 't2'), task(6, 'skip', 't2')], { variantId: 'A' });
+  const onlyFirst = (id: string): ReportSession => session(id, [nav(1, '/'), task(2, 'start'), nav(3, '/gracias.html'), task(4, 'done')], { variantId: 'A' });
+  // Tarea 1: 4 de 4. Tarea 2: 0 de 1. Promedio de tasas = 50 %; sobre los intentos = 4 de 5.
+  const r = computeStudyReport(s, [both('a'), onlyFirst('b'), onlyFirst('c'), onlyFirst('d')]);
+  assert.deepEqual(r.tasks.map((t) => t.successRate), [1, 0]);
+  assert.equal(r.successRate, 4 / 5);
+  assert.equal(r.variants[0]!.successRate, 4 / 5);
 });

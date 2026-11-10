@@ -1,21 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import rrwebPlayer from 'rrweb-player';
 import type { eventWithTime } from '@rrweb/types';
-import { ArrowLeft, Check, Download, Flag, Hand, ListChecks, MessageSquare, Monitor, MoveHorizontal, Navigation, NotebookPen, PlayCircle, Smartphone, Target, X } from 'lucide-react';
+import { ArrowLeft, Check, Download, Flag, Hand, ListChecks, MessageSquare, Monitor, MoveHorizontal, Navigation, NotebookPen, PlayCircle, Smartphone, Target, Undo2, X } from 'lucide-react';
 import {
   BLOCK_KIND_LABELS,
   blockKind,
   blockTitle,
   isQuestionBlock,
   isTaskBlock,
-  screenLabel,
+  needsReview,
   SESSION_LIMITS,
   studyBlocks,
   type AnswerResult,
   type AnswerValue,
   type Block,
   type QuestionBlock,
+  type ScreenInfo,
   type SessionEventsResponse,
+  type SessionPatch,
   type SessionSummary,
   type TaptanaEvent,
   type TaptanaOwnEvent,
@@ -34,6 +36,7 @@ import { downloadText } from '@/lib/download';
 import { friendlyError } from '@/lib/errors';
 import { plural, seconds } from '@/lib/format';
 import { outcomeBadge } from '@/lib/outcomes';
+import { liveTitleIsStable, screenNamer, type ScreenNamer } from '@/lib/screens';
 import { exportFileName, stripPrototypeBase } from '@/lib/sessions';
 import { cn, formatDate, formatDuration } from '@/lib/utils';
 import { Link } from '@/router';
@@ -93,7 +96,7 @@ function answerText(value: AnswerValue, block: QuestionBlock | undefined): strin
   return value.trim() ? `«${value}»` : 'sin texto';
 }
 
-function describe(e: StepEvent, blocks: Map<string, Block>): string {
+function describe(e: StepEvent, blocks: Map<string, Block>, screenName: ScreenNamer): string {
   const title = (id: string): string => {
     const b = blocks.get(id);
     return b ? blockTitle(b) || BLOCK_KIND_LABELS[blockKind(b)] : 'un bloque que ya no está en el estudio';
@@ -106,9 +109,8 @@ function describe(e: StepEvent, blocks: Map<string, Block>): string {
     case 'swipe':
       return `Deslizó hacia ${{ up: 'arriba', down: 'abajo', left: 'la izquierda', right: 'la derecha' }[e.direction]}`;
     case 'navigation': {
-      const path = stripPrototypeBase(e.to);
-      const name = e.title?.trim() || screenLabel(path) || path;
-      return `Llegó a «${name}»`;
+      // El mismo nombre que en el constructor y en el reporte, no el título de esta visita.
+      return `Llegó a «${screenName(stripPrototypeBase(e.to))}»`;
     }
     case 'task':
       if (e.action === 'start') return `Empezó: ${title(e.taskId)}`;
@@ -142,6 +144,7 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState(0);
   const [attempt, setAttempt] = useState(0);
+  const [knownScreens, setKnownScreens] = useState<ScreenInfo[]>([]);
   const frame = useRef<HTMLDivElement>(null);
   const player = useRef<rrwebPlayer | null>(null);
 
@@ -151,12 +154,19 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
     setSession(null);
     setError(null);
     setCurrent(0);
+    setKnownScreens([]);
     (async () => {
       try {
-        const result = await (await getClient()).getSessionEvents(id);
+        const client = await getClient();
+        const result = await client.getSessionEvents(id);
         if (cancelled) return;
         setData(result);
         setSession(result?.session ?? null);
+        if (result) {
+          // Los nombres de pantalla salen de la misma lista que usan el constructor y el reporte.
+          const list = await client.listPrototypeScreens(result.session.prototypeId).catch((): ScreenInfo[] => []);
+          if (!cancelled) setKnownScreens(list);
+        }
       } catch (e) {
         if (!cancelled) setError(friendlyError(e, 'No pudimos cargar esta sesión.'));
       }
@@ -169,6 +179,16 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
   const playerEvents = useMemo(() => (data ? toPlayerEvents(data.events) : []), [data]);
   const steps = useMemo(() => (data?.events ?? []).filter(isStep), [data]);
   const blocks = useMemo(() => new Map((data?.study ? studyBlocks(data.study) : []).map((b) => [b.id, b])), [data]);
+  const screenName = useMemo(() => {
+    // Pantallas que la API no conoce y que no son un archivo (hash, virtuales): vale su título en vivo.
+    const live: Array<{ id: string; title: string }> = [];
+    for (const e of data?.events ?? []) {
+      if (e.kind !== 'taptana' || e.type !== 'navigation' || !e.title?.trim()) continue;
+      const path = stripPrototypeBase(e.to);
+      if (liveTitleIsStable(path)) live.push({ id: path, title: e.title.trim() });
+    }
+    return screenNamer([...knownScreens, ...live]);
+  }, [data, knownScreens]);
   const canPlay = playerEvents.filter((e) => e.type !== RRWEB_CUSTOM).length >= 2;
   /** rrweb cuenta el tiempo desde su primer evento; la sesión, desde `startedAt`. */
   const playerStart = playerEvents[0]?.timestamp ?? data?.session.startedAt ?? 0;
@@ -320,12 +340,18 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
           </Button>
           <div className="min-w-0 space-y-1">
             <LabelEditor size="lg" session={session} onSave={async (label) => void (await patch({ label }, 'No se pudo guardar la etiqueta.'))} />
-            <p className="text-muted-foreground text-sm flex items-center gap-x-1.5 gap-y-1 flex-wrap">
-              {session.touch ? <Smartphone className="size-4" aria-hidden /> : <Monitor className="size-4" aria-hidden />}
-              <span>
-                {formatDate(session.startedAt)} · {session.deviceLabel} · {session.viewport.width}×{session.viewport.height} · {formatDuration(session.durationMs)}
+            {/* Cada dato va entero en su renglón: sin puntos sueltos al inicio de una línea en celulares. */}
+            <p className="text-muted-foreground text-sm flex items-center gap-x-3 gap-y-1 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                {session.touch ? <Smartphone className="size-4" aria-hidden /> : <Monitor className="size-4" aria-hidden />}
+                {formatDate(session.startedAt)}
               </span>
-              {session.label && session.participant && <span>· alias: {session.participant}</span>}
+              <span>{session.deviceLabel}</span>
+              <span className="whitespace-nowrap">
+                {session.viewport.width}×{session.viewport.height}
+              </span>
+              <span className="whitespace-nowrap">Duró {formatDuration(session.durationMs)}</span>
+              {session.label && session.participant && <span>Alias: {session.participant}</span>}
               {study && (
                 <Badge variant="secondary" className="max-w-full">
                   <span className="truncate">
@@ -375,7 +401,7 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
                 <CardTitle className="text-base flex items-center gap-2">
                   <ListChecks className="size-4" /> Tareas y respuestas
                 </CardTitle>
-                <CardDescription>Toca una tarea para ir al momento en que empezó. Si viste otra cosa en la grabación, corrige el resultado.</CardDescription>
+                <CardDescription>Toca una tarea para ir al momento en que empezó. Si viste otra cosa en la grabación, corrige el resultado; «Quitar marca» lo deja como estaba.</CardDescription>
               </CardHeader>
               <CardContent className="px-4">
                 <ol className="divide-y">
@@ -387,7 +413,7 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
                         block={b}
                         result={results.get(b.id)}
                         onGoto={goto}
-                        onManual={(value) => void patch({ manual: { [b.id]: value } }, 'No se pudo guardar el resultado.')}
+                        onManual={(value) => void patch({ manual: { [b.id]: value } as SessionPatch['manual'] }, 'No se pudo guardar el resultado.')}
                       />
                     ) : isQuestionBlock(b) ? (
                       <AnswerRow key={b.id} index={i} block={b} answer={answers.get(b.id)} onGoto={goto} />
@@ -433,7 +459,7 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
                         <span className="pt-0.5" aria-hidden>
                           <StepIcon e={e} />
                         </span>
-                        <span className="min-w-0 break-words">{describe(e, blocks)}</span>
+                        <span className="min-w-0 break-words">{describe(e, blocks, screenName)}</span>
                       </button>
                     </li>
                   );
@@ -458,7 +484,8 @@ function TaskRow({
   block: TaskBlock;
   result: TaskResult | undefined;
   onGoto: (t: number) => void;
-  onManual: (value: 'success' | 'failure') => void;
+  /** null quita la marca: el resultado vuelve a ser el de la regla, o "por revisar". */
+  onManual: (value: 'success' | 'failure' | null) => void;
 }) {
   const firstClick = blockKind(block) === 'first-click';
   const badge = result ? outcomeBadge(block, result) : { label: 'No empezó', className: 'border-border text-muted-foreground' };
@@ -472,6 +499,9 @@ function TaskRow({
     if (firstClick && result.firstTap) detail.push(`primer toque: ${result.firstTap.text ? `«${result.firstTap.text}»` : result.firstTap.selector}`);
   }
   const started = result?.startedAt;
+  // Si la regla ya decidió (o el participante dijo "No pude"), marcar es corregir ese resultado.
+  const decided = Boolean(result) && !result?.manual && !needsReview(block, result as TaskResult);
+  const correcting = decided || (Boolean(result?.manual) && block.success?.type !== 'manual');
 
   return (
     <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:gap-3">
@@ -492,7 +522,8 @@ function TaskRow({
         {detail.length > 0 && <div className="text-muted-foreground text-xs pl-6 mt-0.5">{detail.join(' · ')}</div>}
       </button>
       {result && result.outcome !== 'pending' && (
-        <div className="flex gap-1.5 shrink-0 pl-6 sm:pl-0" role="group" aria-label="Tu veredicto">
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0 pl-6 sm:pl-0" role="group" aria-label={correcting ? 'Corregir resultado' : 'Tu veredicto'}>
+          <span className="text-xs text-muted-foreground w-full sm:w-auto sm:mr-1">{correcting ? 'Corregir resultado:' : 'Tu veredicto:'}</span>
           <Button
             variant="outline"
             size="sm"
@@ -511,6 +542,11 @@ function TaskRow({
           >
             <X /> No lo logró
           </Button>
+          {result.manual && (
+            <Button variant="ghost" size="sm" onClick={() => onManual(null)} title={block.success?.type === 'manual' ? 'Vuelve a quedar por revisar' : 'Vuelve a valer lo que decidió la regla'}>
+              <Undo2 /> Quitar marca
+            </Button>
+          )}
         </div>
       )}
     </li>

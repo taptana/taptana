@@ -12,8 +12,10 @@
  *
  * 2. Acceso → 401 si no se cumple ninguna:
  *    - la conexión es local: viene de esta misma computadora;
- *    - trae la llave: `?key=…` la guarda en la cookie `taptana_key` (HttpOnly) y redirige a la
- *      misma dirección sin el parámetro;
+ *    - trae la llave: en las PÁGINAS del panel, `?key=…` la guarda en la cookie `taptana_key`
+ *      (HttpOnly) y redirige a la misma dirección sin el parámetro. La API no acepta `?key=`
+ *      (una llave en la URL queda en historiales y registros): solo la cookie o la cabecera
+ *      `x-taptana-key` (para scripts);
  *    - el panel está en modo abierto (`--open-panel`, `TAPTANA_PANEL=open`).
  *
  * La llave vive en `<dataDir>/panel.key` y la terminal la imprime dentro del link
@@ -36,6 +38,8 @@ import { crossSitePage, panelLockedPage } from './pages.js';
 
 export const PANEL_KEY_COOKIE = 'taptana_key';
 export const PANEL_KEY_PARAM = 'key';
+/** Cabecera con la llave, para usar la API desde un script (sin cookie). */
+export const PANEL_KEY_HEADER = 'x-taptana-key';
 export const PANEL_KEY_FILE = 'panel.key';
 
 const COOKIE_MAX_AGE_S = 60 * 60 * 24 * 180;
@@ -167,7 +171,9 @@ export function createPanelGuard(opts: PanelGuardOptions = {}): PanelGuard {
   const hasKey = (c: Context): boolean => {
     if (!key) return false;
     const cookie = getCookie(c, PANEL_KEY_COOKIE);
-    return cookie !== undefined && safeEqual(cookie, key);
+    if (cookie !== undefined && safeEqual(cookie, key)) return true;
+    const header = c.req.header(PANEL_KEY_HEADER);
+    return header !== undefined && safeEqual(header, key);
   };
 
   const allowed = (c: Context): boolean => open || isLocal(c) || hasKey(c);
@@ -183,12 +189,13 @@ export function createPanelGuard(opts: PanelGuardOptions = {}): PanelGuard {
     async (c, next) => {
       if (isCrossSite(c)) return deny(c, kind, 403);
       let ok = allowed(c);
-      const given = c.req.query(PANEL_KEY_PARAM);
+      // `?key=` solo vale en las páginas del panel; en la API se ignora.
+      const given = kind === 'pages' ? c.req.query(PANEL_KEY_PARAM) : undefined;
       if (given !== undefined) {
         if (key && safeEqual(given, key)) {
           setCookie(c, PANEL_KEY_COOKIE, key, { httpOnly: true, sameSite: 'Lax', path: '/', maxAge: COOKIE_MAX_AGE_S });
           ok = true;
-          if (kind === 'pages' && (c.req.method === 'GET' || c.req.method === 'HEAD')) {
+          if (c.req.method === 'GET' || c.req.method === 'HEAD') {
             // La llave no se queda en la barra de direcciones ni en el historial.
             const url = new URL(c.req.url);
             url.searchParams.delete(PANEL_KEY_PARAM);

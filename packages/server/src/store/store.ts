@@ -52,7 +52,7 @@ export interface Store {
    * tenga el mismo id. Si su prototipo no existe, lo crea visible con el nombre "Importado".
    */
   importSession(data: SessionExport): void;
-  /** Etiqueta, notas, exclusión y marcas manuales (estas se suman a las que ya había). */
+  /** Etiqueta, notas, exclusión y marcas manuales (estas se suman a las que ya había; `null` quita una). */
   setSessionFields(sessionId: string, patch: SessionPatch): boolean;
   deleteSession(id: string): boolean;
   /** Las sesiones de un estudio con sus eventos propios (sin rrweb), para el reporte y el CSV. */

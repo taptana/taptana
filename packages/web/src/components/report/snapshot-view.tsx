@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import rrwebPlayer from 'rrweb-player';
 import type { eventWithTime } from '@rrweb/types';
-import { PREVIEW_WINDOW } from '@taptana/shared';
+import { PREVIEW_WINDOW, type TapEvent } from '@taptana/shared';
 import { getClient } from '@/api/client';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -15,19 +15,31 @@ const MAX_CACHED_SESSIONS = 4;
 
 // ── Eventos de rrweb por sesión (se piden una vez aunque varias pantallas usen la misma) ──
 
-const replayCache = new Map<string, Promise<eventWithTime[] | null>>();
+interface LoadedSession {
+  /** Eventos de rrweb en orden, o null si la sesión no trae una foto completa. */
+  replay: eventWithTime[] | null;
+  /** Los toques, para saber qué texto tenía un elemento. */
+  taps: TapEvent[];
+}
 
-function loadReplayEvents(sessionId: string): Promise<eventWithTime[] | null> {
+const replayCache = new Map<string, Promise<LoadedSession | null>>();
+
+/** La sesión ya separada en grabación y toques. Se pide una sola vez por sesión. */
+export function loadSession(sessionId: string): Promise<LoadedSession | null> {
   const hit = replayCache.get(sessionId);
   if (hit) return hit;
   const loading = getClient()
     .then((c) => c.getSessionEvents(sessionId))
-    .then((data) => {
+    .then((data): LoadedSession | null => {
       if (!data) return null;
       const events: eventWithTime[] = [];
-      for (const e of data.events) if (e.kind === 'rrweb') events.push(e.data as eventWithTime);
+      const taps: TapEvent[] = [];
+      for (const e of data.events) {
+        if (e.kind === 'rrweb') events.push(e.data as eventWithTime);
+        else if (e.type === 'tap') taps.push(e);
+      }
       events.sort((a, b) => a.timestamp - b.timestamp);
-      return events.some((e) => e.type === RRWEB_FULL_SNAPSHOT) ? events : null;
+      return { replay: events.some((e) => e.type === RRWEB_FULL_SNAPSHOT) ? events : null, taps };
     });
   loading.catch(() => replayCache.delete(sessionId));
   replayCache.set(sessionId, loading);
@@ -38,6 +50,10 @@ function loadReplayEvents(sessionId: string): Promise<eventWithTime[] | null> {
     replayCache.delete(oldest);
   }
   return loading;
+}
+
+function loadReplayEvents(sessionId: string): Promise<eventWithTime[] | null> {
+  return loadSession(sessionId).then((s) => s?.replay ?? null);
 }
 
 /** Suelta las grabaciones guardadas (al salir del reporte). */

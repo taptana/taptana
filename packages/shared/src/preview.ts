@@ -32,16 +32,26 @@ export type RecorderMessage =
   /** Cambió la pantalla. `screen` es un ScreenId. */
   | { source: 'taptana'; type: 'screen'; screen: string; title: string; via: NavigationEvent['via'] }
   /** Un toque. `selector` es el más corto y estable (#id, .clase, o la ruta). */
-  | { source: 'taptana'; type: 'tap'; screen: string; x: number; y: number; target: TargetInfo; selector: string }
+  | { source: 'taptana'; type: 'tap'; screen: string; x: number; y: number; target: TargetInfo; selector: string;
+      /** true: es la respuesta a un `pick` del panel; el toque NO activó el prototipo. */
+      picked?: boolean }
   /** Modo prueba: pide el estudio (el borrador) al panel. */
   | { source: 'taptana'; type: 'need-study' }
-  /** Modo prueba: empezó un bloque, o terminó el estudio. */
-  | { source: 'taptana'; type: 'tryout'; event: 'block' | 'finish'; blockId?: string };
+  /**
+   * Modo prueba: empezó un bloque, terminó el estudio, o se presionó Escape dentro del iframe
+   * (`escape`: el panel cierra el diálogo aunque el foco esté en el prototipo).
+   */
+  | { source: 'taptana'; type: 'tryout'; event: 'block' | 'finish' | 'escape'; blockId?: string };
 
 /** Panel → recorder (`iframe.contentWindow.postMessage`). */
 export type PanelMessage =
   /** El estudio a probar. `startAt`: id del bloque por el que empezar ("Probar esta tarea"). */
-  { source: 'taptana-panel'; type: 'study'; study: StudyRecord; startAt?: string };
+  | { source: 'taptana-panel'; type: 'study'; study: StudyRecord; startAt?: string }
+  /**
+   * Modo demo: el próximo toque se avisa (`tap` con `picked: true`) y NO activa el prototipo (no
+   * navega ni abre nada). Sirve para elegir un elemento. `cancel: true` lo desarma sin tocar.
+   */
+  | { source: 'taptana-panel'; type: 'pick'; cancel?: boolean };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -69,13 +79,14 @@ export function isRecorderMessage(data: unknown): data is RecorderMessage {
         typeof data['selector'] === 'string' &&
         isRecord(data['target']) &&
         typeof data['target']['tag'] === 'string' &&
-        typeof data['target']['selector'] === 'string'
+        typeof data['target']['selector'] === 'string' &&
+        (data['picked'] === undefined || typeof data['picked'] === 'boolean')
       );
     case 'need-study':
       return true;
     case 'tryout':
       return (
-        (data['event'] === 'block' || data['event'] === 'finish') &&
+        (data['event'] === 'block' || data['event'] === 'finish' || data['event'] === 'escape') &&
         (data['blockId'] === undefined || typeof data['blockId'] === 'string')
       );
     default:
@@ -85,7 +96,9 @@ export function isRecorderMessage(data: unknown): data is RecorderMessage {
 
 /** ¿`data` es un mensaje del panel bien formado? El recorder revisa además `event.source === window.parent`. */
 export function isPanelMessage(data: unknown): data is PanelMessage {
-  if (!isRecord(data) || data['source'] !== 'taptana-panel' || data['type'] !== 'study') return false;
+  if (!isRecord(data) || data['source'] !== 'taptana-panel') return false;
+  if (data['type'] === 'pick') return data['cancel'] === undefined || typeof data['cancel'] === 'boolean';
+  if (data['type'] !== 'study') return false;
   const study = data['study'];
   // No se exige `id`: un borrador sin guardar también se puede probar.
   if (!isRecord(study)) return false;

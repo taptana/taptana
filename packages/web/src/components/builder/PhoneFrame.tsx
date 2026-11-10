@@ -5,10 +5,11 @@
  */
 import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
 import { ExternalLink, RotateCw } from 'lucide-react';
-import { DEMO_WINDOW, isRecorderMessage, screenLabel, type PanelMessage, type Prototype, type RecorderMessage } from '@taptana/shared';
+import { DEMO_WINDOW, isRecorderMessage, type PanelMessage, type Prototype, type RecorderMessage, type ScreenInfo } from '@taptana/shared';
 import { Hint } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { prototypeFrameUrl } from '@/lib/links';
+import { liveTitleIsStable, nameScreen } from '@/lib/screens';
 import { cn } from '@/lib/utils';
 
 export interface PhoneHandle {
@@ -17,7 +18,24 @@ export interface PhoneHandle {
   /** Cuántos elementos de la pantalla actual coinciden con el selector; null si no se puede saber. */
   countMatches(selector: string): number | null;
   /** Manda un mensaje al recorder del iframe. */
-  post(message: PanelMessage): void;
+  post(message: PanelMessage | PickMessage): void;
+}
+
+/**
+ * "El próximo toque es para elegir": el recorder lo avisa y NO activa el prototipo (no navega).
+ * `cancel` lo desarma. Declarado aquí para compilar también con un `shared` que aún no lo trae.
+ */
+export interface PickMessage {
+  source: 'taptana-panel';
+  type: 'pick';
+  cancel?: boolean;
+}
+
+/** ¿Es el aviso "se presionó Escape dentro del prototipo" del modo prueba? */
+function isEscapeMessage(data: unknown): boolean {
+  if (typeof data !== 'object' || data === null) return false;
+  const d = data as Record<string, unknown>;
+  return d['source'] === 'taptana' && d['type'] === 'tryout' && d['event'] === 'escape';
 }
 
 export function PhoneFrame({
@@ -25,6 +43,9 @@ export function PhoneFrame({
   screen,
   windowName = DEMO_WINDOW,
   onMessage,
+  onEscape,
+  screens = [],
+  hideRibbon = false,
   ref,
   banner,
   highlight = false,
@@ -35,6 +56,12 @@ export function PhoneFrame({
   screen?: string | undefined;
   windowName?: string;
   onMessage?: (message: RecorderMessage) => void;
+  /** Se presionó Escape con el foco dentro del prototipo. */
+  onEscape?: () => void;
+  /** Pantallas conocidas, para nombrar la que se muestra igual que en el resto del panel. */
+  screens?: readonly ScreenInfo[];
+  /** Oculta la cinta "Vista previa" que el recorder dibuja dentro del prototipo (el panel la muestra fuera). */
+  hideRibbon?: boolean;
   ref?: Ref<PhoneHandle>;
   /** Aviso sobre el teléfono (modo grabar, elegir elemento). */
   banner?: ReactNode;
@@ -46,6 +73,43 @@ export function PhoneFrame({
   const [current, setCurrent] = useState<{ screen: string; title: string } | null>(null);
   const handler = useRef(onMessage);
   handler.current = onMessage;
+  const escape = useRef(onEscape);
+  escape.current = onEscape;
+
+  /** El documento del prototipo (mismo origen), o null si todavía no se puede leer. */
+  const frameDocument = (): Document | null => {
+    try {
+      return frame.current?.contentDocument ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Lo que el panel arregla dentro del prototipo en cada carga: Escape cierra el diálogo aunque
+  // el foco esté en el iframe, y la cinta de "Vista previa" no tapa el contenido.
+  const tend = (): void => {
+    const doc = frameDocument();
+    if (!doc) return;
+    const marked = doc as Document & { __taptanaEscape?: boolean };
+    if (escape.current && !marked.__taptanaEscape) {
+      marked.__taptanaEscape = true;
+      doc.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !e.defaultPrevented) escape.current?.();
+      });
+    }
+    if (hideRibbon) {
+      const ribbon = doc.querySelector('[data-taptana-ui="study"]')?.shadowRoot?.querySelector<HTMLElement>('.ribbon');
+      if (ribbon) ribbon.style.display = 'none';
+    }
+  };
+  const tendRef = useRef(tend);
+  tendRef.current = tend;
+
+  useEffect(() => {
+    if (!hideRibbon && !onEscape) return;
+    const timer = window.setInterval(() => tendRef.current(), 400);
+    return () => window.clearInterval(timer);
+  }, [hideRibbon, onEscape !== undefined]);
 
   const src = proto ? prototypeFrameUrl(proto, screen ? { screen } : {}) : null;
 
@@ -55,8 +119,14 @@ export function PhoneFrame({
 
   useEffect(() => {
     const onWindowMessage = (e: MessageEvent): void => {
-      if (!frame.current || e.source !== frame.current.contentWindow || !isRecorderMessage(e.data)) return;
+      if (!frame.current || e.source !== frame.current.contentWindow) return;
+      if (isEscapeMessage(e.data)) {
+        escape.current?.();
+        return;
+      }
+      if (!isRecorderMessage(e.data)) return;
       const msg = e.data;
+      tendRef.current();
       if (msg.type === 'ready' || msg.type === 'screen') setCurrent({ screen: msg.screen, title: msg.title });
       handler.current?.(msg);
     };
@@ -93,7 +163,10 @@ export function PhoneFrame({
         <span className="min-w-0 flex-1 truncate text-muted-foreground" title={current?.screen}>
           {current ? (
             <>
-              Pantalla: <span className="font-medium text-foreground">{current.title || screenLabel(current.screen)}</span>
+              Pantalla:{' '}
+              <span className="font-medium text-foreground">
+                {nameScreen(current.screen, [...screens, ...(current.title && liveTitleIsStable(current.screen) ? [{ id: current.screen, title: current.title }] : [])])}
+              </span>
             </>
           ) : proto ? (
             'Cargando el prototipo…'
@@ -127,6 +200,7 @@ export function PhoneFrame({
             name={windowName}
             src={src}
             title="Prototipo en el teléfono"
+            onLoad={() => tendRef.current()}
             className="block h-[min(680px,calc(100dvh-13rem))] min-h-[460px] w-full bg-white"
           />
         ) : (

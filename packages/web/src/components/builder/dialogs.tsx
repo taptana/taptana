@@ -3,12 +3,11 @@
  * importar un study.json y el panel de "Grabar el camino correcto".
  */
 import { useEffect, useRef, useState } from 'react';
-import { Check, CircleCheck, ClipboardPaste, Copy, FileUp, Hand, MonitorSmartphone, RotateCcw, Smartphone, Sparkles, Wifi } from 'lucide-react';
+import { Check, CircleCheck, ClipboardPaste, Copy, EyeOff, FileUp, Hand, MonitorSmartphone, RotateCcw, Smartphone, Sparkles, Wifi } from 'lucide-react';
 import {
   TRYOUT_PARAM,
   TRYOUT_WINDOW,
   blockTitle,
-  screenLabel,
   type Prototype,
   type RecorderMessage,
   type ScreenInfo,
@@ -24,6 +23,7 @@ import { toast } from '@/components/ui/toast';
 import { copyText } from '@/lib/download';
 import { friendlyError } from '@/lib/errors';
 import { buildStudyPrompt } from '@/lib/prompt';
+import { nameScreen } from '@/lib/screens';
 import { demoResult, parseStudyText, type DemoStep } from './draft';
 import { KIND_INFO, ScreenName } from './fields';
 import { PhoneFrame, type PhoneHandle } from './PhoneFrame';
@@ -131,10 +131,13 @@ export function TryoutDialog({
   proto,
   study,
   startAt,
+  screens = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   proto: Prototype | undefined;
+  /** Pantallas conocidas, para nombrarlas igual que en el constructor. */
+  screens?: readonly ScreenInfo[];
   /** El borrador validado (con o sin id). */
   study: (Study & Partial<Pick<StudyRecord, 'id' | 'createdAt' | 'updatedAt'>>) | null;
   /** Probar solo desde este bloque. */
@@ -191,8 +194,17 @@ export function TryoutDialog({
             ref={phone}
             proto={proto}
             windowName={TRYOUT_WINDOW}
+            screens={screens}
             onMessage={onMessage}
+            // Escape cierra aunque el foco esté dentro del prototipo.
+            onEscape={() => onOpenChange(false)}
+            // La cinta "Vista previa" va aquí afuera, para no tapar la parte de arriba del prototipo.
+            hideRibbon
             banner={
+              <div className="space-y-2">
+              <p className="mx-auto flex w-fit items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-800 dark:text-amber-300" role="status">
+                <EyeOff className="size-3.5" /> Vista previa · no se graba
+              </p>
               <div className="flex items-center gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm" aria-live="polite">
                 {finished ? (
                   <>
@@ -213,6 +225,7 @@ export function TryoutDialog({
                 ) : (
                   <span className="text-muted-foreground">{startAt ? 'Sigue la instrucción en el teléfono.' : 'Empieza por la bienvenida, como un participante.'}</span>
                 )}
+              </div>
               </div>
             }
           />
@@ -416,12 +429,26 @@ export function ImportDialog({
   };
 
   const missingProto = study !== null && !protos.some((p) => p.id === study.prototypeId);
+  // Por qué todavía no se puede importar, dicho junto al botón.
+  const blocked = busy
+    ? null
+    : problems
+      ? 'Corrige lo que aparece arriba para poder importar.'
+      : !text.trim()
+        ? 'Elige un archivo o pega el JSON para continuar.'
+        : !study
+          ? 'Pulsa «Revisar» para comprobar el JSON antes de importar.'
+          : protos.length === 0
+            ? 'Falta un prototipo: sube uno en «Prototipos».'
+            : !prototypeId
+              ? 'Elige con qué prototipo vas a usar este estudio.'
+              : null;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Importar un estudio</DialogTitle>
+          <DialogTitle>Importar estudio</DialogTitle>
           <DialogDescription>Trae un archivo study.json (exportado de Taptana o escrito por una IA), o pega su contenido.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -496,13 +523,19 @@ export function ImportDialog({
             </div>
           )}
         </div>
-        <DialogFooter>
+        <DialogFooter className="sm:items-center">
           <Button variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button disabled={!study || !prototypeId || busy} onClick={() => void submit()}>
+          <Button disabled={!study || !prototypeId || busy} aria-describedby={blocked ? 'import-blocked' : undefined} onClick={() => void submit()}>
             {busy ? 'Importando…' : 'Importar estudio'}
           </Button>
+          {/* Último en el código: en celular (columna invertida) queda arriba de los botones; en escritorio, a la izquierda. */}
+          {blocked && (
+            <p id="import-blocked" className="text-xs text-muted-foreground sm:order-first sm:mr-auto" role="status">
+              {blocked}
+            </p>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -563,7 +596,7 @@ export function RecordPanel({
                 <>
                   <MonitorSmartphone className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                   <span className="min-w-0">
-                    Pantalla <span className="font-medium">{s.title || screenLabel(s.screen)}</span> <span className="font-mono text-xs break-all text-muted-foreground">{s.screen}</span>
+                    Pantalla <span className="font-medium">{nameScreen(s.screen, screens)}</span> <span className="font-mono text-xs break-all text-muted-foreground">{s.screen}</span>
                   </span>
                 </>
               ) : (

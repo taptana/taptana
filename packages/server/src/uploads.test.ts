@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { deflateSync, zipSync, strToU8, type Zippable } from 'fflate';
-import { extractUpload, hasAbsoluteUrls, MAX_FILES, UploadError } from './uploads.js';
+import { extractUpload, usesHistoryRouter, MAX_FILES, UploadError } from './uploads.js';
 import { listZip } from './zip.js';
 
 const tmp = (): string => mkdtempSync(join(tmpdir(), 'taptana-up-'));
@@ -170,18 +170,33 @@ test('a bad new version leaves the previous files untouched', async () => {
   assert.deepEqual(readdirSync(join(dest, '..')), ['p']);
 });
 
-test('detects absolute urls in the entry html', async () => {
-  assert.equal(hasAbsoluteUrls('<link rel="stylesheet" href="/css/app.css">'), true);
-  assert.equal(hasAbsoluteUrls("<script src='/js/app.js'></script>"), true);
-  assert.equal(hasAbsoluteUrls('<a href="/">Inicio</a>'), true);
-  assert.equal(hasAbsoluteUrls('<div style="background:url(/img/fondo.png)"></div>'), true);
-  assert.equal(hasAbsoluteUrls('<form action="/buscar">'), true);
-  assert.equal(hasAbsoluteUrls('<link href="css/app.css"><script src="./app.js"></script><a href="producto.html">x</a>'), false);
-  assert.equal(hasAbsoluteUrls('<script src="//cdn.example.com/x.js"></script><a href="https://example.com/">x</a>'), false);
+test('absoluteUrls: only for prototypes that navigate with the History API', async () => {
+  assert.equal(usesHistoryRouter('history.pushState({}, "", "/carrito")'), true);
+  assert.equal(usesHistoryRouter('window.history.replaceState(null,"",u)'), true);
+  assert.equal(usesHistoryRouter('e.pushState (s,"",t)'), true, 'minified');
+  assert.equal(usesHistoryRouter('const router = createBrowserRouter([{ path: "/" }])'), true);
+  assert.equal(usesHistoryRouter('createRouter({ history: createWebHistory("/app/") })'), true);
+  assert.equal(usesHistoryRouter('<link rel="stylesheet" href="/css/app.css"><a href="/checkout/">Pagar</a>'), false);
+  assert.equal(usesHistoryRouter('location.hash = "#/carrito"; history.back()'), false);
 
-  const dest = join(tmp(), 'p');
-  const r = await extractUpload('spa.zip', zipSync({ 'index.html': strToU8('<script src="/assets/app.js"></script>'), 'otra.html': strToU8('<a href="x.html">') }), dest);
-  assert.equal(r.absoluteUrls, true);
+  // Varias carpetas con rutas absolutas a sus archivos: funciona bajo /p/<id>/, no hace falta la raíz.
+  const site = await extractUpload(
+    'sitio.zip',
+    zipSync({ 'index.html': strToU8('<link href="/css/app.css" rel="stylesheet"><a href="/checkout/">Pagar</a>'), 'css/app.css': strToU8('body{}'), 'checkout/index.html': strToU8('<a href="/">Volver</a>') }),
+    join(tmp(), 'sitio'),
+  );
+  assert.equal(site.absoluteUrls, false);
+  // Una app con router de History, en el HTML o en un script de una subcarpeta.
+  const inline = await extractUpload('spa.html', strToU8('<script>history.pushState({}, "", "/carrito")</script>'), join(tmp(), 'a'));
+  assert.equal(inline.absoluteUrls, true);
+  const bundled = await extractUpload(
+    'spa.zip',
+    zipSync({ 'index.html': strToU8('<script type="module" src="/assets/app.js"></script>'), 'assets/app.js': strToU8('function go(t){window.history.pushState({},"",t)}'), 'assets/data.json': strToU8('{"x":"pushState("}') }),
+    join(tmp(), 'b'),
+  );
+  assert.equal(bundled.absoluteUrls, true);
+  const dataOnly = await extractUpload('p.zip', zipSync({ 'index.html': strToU8('<p>hola</p>'), 'data.json': strToU8('{"x":"pushState("}') }), join(tmp(), 'c'));
+  assert.equal(dataOnly.absoluteUrls, false, 'only .html and .js are read');
 });
 
 test('listZip reads stored and deflated entries and refuses garbage', () => {

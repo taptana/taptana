@@ -73,6 +73,7 @@ const INVALID_JSON = 'El cuerpo de la petición no es JSON válido.';
 const NO_SESSION = 'No existe esta sesión.';
 const NO_STUDY = 'No existe este estudio.';
 const NO_PROTOTYPE = 'No existe este prototipo.';
+const STUDY_PROTOTYPE_MISSING = 'Ese prototipo no existe aquí. Elige uno de tus prototipos para este estudio.';
 
 export interface ApiOptions {
   store: Store;
@@ -277,9 +278,23 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
     return { ok: true as const, value: result.value };
   };
 
+  /**
+   * Un estudio apunta a un prototipo de esta instalación. Si el que trae no existe (un
+   * study.json escrito para otra computadora), se rechaza con un mensaje claro, salvo con
+   * `?allowMissingPrototype=1` (para importar primero y subir el prototipo después).
+   */
+  const missingPrototype = (c: Context, prototypeId: string): Response | null => {
+    if (['1', 'true'].includes(c.req.query('allowMissingPrototype') ?? '')) return null;
+    // La carpeta que se está sirviendo existe aunque todavía no tenga sesiones.
+    if (store.getPrototype(prototypeId) || (prototypeId === LOCAL_PROTOTYPE_ID && prototypeDir)) return null;
+    return c.json({ error: STUDY_PROTOTYPE_MISSING, code: 'prototype-missing', issues: [{ message: STUDY_PROTOTYPE_MISSING, field: 'prototypeId' }] }, 400);
+  };
+
   api.post('/studies', studyLimit, async (c) => {
     const result = await readStudy(c);
     if (!result.ok) return result.response;
+    const missing = missingPrototype(c, result.value.prototypeId);
+    if (missing) return missing;
     return c.json(store.saveStudy(result.value), 201);
   });
 
@@ -291,7 +306,7 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
   });
 
   /** Reporte del estudio (ver computeStudyReport). Filtros: ?variant=<id>&device=touch|desktop */
-  api.get('/studies/:id/report', (c) => {
+  api.get('/studies/:id/report', async (c) => {
     const study = store.getStudy(c.req.param('id'));
     if (!study) return c.json<ApiError>({ error: NO_STUDY }, 404);
     const filter: ReportFilter = {};
@@ -302,7 +317,9 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
       if (device !== 'touch' && device !== 'desktop') return c.json<ApiError>({ error: 'El filtro "device" tiene que ser "touch" o "desktop".' }, 400);
       filter.device = device;
     }
-    return c.json(computeStudyReport(study, store.listReportSessions(study.id), filter));
+    // Las pantallas del prototipo dan los nombres: el reporte dice lo mismo que el constructor.
+    const screens = store.listScreens(study.prototypeId, await htmlFiles(study.prototypeId));
+    return c.json(computeStudyReport(study, store.listReportSessions(study.id), filter, { screens }));
   });
 
   /** El estudio como CSV, una fila por participante, para abrir en una hoja de cálculo. */
@@ -324,7 +341,13 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
   api.put('/studies/:id', studyLimit, async (c) => {
     const result = await readStudy(c);
     if (!result.ok) return result.response;
-    if (!store.getStudy(c.req.param('id'))) return c.json<ApiError>({ error: NO_STUDY }, 404);
+    const current = store.getStudy(c.req.param('id'));
+    if (!current) return c.json<ApiError>({ error: NO_STUDY }, 404);
+    // Solo se revisa si cambia de prototipo: un estudio cuyo prototipo se borró se puede seguir editando.
+    if (result.value.prototypeId !== current.prototypeId) {
+      const missing = missingPrototype(c, result.value.prototypeId);
+      if (missing) return missing;
+    }
     return c.json(store.saveStudy(result.value, c.req.param('id')));
   });
 

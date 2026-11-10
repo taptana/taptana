@@ -113,19 +113,29 @@ export function biggestDrop(steps: readonly FunnelStep[]): number {
   return at;
 }
 
-/** La regla de éxito de una tarea, en palabras. */
-export function ruleText(rule: SuccessRule | undefined, nameOf: (path: string) => string): string {
+/**
+ * La regla de éxito de una tarea, en palabras y sin selectores CSS: `elementText` es el texto del
+ * elemento que hay que tocar, si se conoce. El selector queda para un tooltip (`ruleSelector`).
+ */
+export function ruleText(rule: SuccessRule | undefined, nameOf: (path: string) => string, elementText?: string | null): string {
   if (!rule) return '';
   switch (rule.type) {
     case 'reached':
       return `Se logra al llegar a «${nameOf(rule.path)}»`;
     case 'tapped':
-      return `Se logra al tocar ${rule.selector}`;
+      return elementText?.trim() ? `Se logra al tocar «${elementText.trim()}»` : 'Se logra al tocar un elemento concreto del prototipo';
     case 'visible':
-      return rule.text ? `Se logra cuando aparece el texto «${rule.text}»` : `Se logra cuando aparece ${rule.selector ?? 'un elemento'}`;
+      return rule.text ? `Se logra cuando aparece el texto «${rule.text}»` : 'Se logra cuando aparece un elemento concreto del prototipo';
     case 'manual':
       return 'El resultado lo decides tú al ver la grabación';
   }
+}
+
+/** El selector CSS de la regla, para mostrarlo como dato secundario; '' si la regla no usa uno. */
+export function ruleSelector(rule: SuccessRule | undefined): string {
+  if (rule?.type === 'tapped') return rule.selector;
+  if (rule?.type === 'visible' && !rule.text) return rule.selector ?? '';
+  return '';
 }
 
 export const OUTCOME_ORDER: ReadonlyArray<keyof TaskOutcomeCounts> = ['direct', 'indirect', 'review', 'reported', 'failed', 'incomplete'];

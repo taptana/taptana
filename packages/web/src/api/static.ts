@@ -54,7 +54,7 @@ import {
   type StudyReport,
   type TaptanaEvent,
 } from '@taptana/shared';
-import type { ApiClient, PrototypePage } from './client.ts';
+import type { ApiClient, ManualMarks, PrototypePage } from './client.ts';
 import { SessionExistsError, UserError } from '@/lib/errors';
 import { idbAvailable, idbBatch, idbRequest, openDb } from '@/lib/idb';
 import { htmlTitle, unpack } from '@/lib/unzip';
@@ -70,10 +70,19 @@ const META = 'manual';
 /** Ids que el prototipo de ejemplo tuvo en versiones anteriores de la demo. */
 const EXAMPLE_ALIASES = new Set(['demo-tienda', EXAMPLE_PROTOTYPE_ID]);
 
-const NO_STORAGE =
-  'Este navegador no deja guardar datos aquí (suele pasar en ventanas privadas), así que la demo no puede guardar prototipos, estudios ni sesiones. Ábrela en una ventana normal o corre Taptana en tu computadora con «pnpm start».';
-const NO_SERVICE_WORKER =
-  'Este navegador no permite «service workers» (pasa en ventanas privadas de algunos navegadores), y la demo los necesita para mostrar un prototipo subido. Abre la demo en una ventana normal o corre Taptana en tu computadora con «pnpm start».';
+/** Qué hacer cuando el navegador no deja guardar: el problema no es el archivo. */
+const BLOCKED_FIX = 'No es un problema de tu archivo. Abre esta página en Chrome o Safari, en una ventana normal, o corre Taptana en tu computadora con «pnpm start».';
+const NO_STORAGE = `Tu navegador bloqueó el almacenamiento que la demo necesita para guardar prototipos, estudios y sesiones. Pasa en ventanas privadas y en navegadores que se abren dentro de otra app (Instagram, WhatsApp, correo). ${BLOCKED_FIX}`;
+const NO_SERVICE_WORKER = `Tu navegador bloqueó una función («service worker») que la demo necesita para mostrar un prototipo subido. Pasa en ventanas privadas y en navegadores que se abren dentro de otra app (Instagram, WhatsApp, correo). ${BLOCKED_FIX}`;
+
+/** ¿El navegador ofrece service workers? En algunos contextos, solo preguntar ya lanza un error. */
+function serviceWorkerAvailable(): boolean {
+  try {
+    return typeof navigator !== 'undefined' && 'serviceWorker' in navigator && Boolean(navigator.serviceWorker) && window.isSecureContext !== false;
+  } catch {
+    return false;
+  }
+}
 
 function panelDb(): Promise<IDBDatabase> {
   if (!idbAvailable()) return Promise.reject(new UserError(NO_STORAGE));
@@ -135,9 +144,12 @@ interface StoredFile {
 }
 
 /** Lo que el moderador anotó de una sesión (y si borró una de las de ejemplo). */
+/** Marcas guardadas: null es "se quitó la marca" (tapa la que traiga una sesión de ejemplo). */
+type StoredMarks = Record<string, 'success' | 'failure' | null>;
+
 interface SessionMeta {
   sessionId: string;
-  manual?: ManualResults;
+  manual?: StoredMarks;
   label?: string;
   notes?: string;
   excluded?: boolean;
@@ -183,9 +195,11 @@ export class StaticClient implements ApiClient {
   }
 
   async uploadProblem(): Promise<string | null> {
-    if (!('serviceWorker' in navigator)) return NO_SERVICE_WORKER;
+    if (!serviceWorkerAvailable()) return NO_SERVICE_WORKER;
     try {
-      await panelDb();
+      // Abrir la base no basta: en algunos navegadores abre pero no deja leer.
+      const db = await panelDb();
+      await idbRequest(db, PROTOTYPES, 'readonly', (s) => s.count());
     } catch {
       return NO_STORAGE;
     }
@@ -299,7 +313,12 @@ export class StaticClient implements ApiClient {
       if (start.variantId) session.variantId = start.variantId;
     }
     const study = session.studyId ? (studies.get(session.studyId) ?? light.study) : undefined;
-    const manual: ManualResults = { ...manualMarks(session.tasks), ...(meta?.manual ?? {}) };
+    // Una marca guardada como null es "quitar la marca": tapa la que traiga la sesión de ejemplo.
+    const manual: ManualResults = { ...manualMarks(session.tasks) };
+    for (const [taskId, value] of Object.entries(meta?.manual ?? {})) {
+      if (value === 'success' || value === 'failure') manual[taskId] = value;
+      else delete manual[taskId];
+    }
     if (study) {
       session.tasks = computeTaskResults(study, light.own, manual, session.lastSeenAt);
       session.answers = computeAnswers(study, light.own);
@@ -386,7 +405,12 @@ export class StaticClient implements ApiClient {
   async patchSession(id: string, patch: SessionPatch): Promise<SessionSummary> {
     const prev = (await this.metas()).get(id) ?? { sessionId: id };
     const next: SessionMeta = { ...prev };
-    if (patch.manual) next.manual = { ...(prev.manual ?? {}), ...patch.manual };
+    if (patch.manual) {
+      const marks: StoredMarks = { ...(prev.manual ?? {}) };
+      // null (o cualquier otra cosa) quita la marca: la tarea vuelve a "por revisar".
+      for (const [taskId, value] of Object.entries(patch.manual as Record<string, unknown>)) marks[taskId] = value === 'success' || value === 'failure' ? value : null;
+      next.manual = marks;
+    }
     if (patch.label !== undefined) next.label = patch.label.trim().slice(0, SESSION_LIMITS.label);
     if (patch.notes !== undefined) next.notes = patch.notes.slice(0, SESSION_LIMITS.notes);
     if (patch.excluded !== undefined) next.excluded = patch.excluded;
@@ -396,8 +420,8 @@ export class StaticClient implements ApiClient {
     return session;
   }
 
-  setManualResults(id: string, manual: ManualResults): Promise<SessionSummary> {
-    return this.patchSession(id, { manual });
+  setManualResults(id: string, manual: ManualMarks): Promise<SessionSummary> {
+    return this.patchSession(id, { manual: manual as SessionPatch['manual'] });
   }
 
   // ── Estudios ─────────────────────────────────────────────────────────
@@ -598,7 +622,7 @@ export class StaticClient implements ApiClient {
 
 /** Registra el service worker que sirve los prototipos subidos (y el estudio al recorder). */
 export async function ensureServiceWorker(base: string): Promise<void> {
-  if (!('serviceWorker' in navigator)) throw new UserError(NO_SERVICE_WORKER);
+  if (!serviceWorkerAvailable()) throw new UserError(NO_SERVICE_WORKER);
   const scope = base.endsWith('/') ? base : `${base}/`;
   let reg: ServiceWorkerRegistration;
   try {

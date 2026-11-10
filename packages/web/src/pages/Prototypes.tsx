@@ -16,6 +16,7 @@ import { copyText } from '@/lib/download';
 import { friendlyError } from '@/lib/errors';
 import { plural } from '@/lib/format';
 import { participantUrl } from '@/lib/links';
+import { nameScreen } from '@/lib/screens';
 import { cn, formatRelative } from '@/lib/utils';
 import { Link, useRouter } from '@/router';
 
@@ -65,7 +66,14 @@ export function PrototypesPage() {
       if (id) toast.success(`«${proto.name}» se actualizó. El link es el mismo.`);
       else toast.success(`«${proto.name}» está listo.`, { action: { label: 'Crear estudio', onClick: () => navigate({ name: 'study', id: null }) }, durationMs: 8000 });
     } catch (e) {
-      setError(friendlyError(e, 'No se pudo subir el archivo. Revisa que sea un .html o un .zip e intenta de nuevo.'));
+      setError(
+        friendlyError(
+          e,
+          IS_DEMO
+            ? 'No se pudo guardar el prototipo en este navegador. Suele pasar cuando el navegador bloquea el almacenamiento (ventana privada, o un navegador abierto dentro de otra app); no es un problema de tu archivo. Abre esta página en Chrome o Safari, en una ventana normal, o corre Taptana en tu computadora con «pnpm start».'
+            : 'No se pudo subir el archivo. Revisa que sea un .html o un .zip e intenta de nuevo.',
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -371,9 +379,8 @@ function PrototypeCard({
               </div>
             )}
             <div className="space-y-1.5">
-              <Label htmlFor={`link-${proto.id}`} className="mb-0">
-                Link del prototipo (sin estudio)
-              </Label>
+              {/* Sin mb-0: en Tailwind v4 `space-y` separa con margen inferior, y mb-0 dejaba la etiqueta pegada al campo. */}
+              <Label htmlFor={`link-${proto.id}`}>Link del prototipo (sin estudio)</Label>
               <Input id={`link-${proto.id}`} readOnly value={link} className="font-mono text-xs" onFocus={(e) => e.target.select()} />
               <div className="flex flex-wrap gap-2 pt-1">
                 <Button variant="outline" size="sm" onClick={() => void copy()}>
@@ -403,8 +410,12 @@ function PrototypeCard({
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {proto.absoluteUrls && !proto.root
-                    ? 'Recomendado: este prototipo usa rutas que empiezan con «/» (por ejemplo /css/app.css). Si se ve sin estilos o sus páginas no cargan, actívalo.'
-                    : 'Sirve el prototipo en la dirección principal en vez de una subcarpeta. Úsalo si se ve sin estilos o si es una app con rutas propias. Solo un prototipo a la vez.'}
+                    ? 'Puede hacer falta: este prototipo parece una app con rutas propias. Si al navegar vuelve siempre al inicio o sus páginas no cargan, actívalo; si se ve bien, déjalo como está.'
+                    : 'Sirve el prototipo en la dirección principal en vez de una subcarpeta. Úsalo si se ve sin estilos o si es una app con rutas propias.'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Solo un prototipo a la vez:</span>{' '}
+                  {proto.root ? 'si activas otro, este deja de estar en la raíz (su link normal sigue funcionando).' : 'si activas este, se desactiva el que estaba.'}
                 </p>
               </div>
             )}
@@ -499,7 +510,7 @@ function Screens({ prototypeId }: { prototypeId: string }) {
               <ul className="space-y-1 text-sm max-h-56 overflow-y-auto">
                 {screens.map((s) => (
                   <li key={s.id} className="flex items-baseline gap-2 min-w-0">
-                    <span className="truncate">{s.title || s.label}</span>
+                    <span className="truncate">{nameScreen(s.id, screens)}</span>
                     <span className="font-mono text-xs text-muted-foreground truncate">{s.id}</span>
                     {s.source === 'seen' && (
                       <Badge variant="outline" className="ml-auto text-muted-foreground" title="No es un archivo: alguien llegó a esta pantalla en una sesión">

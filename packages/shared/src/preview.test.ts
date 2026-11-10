@@ -81,3 +81,13 @@ test('isPanelMessage rejects everything else', () => {
   ];
   for (const m of junk) assert.equal(isPanelMessage(m), false, JSON.stringify(m));
 });
+
+test('pick (panel → recorder) and escape (recorder → panel) are part of the contract', () => {
+  assert.equal(isPanelMessage({ source: 'taptana-panel', type: 'pick' }), true);
+  assert.equal(isPanelMessage({ source: 'taptana-panel', type: 'pick', cancel: true }), true);
+  assert.equal(isPanelMessage({ source: 'taptana-panel', type: 'pick', cancel: 'si' }), false);
+  assert.equal(isRecorderMessage({ source: 'taptana', type: 'tryout', event: 'escape' }), true);
+  const tap = { source: 'taptana', type: 'tap', screen: '/index.html', x: 1, y: 2, selector: '#a', target: { tag: 'a', selector: '#a' } };
+  assert.equal(isRecorderMessage({ ...tap, picked: true }), true);
+  assert.equal(isRecorderMessage({ ...tap, picked: 'yes' }), false);
+});

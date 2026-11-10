@@ -116,10 +116,15 @@ test('?key= sets an HttpOnly cookie and redirects without the key', async () => 
   assert.equal((await app.request('/api/v1/sessions', from(LAN, { cookie }))).status, 200);
   assert.equal((await app.request('/api/v1/sessions', from(LAN, { cookie: `otra=1; ${cookie}` }))).status, 200);
 
-  // En la API la llave también vale (y deja la cookie), sin redirigir.
+  // En la API la llave NO vale en la dirección (quedaría en historiales y registros)...
   const api = await app.request(`/api/v1/sessions?key=${KEY}`, from(LAN));
-  assert.equal(api.status, 200);
-  assert.match(api.headers.get('set-cookie') ?? '', /HttpOnly/i);
+  assert.equal(api.status, 401);
+  assert.equal(api.headers.get('set-cookie'), null);
+  // ...solo en la cookie o en la cabecera x-taptana-key (para scripts).
+  assert.equal((await app.request('/api/v1/sessions', from(LAN, { 'x-taptana-key': KEY }))).status, 200);
+  assert.equal((await app.request('/api/v1/sessions', from(LAN, { 'x-taptana-key': `${KEY}x` }))).status, 401);
+  // Una llave equivocada en la dirección no le quita el acceso a quien ya trae la cookie.
+  assert.equal((await app.request('/api/v1/sessions?key=otra', from(LAN, { cookie }))).status, 200);
 });
 
 test('a wrong key or a wrong cookie does not open anything', async () => {

@@ -108,7 +108,7 @@ export function StudiesPage() {
   const actions = (
     <>
       <Button variant="outline" onClick={() => setImportOpen(true)}>
-        <Upload /> Importar study.json
+        <Upload /> Importar estudio
       </Button>
       <Button asChild>
         <Link to={{ name: 'study', id: null }}>
@@ -139,7 +139,7 @@ export function StudiesPage() {
                 </Link>
               </Button>
               <Button variant="outline" onClick={() => setImportOpen(true)}>
-                <Upload /> Importar study.json
+                <Upload /> Importar estudio
               </Button>
             </>
           }

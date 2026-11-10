@@ -51,6 +51,8 @@ function Kpi({ icon, label, value, sub }: { icon: ReactNode; label: string; valu
 /** Puntaje grande + los cuatro números del estudio. */
 export function Overview({ report }: { report: StudyReport }) {
   const [how, setHow] = useState(false);
+  // `bounced` llega con la versión nueva del reporte; un servidor anterior no lo manda.
+  const bounced = (report as StudyReport & { bounced?: number }).bounced ?? 0;
   const band = scoreBand(report.score);
   const withData = report.tasks.filter((t) => t.decided > 0).length;
   return (
@@ -89,8 +91,16 @@ export function Overview({ report }: { report: StudyReport }) {
           value={String(report.participants)}
           sub={
             <>
-              {report.completed === report.participants ? 'Todos llegaron al final' : `${report.completed} de ${report.participants} llegaron al final`}
-              {report.excluded > 0 && ` · ${plural(report.excluded, 'sesión excluida', 'sesiones excluidas')}`}
+              <span className="block">
+                {plural(report.participants, 'participante', 'participantes')}
+                {report.participants > 0 && (report.completed === report.participants ? ' · todos llegaron al final' : ` · ${report.completed} de ${report.participants} llegaron al final`)}
+              </span>
+              {bounced > 0 && (
+                <span className="block" data-testid="bounced">
+                  {bounced === 1 ? '1 entró y salió sin empezar' : `${bounced} entraron y salieron sin empezar`}
+                </span>
+              )}
+              {report.excluded > 0 && <span className="block">{plural(report.excluded, 'sesión excluida', 'sesiones excluidas')}</span>}
             </>
           }
         />
@@ -98,10 +108,10 @@ export function Overview({ report }: { report: StudyReport }) {
           icon={<Target />}
           label="Tareas logradas"
           value={withData ? pct(report.successRate) : '—'}
-          sub={withData ? 'De quienes empezaron cada tarea, en promedio' : 'Sin resultados decididos'}
+          sub={withData ? 'De todos los intentos ya decididos' : 'Sin resultados decididos'}
         />
         <Kpi icon={<Clock />} label="Duración mediana" value={seconds(report.medianDurationMs)} sub="Del estudio completo, por participante" />
-        <Kpi icon={<MousePointerClick />} label="Misclicks" value={pct(report.avgMisclickRate)} sub="De los toques cayeron donde no pasa nada" />
+        <Kpi icon={<MousePointerClick />} label="Misclicks" value={pct(report.avgMisclickRate)} sub="De los toques de las tareas cayeron donde no pasa nada" />
       </div>
 
       <HowDialog open={how} onOpenChange={setHow} />
@@ -112,11 +122,11 @@ export function Overview({ report }: { report: StudyReport }) {
 const DEFINITIONS: Array<{ term: string; text: string }> = [
   {
     term: 'Participantes',
-    text: 'Las personas que abrieron el link del estudio y aceptaron que se grabe. Las sesiones que marcaste como "Excluir del reporte" no cuentan. En cada tarea solo cuentan quienes la empezaron.',
+    text: 'Las personas que abrieron el link del estudio, aceptaron que se grabe y empezaron al menos un bloque. Quienes aceptaron y salieron sin empezar se cuentan aparte ("entraron y salieron sin empezar"). Las sesiones que marcaste como "Excluir del reporte" no cuentan. En cada tarea solo cuentan quienes la empezaron.',
   },
   {
     term: 'Éxito directo e indirecto',
-    text: 'Hay éxito cuando se cumple la regla de la tarea o cuando tú lo marcas. Es directo si la persona siguió exactamente el camino esperado, e indirecto si llegó dando vueltas. Si la tarea no tiene camino esperado, se usa el camino más corto de quienes lo lograron.',
+    text: 'Hay éxito cuando se cumple la regla de la tarea o cuando tú lo marcas. Es directo si la persona siguió exactamente el camino esperado, e indirecto si llegó dando vueltas. Si la tarea no tiene camino esperado, se usa el camino más común de quienes lo lograron.',
   },
   {
     term: 'Dijo que terminó, No pudo, Sin terminar',
@@ -136,7 +146,7 @@ const DEFINITIONS: Array<{ term: string; text: string }> = [
   },
   {
     term: 'Misclick (toque sin efecto)',
-    text: 'Un toque sobre algo que no es tocable y que no produjo ningún cambio. Muchos misclicks en un mismo lugar indican que algo parece un botón y no lo es. Las grabaciones antiguas sin este dato no cuentan.',
+    text: 'Un toque sobre algo que no es tocable y que no produjo ningún cambio. Muchos misclicks en un mismo lugar indican que algo parece un botón y no lo es. La tasa de misclicks de una tarea son sus toques sin efecto divididos entre todos los toques hechos durante esa tarea (no entre personas). Las grabaciones antiguas sin este dato no cuentan.',
   },
   {
     term: 'Puntaje de una tarea (0 a 100)',
@@ -144,7 +154,7 @@ const DEFINITIONS: Array<{ term: string; text: string }> = [
   },
   {
     term: 'Puntaje del estudio',
-    text: 'El promedio del puntaje de las tareas que ya tienen resultados decididos. "Tareas logradas" es el promedio del éxito (directo + indirecto) de esas mismas tareas.',
+    text: 'El promedio del puntaje de las tareas que ya tienen resultados decididos. "Tareas logradas" junta los intentos de todas las tareas: intentos logrados (directo + indirecto) divididos entre todos los intentos ya decididos. Los que están por revisar o sin terminar no entran.',
   },
   {
     term: 'Mapas de calor',

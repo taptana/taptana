@@ -11,6 +11,7 @@ import {
   sameScreen,
   screenId,
   screenLabel,
+  screenUrl,
   type BlockKind,
   type ContextBlock,
   type Prototype,
@@ -47,8 +48,8 @@ import {
   type DraftStudy,
   type Selection,
 } from '@/components/builder/draft';
-import { ShowErrorsContext } from '@/components/builder/fields';
-import { PhoneFrame, type PhoneHandle } from '@/components/builder/PhoneFrame';
+import { KIND_INFO, ShowErrorsContext } from '@/components/builder/fields';
+import { PhoneFrame, type PhoneHandle, type PickMessage } from '@/components/builder/PhoneFrame';
 import { ErrorState, Layout, PageHeader, PageSkeleton, RouteTabs } from '@/components/layout';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -60,11 +61,14 @@ import { downloadText } from '@/lib/download';
 import { friendlyError } from '@/lib/errors';
 import { plural } from '@/lib/format';
 import { participantUrl } from '@/lib/links';
+import { liveTitleIsStable } from '@/lib/screens';
 import { Link, useNavigationBlocker, useRouter } from '@/router';
 
 type PhoneMode = { type: 'record'; blockId: string; steps: DemoStep[] } | { type: 'pick'; blockId: string } | null;
 
 const AUTOSAVE_MS = 800;
+/** "El próximo toque es para elegir": el recorder lo avisa sin activar el prototipo. */
+const PICK: PickMessage = { source: 'taptana-panel', type: 'pick' };
 
 function useDebounced<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -344,6 +348,16 @@ export function StudyEditorPage({ id }: { id: string | null }) {
     return () => window.clearTimeout(timer);
   }, [selector, tick, phoneScreen]);
 
+  // Elegir en el prototipo: se le avisa al recorder para que el toque no navegue. Al salir del
+  // modo (con o sin toque) se desarma.
+  const picking = mode?.type === 'pick';
+  useEffect(() => {
+    if (!picking) return;
+    const target = phone.current;
+    target?.post(PICK);
+    return () => target?.post({ ...PICK, cancel: true });
+  }, [picking]);
+
   const showPhone = (): void => {
     window.setTimeout(() => phoneBox.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 0);
   };
@@ -354,7 +368,11 @@ export function StudyEditorPage({ id }: { id: string | null }) {
       const sid = screenId(msg.screen);
       setPhoneScreen(sid);
       // Las pantallas que aparecen al navegar se pueden elegir aunque no sean un archivo.
-      setSeenScreens((list) => (list.some((s) => sameScreen(s.id, sid)) ? list : [...list, { id: sid, label: screenLabel(sid), ...(msg.title ? { title: msg.title } : {}), source: 'seen' }]));
+      // El título en vivo solo nombra pantallas que no son un archivo: en "/producto.html" sería el
+      // del producto de esta visita, y la pantalla se tiene que llamar igual en todo el panel.
+      setSeenScreens((list) => (list.some((s) => sameScreen(s.id, sid)) ? list : [...list, { id: sid, label: screenLabel(sid), ...(msg.title && liveTitleIsStable(sid) ? { title: msg.title } : {}), source: 'seen' }]));
+      // El prototipo cargó de nuevo mientras se elige: se le vuelve a avisar.
+      if (mode?.type === 'pick') phone.current?.post(PICK);
       setMode((m) => (m?.type === 'record' ? { ...m, steps: pushScreen(m.steps, msg.screen, msg.title) } : m));
       return;
     }
@@ -366,12 +384,16 @@ export function StudyEditorPage({ id }: { id: string | null }) {
       const block = draft?.blocks.find((b) => b.id === mode.blockId);
       if (block && isDraftTask(block) && picked) {
         const success: SuccessRule = block.success?.type === 'visible' ? { ...block.success, selector: picked } : { type: 'tapped', selector: picked };
-        updateBlock({ ...block, success });
+        const next = { ...block, success };
+        // En primer clic, la pantalla donde se tocó es donde se hace la pregunta.
+        if (block.kind === 'first-click' && !block.startPath?.trim()) next.startPath = screenUrl(msg.screen);
+        updateBlock(next);
         toast.success(msg.target.text ? `Elegiste "${msg.target.text.slice(0, 40)}"` : 'Elemento elegido');
       }
       setMode(null);
-      // El toque pudo cambiar de pantalla: el teléfono vuelve al inicio de la tarea, donde se comprueba el selector.
-      window.setTimeout(() => phone.current?.reload(), 700);
+      // Con un recorder que entiende "pick" el toque no activó nada (`picked`). Si no, pudo cambiar
+      // de pantalla: el teléfono vuelve al inicio de la tarea, donde se comprueba el selector.
+      if ((msg as { picked?: boolean }).picked !== true) window.setTimeout(() => phone.current?.reload(), 700);
     }
   };
 
@@ -459,6 +481,29 @@ export function StudyEditorPage({ id }: { id: string | null }) {
   }
 
   const blockIndex = selected ? draft.blocks.indexOf(selected) : -1;
+  /** El problema con el bloque al que pertenece delante ("Bloque 3 · Sí / No: …"), para que se sepa cuál es. */
+  const issueLabel = (issue: StudyIssue): string => {
+    const at = issue.blockId ? draft.blocks.findIndex((b) => b.id === issue.blockId) : -1;
+    const block = draft.blocks[at];
+    if (!block) return issue.message;
+    return `Bloque ${at + 1} · ${KIND_INFO[block.kind ?? 'task'].label}: ${issue.message}`;
+  };
+
+  // Una app con rutas propias (History API) servida en una subcarpeta suele volver siempre al inicio.
+  const needsRoot = Boolean(proto?.absoluteUrls && !proto.root && proto.source === 'upload' && proto.url && proto.url !== '/');
+  const openAtRoot = async (): Promise<void> => {
+    if (!proto) return;
+    setBusy(true);
+    try {
+      await client.setPrototypeRoot(proto.id, true);
+      setProtos(await client.listPrototypes());
+      toast.success(`«${proto.name}» ahora se abre en la raíz. El link del estudio cambió: vuelve a copiarlo si ya lo habías compartido.`);
+    } catch (e) {
+      toast.error(friendlyError(e, 'No se pudo abrir en la raíz. Inténtalo desde Prototipos.'));
+    } finally {
+      setBusy(false);
+    }
+  };
   const current: Selection = selected || FIXED_SELECTIONS.includes(selection) ? selection : 'settings';
   const link = record && proto ? participantUrl(info, proto, record.id) : null;
   const firstError = errors[0];
@@ -491,6 +536,11 @@ export function StudyEditorPage({ id }: { id: string | null }) {
     },
     onCancelPick: () => setMode(null),
     onTryout: () => openTryout(selection),
+    autoAdvance: (draft.settings?.advance ?? 'auto') === 'auto',
+    onManualAdvance: () => {
+      update({ ...draft, settings: { ...draft.settings, advance: 'manual' } });
+      toast.success('Listo: ahora el estudio espera a que el participante toque «Listo».');
+    },
     report: report?.tasks.find((t) => t.taskId === selection),
   };
 
@@ -592,6 +642,24 @@ export function StudyEditorPage({ id }: { id: string | null }) {
         </Alert>
       )}
 
+      {needsRoot && (
+        <Alert variant="warning" data-testid="needs-root">
+          <TriangleAlert />
+          <AlertTitle>Este prototipo parece una app con rutas propias</AlertTitle>
+          <AlertDescription>
+            <p>
+              Taptana lo sirve dentro de una subcarpeta ({proto?.url}) y ahí su navegación puede volver siempre a la pantalla de inicio. Si en el teléfono no cambia de pantalla, ábrelo en la raíz
+              {client.canServeAtRoot ? '. Solo un prototipo puede estar en la raíz a la vez: si había otro, se desactiva.' : ': eso solo se puede cuando corres Taptana en tu computadora con «pnpm start».'}
+            </p>
+            {client.canServeAtRoot && (
+              <Button size="sm" variant="outline" className="mt-1" disabled={busy} onClick={() => void openAtRoot()}>
+                Abrir en la raíz
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {errors.length > 0 && (
         <Alert variant={record ? 'warning' : 'default'} id="create-missing">
           <CircleAlert />
@@ -608,7 +676,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
                       select(issueSelection(issue));
                     }}
                   >
-                    {issue.message}
+                    {issueLabel(issue)}
                   </button>
                 </li>
               ))}
@@ -676,6 +744,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
               ref={phone}
               proto={proto}
               screen={wantedScreen}
+              screens={screens}
               onMessage={onPhoneMessage}
               highlight={mode !== null}
               banner={
@@ -708,6 +777,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
         open={tryout !== null}
         onOpenChange={(o) => !o && setTryout(null)}
         proto={proto}
+        screens={screens}
         study={tryout ? { ...tryout.study, ...(record ? { id: record.id, createdAt: record.createdAt, updatedAt: record.updatedAt } : {}) } : null}
         startAt={tryout?.startAt}
       />

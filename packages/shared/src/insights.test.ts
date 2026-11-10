@@ -74,11 +74,13 @@ test('a rough study: says what went wrong, most serious first, and still names s
   assert.deepEqual(out, [
     '[bad] «Comprar una planta» es la tarea con menor éxito: la lograron 2 de 6 personas (33 %). Del resto: 4 dijeron que no pudieron.',
     '[bad] En «Comprar una planta», 4 de 6 personas que llegaron a «Monstera» no siguieron a «Tu carrito»: es el paso con mayor caída.',
-    '[bad] En la pantalla «Monstera» hubo 12 toques sin efecto; lo más tocado fue «Foto de la planta» (8 veces). Revisa si parece tocable sin serlo.',
     '[bad] «¿Qué tan fácil fue comprar?» promedió 1,8 de 5 (6 respuestas; 1 = «Muy difícil», 5 = «Muy fácil»): es la pregunta con la nota más baja.',
     '[warn] Hay 5 resultados por revisar en «Costo del envío», una tarea que decides tú. Hasta que los marques no cuentan en el éxito ni en el puntaje.',
+    '[warn] «Aplicar un cupón» es la tarea más lenta: 1 min 15 s de mediana entre quienes la lograron, frente a 8 s de la otra.',
     '[good] 5 de 6 personas lograron «Aplicar un cupón» (83 %).',
   ]);
+  // Las cuatro que nunca se quedan fuera: menor éxito, más lenta, peor escala y por revisar.
+  for (const must of [/menor éxito/, /más lenta/, /nota más baja/, /por revisar/]) assert.equal(out.some((t) => must.test(t)), true, String(must));
   // Lo que no entró por el tope de 6 sigue un orden estable: el mismo reporte da las mismas frases.
   assert.deepEqual(plain(computeStudyReport(shop, rough()).insights), out);
 });
@@ -88,9 +90,9 @@ test('insights point to the block and the screen they talk about', () => {
   assert.deepEqual(insights.map((i) => [i.blockId, i.screen]), [
     ['buy', undefined],
     ['buy', '/producto.html'],
-    ['buy', '/producto.html'],
     ['ease', undefined],
     ['ship', undefined],
+    ['coupon', undefined],
     ['coupon', undefined],
   ]);
   const levels = insights.map((i) => i.level);
@@ -160,7 +162,7 @@ test('with very little data there are still at least two sentences, and they are
   const s = studyOf([{ id: 'q', kind: 'text', question: '¿Qué opinas?' }]);
   const one = computeStudyReport(s, [session('s1', [answer(10, 'q', 'Bien'), finish(20)], { durationMs: 95_000 })]);
   assert.deepEqual(plain(one.insights), [
-    '[warn] Con 1 persona los porcentajes cambian mucho de una persona a otra. Con 5 ya aparece la mayoría de los problemas.',
+    '[warn] Con pocas personas (1) los porcentajes cambian mucho; con 5 o más ya aparecen los problemas principales.',
     '[good] La única persona que participó llegó al final del estudio.',
   ]);
   const six = computeStudyReport(s, [1, 2, 3, 4, 5, 6].map((n) => session(`s${n}`, [answer(10, 'q', 'Bien'), finish(20)], { durationMs: 95_000 })));
@@ -168,7 +170,7 @@ test('with very little data there are still at least two sentences, and they are
     '[good] Las 6 personas llegaron al final del estudio.',
     '[good] Participaron 6 personas. La sesión duró 1 min 35 s de mediana.',
   ]);
-  const quit = computeStudyReport(s, [1, 2, 3, 4, 5, 6].map((n) => session(`s${n}`, [], { durationMs: 20_000 })));
+  const quit = computeStudyReport(s, [1, 2, 3, 4, 5, 6].map((n) => session(`s${n}`, [answer(10, 'q', null)], { durationMs: 20_000 })));
   assert.deepEqual(plain(quit.insights), [
     '[warn] Ninguna de las 6 personas llegó al final del estudio.',
     '[good] Participaron 6 personas. La sesión duró 20 s de mediana.',
@@ -184,4 +186,51 @@ test('no participants, no insights; and never more than six', () => {
     assert.match(i.text, /[.!?]$/);
     assert.doesNotMatch(i.text, /undefined|NaN|null/);
   }
+});
+
+test('screens are named the same way the report names them, never by what one visit showed', () => {
+  const buyer = (n: number, product: string, cartTitle: string, ok: boolean): ReportSession =>
+    session(`s${n}`, [
+      nav(1, '/', 'Plantas para tu casa'), task(1000, 'start', 'buy'), nav(3000, `/producto.html?id=${n}`, product),
+      ...(ok ? [nav(6000, '/carrito.html', cartTitle), nav(9000, '/gracias.html', '¡Gracias!'), task(9001, 'goal', 'buy'), task(9900, 'done', 'buy')] : [task(20_000, 'skip', 'buy')]),
+      finish(30_000),
+    ]);
+  const s = studyOf([shop.blocks[0]!]);
+  const sessions = [buyer(1, 'Monstera deliciosa', 'Carrito · Verde', true), buyer(2, 'Ficus lyrata', 'Datos de envío', true), buyer(3, 'Monstera deliciosa', '', false), buyer(4, 'Sansevieria', '', false), buyer(5, 'Pothos', '', false)];
+  const report = computeStudyReport(s, sessions);
+  assert.equal(report.screenNames['/producto.html'], 'producto');
+  assert.equal(report.screenNames['/carrito.html'], 'carrito');
+  const drop = plain(report.insights).find((t) => t.includes('mayor caída'));
+  assert.equal(drop, '[bad] En «Comprar una planta», 3 de 5 personas que llegaron a «producto» no siguieron a «carrito»: es el paso con mayor caída.');
+  // Con las pantallas del prototipo, las frases usan el mismo nombre que el constructor.
+  const named = computeStudyReport(s, sessions, undefined, { screens: [{ id: '/producto.html', name: 'Producto · Verde' }, { id: '/carrito.html', name: 'Carrito · Verde' }] });
+  assert.equal(plain(named.insights).some((t) => t.includes('que llegaron a «Producto · Verde» no siguieron a «Carrito · Verde»')), true);
+});
+
+test('the funnel sentence counts from everyone who started, and is skipped for a manual task with a guessed path', () => {
+  // Tarea manual sin camino escrito: el camino se deduce de quien el moderador marcó como logrado.
+  const manual = studyOf([{ id: 'ship', title: 'Costo del envío', instruction: '…', success: { type: 'manual' } }]);
+  const run = (n: number, far: boolean): ReportSession =>
+    session(`s${n}`, [nav(1, '/'), task(1000, 'start', 'ship'), ...(far ? [nav(2000, '/carrito.html')] : []), task(5000, 'done', 'ship'), finish(6000)], {
+      tasks: [{ taskId: 'ship', outcome: far ? 'success' : 'failed', ruleMatched: false, reported: 'done', manual: far ? 'success' : 'failure' }],
+    });
+  const report = computeStudyReport(manual, [run(1, true), run(2, false), run(3, false), run(4, false)]);
+  assert.equal(report.tasks[0]!.expectedPathInferred, true);
+  assert.deepEqual(report.tasks[0]!.funnel.map((f) => f.reached), [4, 1]);
+  assert.equal(plain(report.insights).some((t) => t.includes('mayor caída')), false);
+  // La misma tarea con el camino escrito sí se comenta, y parte de las 4 personas que la empezaron.
+  const written = studyOf([{ id: 'ship', title: 'Costo del envío', instruction: '…', success: { type: 'manual' }, expectedPath: ['/carrito.html'] }]);
+  const drop = plain(computeStudyReport(written, [run(1, true), run(2, false), run(3, false), run(4, false)]).insights).find((t) => t.includes('mayor caída'));
+  assert.equal(drop, '[bad] En «Costo del envío», 3 de 4 personas que llegaron a «inicio» no siguieron a «carrito»: es el paso con mayor caída.');
+});
+
+test('with fewer than 3 participants a high score is not called a flow that works', () => {
+  const easy = studyOf([{ id: 'buy', title: 'Comprar', instruction: '…', success: { type: 'reached', path: '/gracias.html' } }]);
+  const happy = (n: number): ReportSession =>
+    session(`s${n}`, [nav(1, '/'), task(1000, 'start', 'buy'), tap(2000, true), nav(3000, '/gracias.html'), task(3900, 'done', 'buy'), finish(8000)]);
+  const two = computeStudyReport(easy, [happy(1), happy(2)]);
+  assert.equal(two.score, 100);
+  assert.equal(plain(two.insights).some((t) => t.includes('El flujo se entiende bien')), false);
+  assert.equal(plain(two.insights).includes('[warn] Con pocas personas (2) los porcentajes cambian mucho; con 5 o más ya aparecen los problemas principales.'), true);
+  assert.equal(plain(computeStudyReport(easy, [happy(1), happy(2), happy(3)]).insights).some((t) => t.includes('El flujo se entiende bien')), true);
 });

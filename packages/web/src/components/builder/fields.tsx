@@ -4,10 +4,11 @@
  */
 import { createContext, useContext, useId, useState, type ReactNode } from 'react';
 import { ChevronDown, CircleDot, FileText, ListChecks, MessageSquareText, MousePointerClick, Smartphone, Star, ThumbsUp, type LucideIcon } from 'lucide-react';
-import { sameScreen, screenLabel, type BlockKind, type ScreenInfo } from '@taptana/shared';
+import { sameScreen, type BlockKind, type ScreenInfo } from '@taptana/shared';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { nameScreen } from '@/lib/screens';
 import { cn } from '@/lib/utils';
 
 export const KIND_INFO: Record<BlockKind, { label: string; hint: string; icon: LucideIcon; untitled: string }> = {
@@ -71,12 +72,11 @@ export function Field({
   );
 }
 
-/** "inicio · /index.html" para mostrar una pantalla sin jerga y sin perder el identificador. */
+/** El nombre de una pantalla (el mismo en todo el panel), con su identificador como tooltip. */
 export function ScreenName({ id, screens, className }: { id: string; screens: readonly ScreenInfo[]; className?: string }) {
-  const known = screens.find((s) => sameScreen(s.id, id));
   return (
     <span className={className} title={id}>
-      {known?.title || screenLabel(id) || id}
+      {nameScreen(id, screens) || id}
     </span>
   );
 }
@@ -107,13 +107,16 @@ export function ScreenPicker({
 }) {
   const list = urlOnly ? screens.filter((s) => !s.id.includes('~')) : screens;
   const phone = phoneScreen && (!urlOnly || !phoneScreen.includes('~')) ? phoneScreen : undefined;
+  // Con una pantalla elegida, el botón dice cuál es (no "Elegir").
+  const chosen = value.trim() ? nameScreen(value.trim(), screens) : '';
+  const isKnown = value.trim() !== '' && screens.some((s) => sameScreen(s.id, value.trim()));
   return (
     <div className="flex gap-2">
       <Input {...inputProps} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} spellCheck={false} autoCapitalize="none" className="min-w-0 flex-1 font-mono text-sm" />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button type="button" variant="outline" className="shrink-0">
-            Elegir <ChevronDown />
+          <Button type="button" variant="outline" className="max-w-[45%] shrink-0" aria-label={chosen ? `Pantalla elegida: ${chosen}. Cambiar` : 'Elegir una pantalla'} title={isKnown ? undefined : chosen ? 'Esta pantalla todavía no se ha visto en el prototipo' : undefined}>
+            <span className="truncate">{chosen || 'Elegir'}</span> <ChevronDown />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-72">
@@ -134,7 +137,7 @@ export function ScreenPicker({
           {list.map((s) => (
             <DropdownMenuItem key={s.id} onSelect={() => onChange(s.id)}>
               <span className="min-w-0">
-                <span className="block truncate">{s.title || s.label}</span>
+                <span className="block truncate">{nameScreen(s.id, screens)}</span>
                 <span className="block truncate font-mono text-xs text-muted-foreground">{s.id}</span>
               </span>
             </DropdownMenuItem>

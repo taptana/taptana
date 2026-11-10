@@ -1,3 +1,4 @@
+import { applyManualPatch } from './study.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -190,7 +191,7 @@ test('validateSessionPatch rejects wrong types with a message in Spanish', () =>
     [{ notes: 'x'.repeat(4001) }, /Las notas no pueden pasar de 4000 caracteres/],
     [{ excluded: 'sí' }, /"excluded" tiene que ser true o false/],
     [{ manual: 'success' }, /Las marcas/],
-    [{ manual: { t1: 'ok' } }, /La marca de la tarea "t1" tiene que ser "success" o "failure"/],
+    [{ manual: { t1: 'ok' } }, /La marca de la tarea "t1" tiene que ser "success", "failure" o null/],
   ];
   for (const [patch, pattern] of cases) {
     const r = validateSessionPatch(patch);
@@ -553,4 +554,13 @@ test('normalizeStudy leaves v2 as it is, is idempotent and never rejects', () =>
   assert.equal(old.name.length, 500);
   assert.equal(old.blocks.length, 1);
   assert.deepEqual(normalizeStudy({} as Study), { v: 2, name: '', prototypeId: '', blocks: [] });
+});
+
+test('validateSessionPatch: null clears a manual mark, and applyManualPatch applies it', () => {
+  const r = validateSessionPatch({ manual: { t1: null, t2: 'failure' } });
+  assert.equal(r.ok, true);
+  if (!r.ok) return;
+  assert.deepEqual(r.value.manual, { t1: null, t2: 'failure' });
+  assert.deepEqual(applyManualPatch({ t1: 'success', t3: 'success' }, r.value.manual), { t2: 'failure', t3: 'success' });
+  assert.deepEqual(applyManualPatch(undefined, { t9: null }), {});
 });

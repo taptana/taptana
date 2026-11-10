@@ -7,10 +7,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Link, useRouter, type Route, type RouteName } from '@/router';
 
 const NAV: Array<{ to: Route; label: string; hint: string; icon: typeof FileArchive; match: (r: RouteName) => boolean }> = [
-  { to: { name: 'home' }, label: 'Inicio', hint: 'Por dónde empezar', icon: House, match: (r) => r === 'home' },
+  { to: { name: 'home' }, label: 'Inicio', hint: 'Empieza aquí', icon: House, match: (r) => r === 'home' },
   { to: { name: 'prototypes' }, label: 'Prototipos', hint: 'Sube tu HTML', icon: FileArchive, match: (r) => r === 'prototypes' },
-  { to: { name: 'studies' }, label: 'Estudios', hint: 'Tareas y resultados', icon: FlaskConical, match: (r) => r === 'studies' || r === 'study' || r === 'report' },
-  { to: { name: 'recordings' }, label: 'Sesiones', hint: 'Grabaciones', icon: PlayCircle, match: (r) => r === 'recordings' || r === 'player' },
+  { to: { name: 'studies' }, label: 'Estudios', hint: 'Tareas', icon: FlaskConical, match: (r) => r === 'studies' || r === 'study' || r === 'report' },
+  { to: { name: 'recordings' }, label: 'Sesiones', hint: 'Paso a paso', icon: PlayCircle, match: (r) => r === 'recordings' || r === 'player' },
 ];
 
 const WIDTHS = { default: 'max-w-5xl', wide: 'max-w-7xl', full: 'max-w-none' } as const;
@@ -51,8 +51,8 @@ export function Layout({ children, wide = false, width }: { children: ReactNode;
                 )}
               >
                 <Icon className="size-4.5 shrink-0" />
-                <span>{item.label}</span>
-                <span className="hidden xl:inline ml-auto text-xs text-muted-foreground/70 font-normal">{item.hint}</span>
+                <span className="whitespace-nowrap">{item.label}</span>
+                <span className="hidden xl:inline ml-auto min-w-0 truncate whitespace-nowrap pl-2 text-xs text-muted-foreground/70 font-normal">{item.hint}</span>
               </Link>
             );
           })}
@@ -62,7 +62,7 @@ export function Layout({ children, wide = false, width }: { children: ReactNode;
             <ShieldCheck className="size-4" />
             {IS_DEMO ? 'Modo demo' : 'Todo local'}
           </p>
-          <p>{IS_DEMO ? 'Lo que subas o grabes queda solo en este navegador.' : 'Prototipos y grabaciones quedan en esta computadora.'}</p>
+          <p>{IS_DEMO ? 'Lo que subas o grabes queda solo en este navegador.' : 'Prototipos y sesiones quedan en esta computadora.'}</p>
         </div>
       </aside>
       <main id="contenido" className="flex-1 min-w-0">

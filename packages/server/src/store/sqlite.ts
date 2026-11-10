@@ -14,6 +14,7 @@ import {
   duplicateStudy,
   knownScreens,
   manualMarks,
+  applyManualPatch,
   normalizeStudy,
   participantName,
   SESSION_LIMITS,
@@ -602,7 +603,9 @@ export class SqliteStore implements Store {
     }
     if (patch.manual !== undefined) {
       sets.push('manual_results = ?');
-      params.push(JSON.stringify({ ...parseManual(row.manual_results), ...patch.manual }));
+      // `null` quita la marca: la tarea vuelve a "por revisar".
+      const marks = applyManualPatch(parseManual(row.manual_results), patch.manual);
+      params.push(Object.keys(marks).length > 0 ? JSON.stringify(marks) : null);
     }
     if (sets.length > 0) {
       this.q(`UPDATE sessions SET ${sets.join(', ')} WHERE id = ?`).run(...params, sessionId);

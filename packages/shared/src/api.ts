@@ -4,7 +4,7 @@
 
 import type { TaptanaEvent } from './events.js';
 import type { DeviceInfo, PageInfo, Prototype, SessionPage, SessionSummary } from './session.js';
-import type { ManualResults, StudyRecord } from './study.js';
+import type { ManualPatch, StudyRecord } from './study.js';
 
 export const API_PREFIX = '/api/v1';
 export const RECORDER_PATH = '/__taptana/recorder.js';
@@ -87,7 +87,12 @@ export interface ScreenInfo {
   id: string;
   /** Nombre corto: "producto", "carrito", "checkout" (`screenLabel`). */
   label: string;
-  /** Título o encabezado, si se conoce. */
+  /**
+   * El nombre para mostrar, UNO por pantalla y el mismo en el constructor y en el reporte
+   * (`screenName`): el título estable si lo hay, y si no `label`. `knownScreens` siempre lo pone.
+   */
+  name?: string;
+  /** Título estable (ver `screenTitles`): el `<title>` del archivo, o el encabezado si no cambia entre visitas. */
   title?: string;
   /** 'file': un archivo HTML del prototipo. 'seen': vista en alguna sesión. */
   source: 'file' | 'seen';
@@ -115,8 +120,12 @@ export interface ServerInfo {
 
 /** PATCH /api/v1/sessions/:id. Solo cambia los campos que vienen (`validateSessionPatch`). */
 export interface SessionPatch {
-  /** Marcas del moderador por tarea. Se suman a las que ya había (una marca nueva reemplaza la anterior de esa tarea). */
-  manual?: ManualResults;
+  /**
+   * Marcas del moderador por tarea. Se suman a las que ya había (una marca nueva reemplaza la
+   * anterior de esa tarea); `null` quita la marca y la tarea vuelve a "por revisar"
+   * (`applyManualPatch`).
+   */
+  manual?: ManualPatch;
   /** Etiqueta del moderador. Vacía la borra. */
   label?: string;
   /** Notas del moderador. Vacías las borra. */

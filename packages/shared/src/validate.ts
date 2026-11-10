@@ -18,6 +18,7 @@ import {
   type BlockKind,
   type ChoiceBlock,
   type ContextBlock,
+  type ManualPatch,
   type ManualResults,
   type ScaleBlock,
   type Study,
@@ -256,10 +257,12 @@ export function validateSessionPatch(value: unknown): ValidationResult<SessionPa
   }
   if (value['manual'] !== undefined) {
     const raw = value['manual'];
-    if (!isRecord(raw)) return { ok: false, error: 'Las marcas ("manual") tienen que ser un objeto { idDeTarea: "success" | "failure" }' };
-    const manual: ManualResults = {};
+    if (!isRecord(raw)) return { ok: false, error: 'Las marcas ("manual") tienen que ser un objeto { idDeTarea: "success" | "failure" | null }' };
+    const manual: ManualPatch = {};
     for (const [taskId, mark] of Object.entries(raw)) {
-      if (mark !== 'success' && mark !== 'failure') return { ok: false, error: `La marca de la tarea "${taskId}" tiene que ser "success" o "failure"` };
+      if (mark !== 'success' && mark !== 'failure' && mark !== null) {
+        return { ok: false, error: `La marca de la tarea "${taskId}" tiene que ser "success", "failure" o null (para quitarla)` };
+      }
       manual[taskId] = mark;
     }
     patch.manual = manual;

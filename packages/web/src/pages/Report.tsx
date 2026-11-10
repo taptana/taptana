@@ -7,6 +7,7 @@ import {
   taskBlocks,
   type Prototype,
   type ReportFilter,
+  type ScreenInfo,
   type ServerInfo,
   type SessionSummary,
   type StudyRecord,
@@ -30,6 +31,7 @@ import { copyText, downloadText } from '@/lib/download';
 import { friendlyError } from '@/lib/errors';
 import { plural } from '@/lib/format';
 import { participantUrl } from '@/lib/links';
+import { screenNamer } from '@/lib/screens';
 import { fileSlug, sessionName } from '@/lib/sessions';
 import { cn } from '@/lib/utils';
 import { Link } from '@/router';
@@ -42,6 +44,8 @@ interface Base {
   proto: Prototype | undefined;
   info: ServerInfo | null;
   sessions: SessionSummary[];
+  /** Pantallas del prototipo según la API: de aquí sale el nombre de cada pantalla. */
+  screens: ScreenInfo[];
 }
 
 /** true mientras se imprime (o se emula la impresión): el reporte dibuja todo. */
@@ -95,14 +99,15 @@ export function ReportPage({ id }: { id: string }) {
           setBase(null);
           return;
         }
-        const [r, protos, sessions, info] = await Promise.all([
+        const [r, protos, sessions, info, screens] = await Promise.all([
           client.getStudyReport(id, next),
           client.listPrototypes(),
           client.listSessions(id),
           client.info().catch(() => null),
+          client.listPrototypeScreens(study.prototypeId).catch((): ScreenInfo[] => []),
         ]);
         if (mine !== request.current) return;
-        setBase({ study, proto: protos.find((p) => p.id === study.prototypeId), info, sessions });
+        setBase({ study, proto: protos.find((p) => p.id === study.prototypeId), info, sessions, screens });
         setReport(r);
         setError(null);
       } catch (e) {
@@ -137,8 +142,13 @@ export function ReportPage({ id }: { id: string }) {
     const ordered = [...base.sessions].sort((a, b) => a.startedAt - b.startedAt);
     const names = new Map<string, string>();
     ordered.forEach((s, i) => names.set(s.id, sessionName(s) ?? `Participante ${i + 1}`));
-    return { study: base.study, proto: base.proto, sessions: new Map(base.sessions.map((s) => [s.id, s])), names, printing, reload };
-  }, [base, printing, reload]);
+    // Un solo nombre por pantalla: el de la API; si la pantalla no está ahí, el título del reporte.
+    // `screenNames` llega con la versión nueva del reporte; un servidor anterior no lo manda.
+    const named = Object.entries((report as (StudyReport & { screenNames?: Record<string, string> }) | null)?.screenNames ?? {}).map(([id, name]) => ({ id, name }));
+    const fromReport = (report?.tasks ?? []).flatMap((t) => t.screens.map((s) => ({ id: s.path, title: s.title })));
+    const screenName = screenNamer([...named, ...base.screens, ...fromReport]);
+    return { study: base.study, proto: base.proto, sessions: new Map(base.sessions.map((s) => [s.id, s])), names, screenName, printing, reload };
+  }, [base, report, printing, reload]);
 
   const entries = useMemo((): IndexEntry[] => {
     if (!base || !report) return [];

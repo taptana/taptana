@@ -188,30 +188,92 @@ export function countScreens(events: readonly TaptanaEvent[]): number {
 }
 
 /**
+ * El título estable de cada pantalla (ScreenId → título). Es la única regla para nombrar
+ * pantallas; la usan el reporte, las frases del resumen y `knownScreens` (el constructor):
+ *
+ * 1. Si la pantalla es un archivo HTML del prototipo, su `<title>` (salvo que varios archivos
+ *    compartan el mismo título: entonces no distingue nada y no se usa).
+ * 2. Si no, el título que traen los eventos de navegación, solo si TODAS las visitas dicen lo
+ *    mismo. Una pantalla que cambia de título según su contenido ("Monstera", "Ficus" en
+ *    producto.html; "Carrito" y "Datos de envío" en el mismo carrito) se queda sin título.
+ * 3. Sin título, el nombre es `screenLabel(id)` (ver `screenName`).
+ */
+export function screenTitles(
+  events: readonly TaptanaEvent[] = [],
+  files: ReadonlyArray<{ path: string; title?: string }> = [],
+): Map<string, string> {
+  const titles = new Map<string, string>();
+  const fileIds = new Set<string>();
+  const fileTitleUses = new Map<string, number>();
+  const fileTitles = new Map<string, string>();
+  for (const file of files) {
+    if (!file || typeof file.path !== 'string') continue;
+    const id = screenId(file.path);
+    if (fileIds.has(id)) continue;
+    fileIds.add(id);
+    const t = typeof file.title === 'string' ? file.title.trim() : '';
+    if (!t) continue;
+    fileTitles.set(id, t);
+    fileTitleUses.set(t, (fileTitleUses.get(t) ?? 0) + 1);
+  }
+  for (const [id, t] of fileTitles) if (fileTitleUses.get(t) === 1) titles.set(id, t);
+  // null: las visitas no coinciden en el título.
+  const seen = new Map<string, string | null>();
+  for (const e of events) {
+    if (!e || e.kind !== 'taptana' || e.type !== 'navigation' || typeof e.to !== 'string') continue;
+    if (typeof e.title !== 'string' || !e.title.trim()) continue;
+    const id = screenId(e.to);
+    if (titles.has(id) && fileIds.has(id)) continue;
+    const t = e.title.trim();
+    const before = seen.get(id);
+    seen.set(id, before === undefined || before === t ? t : null);
+  }
+  for (const [id, t] of seen) if (t !== null && !titles.has(id)) titles.set(id, t);
+  return titles;
+}
+
+/**
+ * El nombre de una pantalla para mostrar: su título estable (de `screenTitles`,
+ * `StudyReport.screenNames` o las pantallas de la API) o, si no tiene, `screenLabel(id)`.
+ */
+export function screenName(
+  id: string,
+  titles?: ReadonlyMap<string, string> | Readonly<Record<string, string | undefined>> | ReadonlyArray<{ id: string; name?: string; title?: string }>,
+): string {
+  const key = screenId(id);
+  let found: string | undefined;
+  if (titles instanceof Map) found = titles.get(key) ?? titles.get(id);
+  else if (Array.isArray(titles)) {
+    const info = (titles as ReadonlyArray<{ id: string; name?: string; title?: string }>).find((s) => s && (s.id === key || s.id === id));
+    found = info?.name ?? info?.title;
+  } else if (titles) {
+    const rec = titles as Readonly<Record<string, string | undefined>>;
+    found = (Object.hasOwn(rec, key) ? rec[key] : undefined) ?? (Object.hasOwn(rec, id) ? rec[id] : undefined);
+  }
+  return (typeof found === 'string' && found.trim()) || screenLabel(key);
+}
+
+/**
  * Las pantallas conocidas de un prototipo, para elegirlas en el constructor: primero sus
  * archivos HTML (`source: 'file'`) y después las que se vieron en sesiones y no son un archivo
  * (`source: 'seen'`): rutas por hash, rutas de History y pantallas virtuales. `events` son los
- * eventos (basta con los de navegación) de las sesiones de ese prototipo.
+ * eventos (basta con los de navegación) de las sesiones de ese prototipo. Cada una trae su
+ * `name` (el nombre único para mostrar) y, si tiene título estable, `title` (`screenTitles`).
  */
 export function knownScreens(files: ReadonlyArray<{ path: string; title?: string }>, events: readonly TaptanaEvent[] = []): ScreenInfo[] {
+  const titles = screenTitles(events, files);
   const byId = new Map<string, ScreenInfo>();
-  for (const file of files) {
-    const id = screenId(file.path);
-    if (byId.has(id)) continue;
-    const info: ScreenInfo = { id, label: screenLabel(id), source: 'file' };
-    if (file.title && file.title.trim()) info.title = file.title.trim();
+  const add = (id: string, source: ScreenInfo['source']): void => {
+    if (byId.has(id)) return;
+    const info: ScreenInfo = { id, label: screenLabel(id), name: screenName(id, titles), source };
+    const title = titles.get(id);
+    if (title) info.title = title;
     byId.set(id, info);
-  }
+  };
+  for (const file of files) add(screenId(file.path), 'file');
   for (const e of events) {
     if (!e || e.kind !== 'taptana' || e.type !== 'navigation' || typeof e.to !== 'string') continue;
-    const id = screenId(e.to);
-    let info = byId.get(id);
-    if (!info) {
-      info = { id, label: screenLabel(id), source: 'seen' };
-      byId.set(id, info);
-    }
-    // El título de un archivo (su <title>) se conserva; a las demás les sirve el encabezado visto.
-    if (!info.title && typeof e.title === 'string' && e.title.trim()) info.title = e.title.trim();
+    add(screenId(e.to), 'seen');
   }
   return [...byId.values()];
 }

@@ -18,7 +18,7 @@ import {
   type StudyRecord,
 } from '@taptana/shared';
 import type { Store } from './store/store.js';
-import { hasAbsoluteUrls, prototypeDir } from './uploads.js';
+import { prototypeDir, scanHistoryRouter } from './uploads.js';
 import { PACKAGE_ROOT } from './version.js';
 
 export const DEFAULT_EXAMPLE_DIR = join(PACKAGE_ROOT, 'example', 'tienda');
@@ -102,7 +102,7 @@ export async function loadExample(opts: ExampleOptions): Promise<ExampleResult> 
     createdAt: existing?.createdAt ?? Date.now(),
     source: 'upload',
     entryPath: '/index.html',
-    absoluteUrls: hasAbsoluteUrls(await fs.readFile(entry, 'utf8')),
+    absoluteUrls: await scanHistoryRouter(dest),
   });
 
   // 2. El estudio: el que traen las sesiones de ejemplo, apuntando al prototipo de ejemplo.

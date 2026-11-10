@@ -5,10 +5,21 @@
  * de la demo.
  *
  * Definiciones (el reporte las muestra en "Cómo se calcula"; docs/plan-v1.md, 1.4):
- * - Participantes: sesiones del estudio que aceptaron grabar y no están excluidas. Cada tarea
- *   cuenta solo a quienes la empezaron.
+ * - Participantes: sesiones del estudio que aceptaron grabar, no están excluidas y empezaron al
+ *   menos un bloque (una tarea o una respuesta). Quien aceptó y se fue sin empezar nada se
+ *   cuenta aparte (`bounced`) y no entra en ningún número ni en el CSV. Cada tarea cuenta solo
+ *   a quienes la empezaron.
  * - Éxito directo: lo logró siguiendo exacto el camino esperado. Sin camino esperado (ni
  *   deducible de quienes lo lograron), todo éxito es directo.
+ * - Camino esperado: el que escribió el diseñador, empezando siempre en la pantalla de inicio
+ *   de la tarea (`startPath`, o la pantalla donde más gente la empezó). Si no escribió ninguno,
+ *   se deduce: el camino MÁS COMÚN entre quienes lo lograron empezando en esa pantalla (si
+ *   empatan, el más corto). Así, marcar o excluir una sesión no cambia quién fue "directo".
+ * - Embudo: su primer paso es la pantalla de inicio y cuenta a todos los que empezaron la tarea.
+ * - Tasa de éxito del estudio: éxitos ÷ intentos decididos, sumando todas las tareas (no el
+ *   promedio de las tasas).
+ * - Tasa de misclick: toques sin efecto ÷ todos los toques de la tarea que traen el dato (es
+ *   por toques, no por personas).
  * - Por revisar: tarea manual que el participante dio por terminada y el moderador aún no
  *   marca. No cuenta en la tasa de éxito ni en el puntaje.
  * - Misclick: toque sin efecto sobre algo no tocable. Las sesiones antiguas sin el dato no
@@ -24,7 +35,7 @@
 import type { NavigationEvent, TapEvent, TaptanaEvent, TaptanaOwnEvent, ViewportEvent } from './events.js';
 import { buildInsights } from './insights.js';
 import { computeAnswers, computeTaskResults, manualMarks, ownEvents } from './results.js';
-import { sameScreen, screenId } from './screen.js';
+import { sameScreen, screenId, screenName, screenTitles } from './screen.js';
 import type { SessionSummary } from './session.js';
 import {
   blockKind,
@@ -75,7 +86,10 @@ export interface HeatPoint {
 export interface ScreenReport {
   /** ScreenId (ver screen.ts): "/producto.html", "/index.html#/carrito", "/index.html~checkout". */
   path: string;
-  /** Título o encabezado de la pantalla, si alguna sesión lo trae. */
+  /**
+   * Título estable de la pantalla (ver `screenTitles`), si lo hay. Para mostrar un nombre usa
+   * `StudyReport.screenNames[path]`, que siempre trae uno.
+   */
   title?: string;
   /** Participantes que pasaron por esta pantalla durante la tarea. */
   visitors: number;
@@ -87,8 +101,11 @@ export interface ScreenReport {
   viewportWidth: number;
   /**
    * Instante de una sesión real para dibujar el fondo del mapa de calor: lo que vio alguien con
-   * el tamaño de pantalla más común. `t` está en el mismo reloj que los eventos (ms desde 1970):
-   * 50 ms antes de su primer toque en la pantalla, o 800 ms después de llegar si no tocó.
+   * el tamaño de pantalla más común. Se elige a quien más tocó en esta pantalla, 50 ms antes de
+   * su ÚLTIMO toque ahí (cuando la pantalla está más completa: carrito lleno, formulario
+   * abierto), o 800 ms después de llegar si nadie tocó. `t` está en el mismo reloj que los
+   * eventos (ms desde 1970) y nunca cae antes de 100 ms después de llegar a la pantalla (salvo
+   * que el toque haya sido antes), para que la foto completa de esa página ya exista.
    */
   sample?: { sessionId: string; t: number; vw: number };
   /** Lo más tocado sin efecto, de más a menos (hasta 5). */
@@ -157,14 +174,21 @@ export interface TaskReport {
   medianTimeMs: number | null;
   /** Misclicks por participante, promedio. */
   avgMisclicks: number;
-  /** Misclicks sobre los toques con el dato, 0 a 1. */
+  /**
+   * Toques sin efecto ÷ todos los toques de la tarea que traen el dato, 0 a 1. Es una tasa por
+   * toques (no "personas que se equivocaron").
+   */
   misclickRate: number;
   /** Toques dentro de la tarea (todos los participantes). */
   tapCount: number;
+  /** Camino esperado. Empieza en la pantalla de inicio de la tarea. */
   expectedPath: string[];
-  /** true si el camino esperado se dedujo de quienes lo lograron. */
+  /** true si el camino esperado se dedujo: el más común entre quienes lo lograron desde la pantalla de inicio. */
   expectedPathInferred: boolean;
-  /** Cuántos llegaron a cada paso del camino esperado, en orden. */
+  /**
+   * Cuántos llegaron a cada paso del camino esperado, en orden. El primer paso es la pantalla
+   * de inicio y siempre vale `participants` (todos los que empezaron la tarea).
+   */
   funnel: Array<{ path: string; reached: number }>;
   screens: ScreenReport[];
   paths: PathReport[];
@@ -211,7 +235,7 @@ export interface VariantReport {
   id: string;
   name: string;
   participants: number;
-  /** Promedio de la tasa de éxito de cada tarea con datos decididos. */
+  /** Éxitos ÷ intentos decididos de esta variante, sumando todas las tareas. */
   successRate: number;
   directRate: number;
   /** Promedio del tiempo mediano de cada tarea. */
@@ -222,14 +246,28 @@ export interface VariantReport {
 
 export interface StudyReport {
   studyId: string;
-  /** Sesiones del estudio que aceptaron grabar, no excluidas y dentro del filtro. */
+  /**
+   * Sesiones del estudio que aceptaron grabar y empezaron al menos un bloque (una tarea o una
+   * respuesta), no excluidas y dentro del filtro.
+   */
   participants: number;
+  /**
+   * Aceptaron grabar y se fueron sin empezar ningún bloque (dentro del filtro). No cuentan como
+   * participantes ni salen en el CSV.
+   */
+  bounced: number;
   /** Llegaron al final del estudio. */
   completed: number;
-  /** Promedio de la tasa de éxito de las tareas con datos decididos, 0 a 1. */
+  /**
+   * "Tareas logradas": éxitos ÷ intentos decididos, sumando todas las tareas, 0 a 1. No es el
+   * promedio de las tasas de cada tarea.
+   */
   successRate: number;
   medianDurationMs: number | null;
-  /** Promedio de la tasa de misclick de las tareas con toques, 0 a 1. */
+  /**
+   * Promedio de la tasa de misclick de las tareas con toques, 0 a 1. Cada tasa es por toques:
+   * toques sin efecto ÷ todos los toques de la tarea que traen el dato.
+   */
   avgMisclickRate: number;
   tasks: TaskReport[];
   variants: VariantReport[];
@@ -239,7 +277,7 @@ export interface StudyReport {
   excluded: number;
   /** Resultados manuales por revisar, sumando todas las tareas. */
   pendingReview: number;
-  /** Participantes por tipo de dispositivo, antes de filtrar. */
+  /** Participantes (sin los que no empezaron nada) por tipo de dispositivo, antes de filtrar. */
   devices: { touch: number; desktop: number };
   /** El filtro aplicado, si hubo alguno. */
   filter?: ReportFilter;
@@ -248,6 +286,21 @@ export interface StudyReport {
   questions: QuestionReport[];
   /** Los bloques en el orden del estudio, para pintar el reporte. */
   order: Array<{ blockId: string; kind: BlockKind }>;
+  /**
+   * El nombre de cada pantalla que aparece en el reporte (ScreenId → nombre). Es UNO por
+   * pantalla, el mismo que usan las frases de `insights` y `GET /prototypes/:id/screens`
+   * (`ScreenInfo.name`): úsalo en caminos, embudo, mapas y pasos de la grabación.
+   */
+  screenNames: Record<string, string>;
+}
+
+export interface ReportOptions {
+  /**
+   * Las pantallas conocidas del prototipo (`knownScreens`, lo mismo que responde
+   * `GET /prototypes/:id/screens`). Si vienen, el reporte usa sus nombres, y así el constructor
+   * y el reporte dicen lo mismo. Si no, los nombres salen de las sesiones del estudio.
+   */
+  screens?: ReadonlyArray<{ id: string; name?: string; title?: string }>;
 }
 
 /** Cómo se llama cada resultado de una tarea, en el reporte, en las listas y en el CSV. */
@@ -269,6 +322,8 @@ export function similarWidth(a: number, b: number): boolean {
 
 const SAMPLE_BEFORE_TAP_MS = 50;
 const SAMPLE_AFTER_ARRIVAL_MS = 800;
+/** La foto completa de una página llega unos milisegundos después del evento de navegación. */
+const SAMPLE_MIN_AFTER_ARRIVAL_MS = 100;
 const DEFAULT_WIDTH = 390;
 const DEFAULT_HEIGHT = 700;
 
@@ -282,6 +337,11 @@ function median(values: number[], round = true): number | null {
 }
 
 const mean = (values: number[]): number => values.reduce((a, b) => a + b, 0) / values.length;
+/** Suma de numeradores ÷ suma de denominadores (0 si no hay nada). */
+function pooled(pairs: Array<[number, number]>): number {
+  const den = pairs.reduce((a, p) => a + p[1], 0);
+  return den ? pairs.reduce((a, p) => a + p[0], 0) / den : 0;
+}
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
 
 const isTap = (e: TaptanaOwnEvent): e is TapEvent =>
@@ -296,20 +356,11 @@ function stepsReached(seq: string[], want: string[]): number {
   return i;
 }
 
-/** El valor más repetido; si empatan, el que apareció primero. */
-function mostCommon<T>(values: T[]): T | undefined {
-  const counts = new Map<T, number>();
-  let best: T | undefined;
-  let bestCount = 0;
-  for (const v of values) {
-    const c = (counts.get(v) ?? 0) + 1;
-    counts.set(v, c);
-    if (c > bestCount) {
-      best = v;
-      bestCount = c;
-    }
-  }
-  return best;
+/** El texto más repetido; si empatan, el primero en orden alfabético (no depende del orden de las sesiones). */
+function mostCommon(values: string[]): string | undefined {
+  const counts = new Map<string, number>();
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0];
 }
 
 /**
@@ -352,6 +403,8 @@ interface Ctx {
   results: Map<string, TaskResult>;
   answers: Map<string, AnswerResult>;
   finished: boolean;
+  /** Empezó al menos un bloque: una tarea o una respuesta. */
+  engaged: boolean;
   who?: string;
 }
 
@@ -370,6 +423,7 @@ function digest(study: StudyRecord, rs: ReportSession): Ctx {
     results: new Map(computeTaskResults(study, own, manual, rs.session.lastSeenAt).map((r) => [r.taskId, r])),
     answers: new Map(computeAnswers(study, own).map((a) => [a.blockId, a])),
     finished: own.some((e) => e.type === 'study' && e.action === 'finish'),
+    engaged: own.some((e) => (e.type === 'task' && e.action === 'start') || e.type === 'answer'),
   };
   const who = rs.session.label || rs.session.participant;
   if (who) ctx.who = who;
@@ -495,14 +549,26 @@ interface ScreenAcc {
   taps: HeatPoint[];
   misclicks: number;
   labels: Map<string, number>;
-  /** Un registro por participante que pasó por la pantalla. */
-  visitors: Array<{ sessionId: string; arrival: number; leave: number; firstTap?: number; vw: number; time: number }>;
+  /**
+   * Un registro por participante que pasó por la pantalla. `arrival`/`leave` son de su visita
+   * más larga; `lastTap` es su último toque ahí y `tapArrival` cuándo llegó en esa visita.
+   */
+  visitors: Array<{
+    sessionId: string;
+    arrival: number;
+    leave: number;
+    lastTap?: number;
+    tapArrival?: number;
+    taps: number;
+    vw: number;
+    time: number;
+  }>;
 }
 
 function taskReport(
   task: TaskBlock,
   segments: Segment[],
-  titles: Map<string, string>,
+  titles: ReadonlyMap<string, string>,
   variants: StudyVariant[],
 ): { report: TaskReport; judged: number } {
   const kind: TaskKind = task.kind ?? 'task';
@@ -523,17 +589,30 @@ function taskReport(
   const written = Array.isArray(task.expectedPath) ? task.expectedPath.filter((p) => typeof p === 'string') : [];
   let expectedPath = kind === 'first-click' ? [] : written.map(resolve);
   const inferred = expectedPath.length === 0;
-  if (inferred && kind !== 'first-click') {
-    // El camino más corto entre quienes lo lograron; si empatan, el más común.
-    const counts = new Map<string, { pages: string[]; count: number }>();
-    for (const s of segments.filter(won)) {
-      const key = s.pages.join('\n');
-      const c = counts.get(key) ?? { pages: s.pages, count: 0 };
-      c.count++;
-      counts.set(key, c);
+  // Pantalla de inicio de la tarea: la que eligió el diseñador o donde más gente la empezó.
+  const startPath = typeof task.startPath === 'string' && task.startPath ? task.startPath : undefined;
+  const startScreen = startPath ? resolve(startPath) : mostCommon(segments.map((s) => s.pages[0] as string));
+  if (kind !== 'first-click' && startScreen !== undefined) {
+    if (inferred) {
+      // El camino más común entre quienes lo lograron empezando en la pantalla de inicio; si
+      // empatan, el más corto. (El más corto a secas cambiaba con una sola sesión rara.)
+      const counts = new Map<string, { key: string; pages: string[]; count: number }>();
+      for (const s of segments.filter(won)) {
+        if (s.pages[0] !== startScreen) continue;
+        const key = s.pages.join('\n');
+        const c = counts.get(key) ?? { key, pages: s.pages, count: 0 };
+        c.count++;
+        counts.set(key, c);
+      }
+      const best = [...counts.values()].sort(
+        (a, b) => b.count - a.count || a.pages.length - b.pages.length || (a.key < b.key ? -1 : 1),
+      )[0];
+      expectedPath = best ? best.pages : [];
+    } else if (expectedPath[0] !== startScreen) {
+      // El camino escrito siempre empieza en la pantalla de inicio: así el embudo arranca con
+      // todos los que empezaron y "directo" compara caminos completos.
+      expectedPath = [startScreen, ...expectedPath];
     }
-    const best = [...counts.values()].sort((a, b) => a.pages.length - b.pages.length || b.count - a.count)[0];
-    expectedPath = best ? best.pages : [];
   }
   const followed = (pages: string[]): boolean =>
     expectedPath.length === 0 || (pages.length === expectedPath.length && pages.every((p, i) => p === expectedPath[i]));
@@ -582,19 +661,25 @@ function taskReport(
     if (s.result.goalAt !== undefined) row.goalAt = s.result.goalAt;
     rows.push(row);
 
-    // Una entrada por pantalla y participante: cuándo llegó, cuánto estuvo, su primer toque ahí.
+    // Una entrada por pantalla y participante: cuándo llegó, cuánto estuvo, su último toque ahí.
     const mine = new Map<string, ScreenAcc['visitors'][number]>();
     for (const v of s.visits) {
       const entry = mine.get(v.screen);
+      const length = Math.max(0, v.end - v.t);
       if (entry) {
-        entry.time += Math.max(0, v.end - v.t);
+        entry.time += length;
+        if (length > entry.leave - entry.arrival) {
+          entry.arrival = v.t;
+          entry.leave = v.end;
+        }
       } else {
         mine.set(v.screen, {
           sessionId: s.ctx.session.id,
           arrival: v.t,
           leave: v.end,
+          taps: 0,
           vw: viewportAt(s.ctx, v.t).width,
-          time: Math.max(0, v.end - v.t),
+          time: length,
         });
       }
     }
@@ -621,7 +706,11 @@ function taskReport(
         sc.labels.set(label, (sc.labels.get(label) ?? 0) + 1);
       }
       const entry = mine.get(path);
-      if (entry && entry.firstTap === undefined) entry.firstTap = tap.t;
+      if (entry) {
+        entry.taps++;
+        entry.lastTap = tap.t;
+        entry.tapArrival = ([...s.visits].reverse().find((v) => v.t <= tap.t) ?? (s.visits[0] as Visit)).t;
+      }
     }
     for (const [path, entry] of mine) screen(path).visitors.push(entry);
   }
@@ -656,12 +745,20 @@ function taskReport(
       };
       const title = titles.get(sc.path);
       if (title) out.title = title;
-      const model = sc.visitors.find((v) => v.vw === width);
+      // El fondo sale de quien más tocó aquí (su pantalla es la que explica más puntos), justo
+      // antes de su último toque. Sin toques, de quien estuvo más tiempo.
+      const model = sc.visitors
+        .filter((v) => v.vw === width)
+        .sort((a, b) => b.taps - a.taps || b.time - a.time)[0];
       if (model) {
-        const t =
-          model.firstTap !== undefined
-            ? Math.max(model.arrival, model.firstTap - SAMPLE_BEFORE_TAP_MS)
-            : Math.max(model.arrival, Math.min(model.arrival + SAMPLE_AFTER_ARRIVAL_MS, model.leave - SAMPLE_BEFORE_TAP_MS));
+        let t: number;
+        if (model.lastTap !== undefined) {
+          const floor = Math.min((model.tapArrival ?? model.arrival) + SAMPLE_MIN_AFTER_ARRIVAL_MS, model.lastTap);
+          t = Math.max(floor, model.lastTap - SAMPLE_BEFORE_TAP_MS);
+        } else {
+          const floor = Math.min(model.arrival + SAMPLE_MIN_AFTER_ARRIVAL_MS, model.leave);
+          t = Math.max(floor, Math.min(model.arrival + SAMPLE_AFTER_ARRIVAL_MS, model.leave - SAMPLE_BEFORE_TAP_MS));
+        }
         out.sample = { sessionId: model.sessionId, t, vw: width };
       }
       return out;
@@ -687,9 +784,10 @@ function taskReport(
     tapCount: rows.reduce((a, r) => a + r.taps, 0),
     expectedPath,
     expectedPathInferred: inferred,
+    // El primer paso es la pantalla de inicio: ahí están todos los que empezaron la tarea.
     funnel: expectedPath.map((path, i) => ({
       path,
-      reached: segments.filter((s) => stepsReached(s.pages, expectedPath) > i).length,
+      reached: i === 0 ? n : segments.filter((s) => stepsReached(s.pages, expectedPath.slice(1)) >= i).length,
     })),
     screens: screenReports,
     paths: [...pathCounts.values()].sort((a, b) => b.count - a.count || b.successes - a.successes).slice(0, 8),
@@ -771,28 +869,36 @@ interface Analysis {
   ctxs: Ctx[];
 }
 
-function analyze(input: StudyRecord, sessions: ReportSession[], filter: ReportFilter = {}): Analysis {
+function analyze(input: StudyRecord, sessions: ReportSession[], filter: ReportFilter = {}, options: ReportOptions = {}): Analysis {
   // Un registro antiguo sin normalizar (`tasks`) se lee igual.
   const study: StudyRecord = { ...input, v: 2, blocks: studyBlocks(input) };
   const mine = sessions.filter((s) => s && s.session && Array.isArray(s.events) && s.session.studyId === study.id);
   const counted = mine.filter((s) => !s.session.excluded);
-  const picked = counted
-    .filter((s) => filter.variantId === undefined || s.session.variantId === filter.variantId)
-    .filter((s) => filter.device === undefined || (filter.device === 'touch') === Boolean(s.session.touch))
-    .sort((a, b) => a.session.startedAt - b.session.startedAt || (a.session.id < b.session.id ? -1 : 1));
-  const ctxs = picked.map((rs) => digest(study, rs));
+  const digested = counted
+    .slice()
+    .sort((a, b) => a.session.startedAt - b.session.startedAt || (a.session.id < b.session.id ? -1 : 1))
+    .map((rs) => digest(study, rs));
+  // Quien aceptó y se fue sin empezar nada no es un participante: se cuenta aparte.
+  const engaged = digested.filter((c) => c.engaged);
+  const inFilter = (c: Ctx): boolean =>
+    (filter.variantId === undefined || c.session.variantId === filter.variantId) &&
+    (filter.device === undefined || (filter.device === 'touch') === Boolean(c.session.touch));
+  const ctxs = engaged.filter(inFilter);
+  const bounced = digested.filter((c) => !c.engaged && inFilter(c)).length;
 
-  // Título de cada pantalla: el más repetido en los eventos de navegación.
-  const titleVotes = new Map<string, string[]>();
-  for (const ctx of ctxs) {
-    for (const e of ctx.own) {
-      if (e.type !== 'navigation' || typeof e.to !== 'string' || typeof e.title !== 'string' || !e.title.trim()) continue;
-      const id = screenId(e.to);
-      titleVotes.set(id, [...(titleVotes.get(id) ?? []), e.title.trim()]);
-    }
+  // Un solo nombre por pantalla. Con las pantallas conocidas del prototipo, el suyo; si no, el
+  // título estable según TODAS las sesiones del estudio (excluir una no cambia los nombres).
+  const titles = screenTitles(mine.flatMap((s) => s.events));
+  const given = new Map<string, string>();
+  for (const sc of options.screens ?? []) {
+    if (!sc || typeof sc.id !== 'string') continue;
+    const id = screenId(sc.id);
+    const name = (typeof sc.name === 'string' && sc.name.trim()) || (typeof sc.title === 'string' && sc.title.trim()) || '';
+    // Una pantalla conocida sin título estable se queda sin título (se nombra por su id).
+    titles.delete(id);
+    if (name) given.set(id, name);
   }
-  const titles = new Map<string, string>();
-  for (const [id, votes] of titleVotes) titles.set(id, mostCommon(votes) as string);
+  for (const [id, name] of given) titles.set(id, name);
 
   const variantList = Array.isArray(study.variants) ? study.variants.filter((v) => v && typeof v.id === 'string') : [];
   const built = taskBlocks(study).map((task) => {
@@ -820,18 +926,30 @@ function analyze(input: StudyRecord, sessions: ReportSession[], filter: ReportFi
       id: v.id,
       name: v.name,
       participants: ctxs.filter((c) => c.session.variantId === v.id).length,
-      successRate: withData.length ? mean(withData.map((x) => x.successRate)) : 0,
-      directRate: withData.length ? mean(withData.map((x) => x.directRate)) : 0,
+      successRate: pooled(withData.map((x) => [x.successRate * x.decided, x.decided])),
+      directRate: pooled(withData.map((x) => [x.directRate * x.decided, x.decided])),
       medianTimeMs: times.length ? Math.round(mean(times)) : null,
       score: vScores.length ? Math.round(mean(vScores)) : null,
     };
   });
 
+  const screenNames: Record<string, string> = {};
+  const named = (id: string): void => {
+    if (!(id in screenNames)) screenNames[id] = screenName(id, titles);
+  };
+  for (const t of tasks) {
+    t.expectedPath.forEach(named);
+    t.screens.forEach((s) => named(s.path));
+    t.paths.forEach((p) => p.pages.forEach(named));
+    t.results.forEach((r) => r.pages.forEach(named));
+  }
+
   const base: Omit<StudyReport, 'insights'> = {
     studyId: study.id,
     participants: ctxs.length,
+    bounced,
     completed: ctxs.filter((c) => c.finished).length,
-    successRate: decided.length ? mean(decided.map((t) => t.successRate)) : 0,
+    successRate: pooled(decided.map((t) => [t.outcomes.direct + t.outcomes.indirect, t.decided])),
     medianDurationMs: median(ctxs.map((c) => c.session.durationMs).filter((d) => typeof d === 'number')),
     avgMisclickRate: tapped.length ? mean(tapped.map((t) => t.misclickRate)) : 0,
     tasks,
@@ -840,11 +958,12 @@ function analyze(input: StudyRecord, sessions: ReportSession[], filter: ReportFi
     excluded: mine.length - counted.length,
     pendingReview: tasks.reduce((a, t) => a + t.outcomes.review, 0),
     devices: {
-      touch: counted.filter((s) => s.session.touch).length,
-      desktop: counted.filter((s) => !s.session.touch).length,
+      touch: engaged.filter((c) => c.session.touch).length,
+      desktop: engaged.filter((c) => !c.session.touch).length,
     },
     questions: questionBlocks(study).map((b) => questionReport(b, ctxs)),
     order: studyBlocks(study).map((b) => ({ blockId: b.id, kind: blockKind(b) })),
+    screenNames,
   };
   const applied: ReportFilter = {};
   if (filter.variantId !== undefined) applied.variantId = filter.variantId;
@@ -855,11 +974,12 @@ function analyze(input: StudyRecord, sessions: ReportSession[], filter: ReportFi
 }
 
 /**
- * El reporte del estudio. Deja fuera las sesiones de otros estudios y las excluidas (las cuenta
- * en `excluded`) y aplica el filtro por variante y dispositivo.
+ * El reporte del estudio. Deja fuera las sesiones de otros estudios, las excluidas (las cuenta
+ * en `excluded`) y las que no empezaron ningún bloque (`bounced`), y aplica el filtro por
+ * variante y dispositivo.
  */
-export function computeStudyReport(study: StudyRecord, sessions: ReportSession[], filter?: ReportFilter): StudyReport {
-  return analyze(study, sessions, filter).report;
+export function computeStudyReport(study: StudyRecord, sessions: ReportSession[], filter?: ReportFilter, options?: ReportOptions): StudyReport {
+  return analyze(study, sessions, filter, options).report;
 }
 
 /** Una celda según RFC 4180. Un texto que empieza como fórmula se desactiva con un apóstrofo. */
@@ -878,32 +998,41 @@ function answerCell(block: QuestionBlock, answer: AnswerResult | undefined): str
   return v;
 }
 
+/** Id corto de una sesión, para nombrar a un participante sin etiqueta ni alias. */
+export function shortSessionId(id: string): string {
+  const bare = id.replace(/^s(es)?_/, '');
+  return bare.length <= 8 ? bare || id : bare.slice(-6);
+}
+
 /**
- * El estudio como CSV, una fila por participante (sin las sesiones excluidas). Columnas:
- * sesión, etiqueta, fecha (ISO), dispositivo, variante, duración_s; por cada tarea,
- * "<título> · resultado", "<título> · tiempo_s" y "<título> · misclicks"; y por cada pregunta,
- * su texto con la respuesta (varias opciones separadas por " | "). Comillas según RFC 4180,
- * saltos de línea CRLF y marca BOM de UTF-8 al inicio, para que Excel lo abra bien.
+ * El estudio como CSV, una fila por participante (sin las sesiones excluidas ni las que no
+ * empezaron ningún bloque). Columnas: participante (etiqueta del moderador, o el alias que
+ * escribió, o el id corto de la sesión), sesión, fecha_utc (ISO 8601 en UTC), dispositivo,
+ * variante, duración_s; por cada tarea, "<título> · resultado", "<título> · tiempo_s" y
+ * "<título> · misclicks"; por cada pregunta, su texto con la respuesta (varias opciones
+ * separadas por " | "); y al final, notas (las del moderador). Comillas según RFC 4180, saltos
+ * de línea CRLF y marca BOM de UTF-8 al inicio, para que Excel lo abra bien.
  */
-export function studyCsv(study: StudyRecord, sessions: ReportSession[]): string {
-  const { study: s, report, ctxs } = analyze(study, sessions);
+export function studyCsv(study: StudyRecord, sessions: ReportSession[], options?: ReportOptions): string {
+  const { study: s, report, ctxs } = analyze(study, sessions, {}, options);
   const tasks = taskBlocks(s);
   const questions = questionBlocks(s);
   const variantName = new Map((Array.isArray(s.variants) ? s.variants : []).filter(Boolean).map((v) => [v.id, v.name]));
 
-  const header: Array<string | number> = ['sesión', 'etiqueta', 'fecha', 'dispositivo', 'variante', 'duración_s'];
+  const header: Array<string | number> = ['participante', 'sesión', 'fecha_utc', 'dispositivo', 'variante', 'duración_s'];
   for (const t of tasks) {
     const title = blockTitle(t);
     header.push(`${title} · resultado`, `${title} · tiempo_s`, `${title} · misclicks`);
   }
   for (const q of questions) header.push(blockTitle(q));
+  header.push('notas');
 
   const rows: Array<Array<string | number>> = [header];
   for (const ctx of ctxs) {
     const { session } = ctx;
     const row: Array<string | number> = [
+      ctx.who ?? shortSessionId(session.id),
       session.id,
-      ctx.who ?? '',
       Number.isFinite(session.startedAt) ? new Date(session.startedAt).toISOString() : '',
       session.deviceLabel ?? '',
       session.variantId ? (variantName.get(session.variantId) ?? session.variantId) : '',
@@ -915,6 +1044,7 @@ export function studyCsv(study: StudyRecord, sessions: ReportSession[]): string 
       else row.push(OUTCOME_LABELS[r.outcome].toLowerCase(), r.durationMs === undefined ? '' : Math.round(r.durationMs / 1000), r.misclicks);
     }
     for (const q of questions) row.push(answerCell(q, ctx.answers.get(q.id)));
+    row.push(typeof session.notes === 'string' ? session.notes : '');
     rows.push(row);
   }
   return '﻿' + rows.map((r) => r.map(csvCell).join(',') + '\r\n').join('');

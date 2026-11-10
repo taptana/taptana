@@ -9,6 +9,8 @@ import {
   sameScreen,
   screenId,
   screenLabel,
+  screenName,
+  screenTitles,
   screenParts,
   screenPath,
   screenSlug,
@@ -238,12 +240,51 @@ test('knownScreens: the HTML files first, then what sessions saw that is not a f
     { kind: 'taptana', type: 'scroll', t: 2, x: 0, y: 0, depth: 1 },
   ];
   assert.deepEqual(knownScreens(files, events), [
-    { id: '/index.html', label: 'inicio', source: 'file', title: 'Verde · Plantas' },
-    { id: '/producto.html', label: 'producto', source: 'file', title: 'Monstera' },
-    { id: '/index.html#/carrito', label: 'carrito', source: 'seen', title: 'Tu carrito' },
-    { id: '/index.html~checkout', label: 'checkout', source: 'seen', title: 'Pago' },
-    { id: '/checkout', label: 'checkout', source: 'seen' },
+    { id: '/index.html', label: 'inicio', name: 'Verde · Plantas', source: 'file', title: 'Verde · Plantas' },
+    { id: '/producto.html', label: 'producto', name: 'Monstera', source: 'file', title: 'Monstera' },
+    { id: '/index.html#/carrito', label: 'carrito', name: 'Tu carrito', source: 'seen', title: 'Tu carrito' },
+    { id: '/index.html~checkout', label: 'checkout', name: 'Pago', source: 'seen', title: 'Pago' },
+    { id: '/checkout', label: 'checkout', name: 'checkout', source: 'seen' },
   ]);
   assert.deepEqual(knownScreens([]), []);
-  assert.deepEqual(knownScreens([{ path: '/a/' }]), [{ id: '/a/index.html', label: 'a', source: 'file' }]);
+  assert.deepEqual(knownScreens([{ path: '/a/' }]), [{ id: '/a/index.html', label: 'a', name: 'a', source: 'file' }]);
+});
+
+test('screenTitles: one stable name per screen, never a per-visit title', () => {
+  const nav = (to: string, title: string): TaptanaEvent => ({ kind: 'taptana', type: 'navigation', t: 1, from: '', to, title });
+  const events = [
+    nav('/producto.html?id=1', 'Monstera deliciosa'),
+    nav('/producto.html?id=2', 'Ficus lyrata'),
+    nav('/carrito.html', 'Carrito · Verde'),
+    nav('/carrito.html', 'Datos de envío'),
+    nav('/index.html~checkout', 'Pago'),
+    nav('/index.html~checkout', ' Pago '),
+    nav('/gracias.html', '¡Gracias!'),
+  ];
+  // Sin archivos: lo que cambia entre visitas se queda sin título y se nombra por su id.
+  const seen = screenTitles(events);
+  assert.equal(seen.get('/producto.html'), undefined);
+  assert.equal(screenName('/producto.html?id=3', seen), 'producto');
+  assert.equal(screenName('/carrito.html', seen), 'carrito');
+  assert.equal(screenName('/index.html~checkout', seen), 'Pago');
+  assert.equal(screenName('/gracias.html', seen), '¡Gracias!');
+  // Con archivos: gana el <title> del archivo, diga lo que diga cada visita.
+  const files = [
+    { path: '/producto.html', title: 'Producto · Verde' },
+    { path: '/carrito.html', title: 'Carrito · Verde' },
+    { path: '/gracias.html', title: 'Verde' },
+    { path: '/ayuda.html', title: 'Verde' },
+  ];
+  const withFiles = screenTitles(events, files);
+  assert.equal(screenName('/producto.html', withFiles), 'Producto · Verde');
+  assert.equal(screenName('/carrito.html', withFiles), 'Carrito · Verde');
+  assert.equal(screenName('/gracias.html', withFiles), '¡Gracias!', 'a <title> shared by several files names nothing: the heading is used');
+  assert.equal(screenName('/ayuda.html', withFiles), 'ayuda');
+  // El mismo nombre desde las tres formas en que llega: mapa, registro del reporte, pantallas de la API.
+  const screens = knownScreens(files, events);
+  assert.equal(screens.find((s) => s.id === '/producto.html')!.name, 'Producto · Verde');
+  assert.equal(screenName('/producto.html', screens), 'Producto · Verde');
+  assert.equal(screenName('/producto.html', { '/producto.html': 'Producto · Verde' }), 'Producto · Verde');
+  assert.equal(screenName('/otra.html', { '/producto.html': 'x' }), 'otra');
+  assert.equal(screenName('/constructor', {}), 'constructor', 'object prototype keys are not names');
 });

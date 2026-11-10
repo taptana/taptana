@@ -1,7 +1,6 @@
 import {
   API_PREFIX,
   type ExampleResponse,
-  type ManualResults,
   type Prototype,
   type PrototypeListResponse,
   type PrototypePagesResponse,
@@ -19,7 +18,7 @@ import {
   type StudyRecord,
   type StudyReport,
 } from '@taptana/shared';
-import type { ApiClient, PrototypePage } from './client.ts';
+import type { ApiClient, ManualMarks, PrototypePage } from './client.ts';
 import { SessionExistsError, UserError, statusMessage } from '@/lib/errors';
 
 const OFFLINE = 'No pudimos conectar con Taptana. Revisa que siga abierta la terminal donde lo arrancaste y recarga la página.';
@@ -115,8 +114,9 @@ export class HttpClient implements ApiClient {
     return request<SessionSummary>(`/sessions/${id(sessionId)}`, json('PATCH', patch));
   }
 
-  setManualResults(sessionId: string, manual: ManualResults): Promise<SessionSummary> {
-    return this.patchSession(sessionId, { manual });
+  setManualResults(sessionId: string, manual: ManualMarks): Promise<SessionSummary> {
+    // `null` quita la marca. El tipo de `shared` puede no aceptarlo todavía.
+    return this.patchSession(sessionId, { manual: manual as SessionPatch['manual'] });
   }
 
   // ── Estudios ─────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { HeatPoint } from '@taptana/shared';
-import { biggestDrop, fallbackHeight, funnelSteps, placePoints, recordingOffset, ruleText, samePages, scoreBand } from './logic.ts';
+import { biggestDrop, fallbackHeight, funnelSteps, placePoints, recordingOffset, ruleSelector, ruleText, samePages, scoreBand } from './logic.ts';
 
 const pt = (p: Partial<HeatPoint>): HeatPoint => ({ x: 100, y: 200, vw: 390, misclick: false, sessionId: 's1', ...p });
 
@@ -78,7 +78,10 @@ test('funnelSteps sin participantes no divide por cero', () => {
 test('ruleText dice la regla en palabras', () => {
   const name = (p: string): string => p;
   assert.match(ruleText({ type: 'reached', path: 'gracias' }, name), /llegar a «gracias»/);
-  assert.match(ruleText({ type: 'tapped', selector: '#pagar' }, name), /tocar #pagar/);
+  assert.match(ruleText({ type: 'tapped', selector: '.cart-link' }, name, '🛒'), /tocar «🛒»/);
+  assert.doesNotMatch(ruleText({ type: 'tapped', selector: '#pagar' }, name), /#pagar/);
+  assert.equal(ruleSelector({ type: 'tapped', selector: '#pagar' }), '#pagar');
+  assert.equal(ruleSelector({ type: 'reached', path: '/a' }), '');
   assert.match(ruleText({ type: 'visible', text: 'Listo' }, name), /texto «Listo»/);
   assert.match(ruleText({ type: 'manual' }, name), /decides tú/);
   assert.equal(ruleText(undefined, name), '');

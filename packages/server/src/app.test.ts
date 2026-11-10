@@ -11,6 +11,7 @@ import {
   EXAMPLE_STUDY_ID,
   SESSION_LIMITS,
   type Prototype,
+  type PrototypeScreensResponse,
   type ScreenInfo,
   type ServerInfo,
   type SessionExport,
@@ -344,9 +345,9 @@ test('studies CRUD (v1 and v2), duplicate, screens, pages and qr through the API
   store.ingestBatch(batchOf('s_1', [{ kind: 'taptana', type: 'navigation', t: 5, from: '', to: '/index.html#/carrito', title: 'Tu carrito' }]) as never);
   const screens = (await (await app.request('/api/v1/prototypes/local/screens')).json()) as { screens: ScreenInfo[] };
   assert.deepEqual(screens.screens, [
-    { id: '/index.html', label: 'inicio', source: 'file' },
-    { id: '/docs/index.html', label: 'docs', source: 'file' },
-    { id: '/index.html#/carrito', label: 'carrito', source: 'seen', title: 'Tu carrito' },
+    { id: '/index.html', label: 'inicio', name: 'inicio', source: 'file' },
+    { id: '/docs/index.html', label: 'docs', name: 'docs', source: 'file' },
+    { id: '/index.html#/carrito', label: 'carrito', name: 'Tu carrito', source: 'seen', title: 'Tu carrito' },
   ]);
   const pages = (await (await app.request('/api/v1/prototypes/local/pages')).json()) as { pages: Array<{ path: string }> };
   assert.deepEqual(pages.pages.map((p) => p.path), ['/index.html', '/docs/index.html']);
@@ -422,8 +423,8 @@ test('report with filters and csv export', async () => {
   const lines = text.trim().split('\r\n');
   assert.equal(lines.length, 4, 'encabezado + 3 participantes (la excluida no sale)');
   assert.ok(text.charCodeAt(0) === 0xfeff, 'empieza con BOM para Excel');
-  assert.match(lines[0] ?? '', /sesión,etiqueta,fecha/);
-  assert.ok(lines.some((line) => line.startsWith('s_a,P1 · Ana,')));
+  assert.match(lines[0] ?? '', /^.?participante,sesión,fecha_utc,.*,notas$/);
+  assert.ok(lines.some((line) => line.startsWith('P1 · Ana,s_a,')));
   assert.ok(!text.includes('s_interna'));
   assert.equal((await app.request('/api/v1/studies/st_nope/export.csv')).status, 404);
 });
@@ -616,7 +617,9 @@ test('uploaded single page apps: fallback to the entry page and absolute paths t
   });
   const created = (await (await upload(app, 'spa.zip', zip)).json()) as Prototype;
   const base = `/p/${created.id}`;
-  assert.equal(created.absoluteUrls, true, 'el panel puede sugerir abrirlo en la raíz');
+  assert.equal(created.absoluteUrls, undefined, 'rutas absolutas a archivos no piden la raíz: bajo /p/<id>/ funcionan');
+  const router = (await (await upload(app, 'router.zip', zipSync({ 'index.html': strToU8('<script src="app.js"></script>'), 'app.js': strToU8('history.pushState({}, "", "/carrito")') }))).json()) as Prototype;
+  assert.equal(router.absoluteUrls, true, 'un router de History sí: el panel sugiere abrirlo en la raíz');
 
   // Ruta de la app (History API) al recargar: recibe la página de entrada.
   const deep = await app.request(`${base}/producto/42`, { headers: HTML });
@@ -905,4 +908,64 @@ test('the example shipped in the package loads and produces a report', async (t)
   assert.equal((await app.request(`/p/${EXAMPLE_PROTOTYPE_ID}/study.json`)).status, 404);
   const screens = (await (await app.request(`/api/v1/prototypes/${EXAMPLE_PROTOTYPE_ID}/screens`)).json()) as { screens: ScreenInfo[] };
   assert.ok(screens.screens.some((s) => s.id === '/gracias.html'));
+});
+
+test('manual marks can be cleared with null: the task goes back to "to review"', async () => {
+  const { app, store } = makeApp();
+  const saved = store.saveStudy(study);
+  await app.request('/api/v1/events', send('POST', batchOf('s_m', [
+    { kind: 'taptana', type: 'study', t: 1, studyId: saved.id, action: 'start' },
+    { kind: 'taptana', type: 'task', t: 2, taskId: 't2', action: 'start' },
+    { kind: 'taptana', type: 'task', t: 3, taskId: 't2', action: 'done' },
+  ])));
+  const review = async (): Promise<number> => ((await (await app.request(`/api/v1/studies/${saved.id}/report`)).json()) as StudyReport).pendingReview;
+  const markOf = async (res: Response): Promise<unknown> => ((await res.json()) as SessionSummary).tasks?.find((t) => t.taskId === 't2')?.manual;
+  assert.equal(await review(), 1);
+  assert.equal(await markOf(await app.request('/api/v1/sessions/s_m', send('PATCH', { manual: { t2: 'failure', t1: 'success' } }))), 'failure');
+  assert.equal(await review(), 0);
+  const cleared = await app.request('/api/v1/sessions/s_m', send('PATCH', { manual: { t2: null } }));
+  assert.equal(cleared.status, 200);
+  assert.equal(await markOf(cleared), null);
+  assert.equal(await review(), 1);
+  assert.deepEqual(store.listReportSessions(saved.id)[0]?.manual, { t1: 'success' }, 'the other marks stay');
+  assert.equal((await app.request('/api/v1/sessions/s_m', send('PATCH', { manual: { t2: 0 } }))).status, 400);
+});
+
+test('a study must point to a prototype that exists here, unless asked otherwise', async () => {
+  const { app, store } = makeUploadApp();
+  const foreign = { ...study, prototypeId: 'pr_deOtraCompu' };
+  const refused = await app.request('/api/v1/studies', send('POST', foreign));
+  assert.equal(refused.status, 400);
+  const problem = (await refused.json()) as { error: string; code: string; issues: Array<{ field?: string }> };
+  assert.match(problem.error, /Ese prototipo no existe aquí/);
+  assert.equal(problem.code, 'prototype-missing');
+  assert.equal(problem.issues[0]?.field, 'prototypeId');
+  assert.equal(store.listStudies().length, 0);
+  // Importar primero y elegir el prototipo después.
+  const allowed = await app.request('/api/v1/studies?allowMissingPrototype=1', send('POST', foreign));
+  assert.equal(allowed.status, 201);
+  const saved = (await allowed.json()) as StudyRecord;
+  // Editarlo sin cambiar de prototipo sigue funcionando; moverlo a otro que no existe, no.
+  assert.equal((await app.request(`/api/v1/studies/${saved.id}`, send('PUT', { ...foreign, name: 'Otro nombre' }))).status, 200);
+  assert.equal((await app.request(`/api/v1/studies/${saved.id}`, send('PUT', { ...foreign, prototypeId: 'pr_tampoco' }))).status, 400);
+  store.savePrototype({ id: 'pr_real', name: 'Real', createdAt: 1, source: 'upload', entryPath: '/index.html' });
+  assert.equal((await app.request(`/api/v1/studies/${saved.id}`, send('PUT', { ...foreign, prototypeId: 'pr_real' }))).status, 200);
+});
+
+test('the report names screens like the screens endpoint does', async () => {
+  const { app, store } = makeApp();
+  store.savePrototype({ id: 'local', name: 'proto', createdAt: 1, source: 'folder', entryPath: '/' });
+  const saved = store.saveStudy(study);
+  const nav = (t: number, to: string, title: string) => ({ kind: 'taptana' as const, type: 'navigation' as const, t, from: '', to, title });
+  await app.request('/api/v1/events', send('POST', batchOf('s_n', [
+    { kind: 'taptana', type: 'study', t: 1, studyId: saved.id, action: 'start' },
+    nav(2, '/', 'Tienda'),
+    { kind: 'taptana', type: 'task', t: 3, taskId: 't1', action: 'start' },
+    nav(4, '/index.html#/carrito', 'Tu carrito'),
+  ])));
+  const report = (await (await app.request(`/api/v1/studies/${saved.id}/report`)).json()) as StudyReport;
+  const { screens } = (await (await app.request('/api/v1/prototypes/local/screens')).json()) as PrototypeScreensResponse;
+  for (const [id, name] of Object.entries(report.screenNames)) assert.equal(screens.find((s) => s.id === id)?.name, name, id);
+  assert.equal(report.screenNames['/index.html#/carrito'], 'Tu carrito');
+  assert.deepEqual(Object.keys(report.screenNames).sort(), ['/index.html', '/index.html#/carrito']);
 });

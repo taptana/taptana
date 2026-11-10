@@ -10,6 +10,7 @@ import {
   SCALE_SIZES,
   STUDY_LIMITS,
   newBlockId,
+  sameScreen,
   screenId,
   type ChoiceBlock,
   type ContextBlock,
@@ -267,6 +268,12 @@ export function ThanksEditor({ draft, onChange, errors }: { draft: DraftStudy; o
 
 // ── Tarea y primer clic ──────────────────────────────────────────────────
 
+/** ¿La regla "llega a una pantalla" apunta al final del camino (o no hay camino escrito)? */
+function endsOnGoal(expectedPath: readonly string[] | undefined, goal: string): boolean {
+  const last = expectedPath?.[expectedPath.length - 1];
+  return last === undefined || sameScreen(last, goal);
+}
+
 const RULE_TEXT: Record<'task' | 'first-click', Partial<Record<SuccessRule['type'], { label: string; hint: string }>>> = {
   task: {
     reached: { label: 'Llega a una pantalla', hint: 'Se cumple cuando aparece la pantalla que elijas. Lo mejor cuando el flujo termina en una pantalla clara.' },
@@ -291,6 +298,10 @@ export interface TaskTools {
   onPick: () => void;
   onCancelPick: () => void;
   onTryout: () => void;
+  /** El estudio avanza solo al cumplirse la regla (ajuste "Avance al cumplir la tarea"). */
+  autoAdvance: boolean;
+  /** Cambia el ajuste a «espera a que toque "Listo"». */
+  onManualAdvance: () => void;
   /** Los resultados de esta tarea, si el estudio ya tiene sesiones. */
   report: TaskReport | undefined;
 }
@@ -401,22 +412,45 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
   return (
     <EditorCard icon={<Icon className="size-5" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.title || info.untitled}>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
-        <button
-          type="button"
-          onClick={tools.onRecord}
-          disabled={tools.recording}
-          className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background p-3.5 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:border-primary disabled:bg-primary/5"
-        >
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-red-500/10 text-red-600">
-            <Video className="size-4.5" />
-          </span>
-          <span className="min-w-0 text-sm">
-            <span className="block font-medium">{tools.recording ? 'Grabando el camino…' : kind === 'first-click' ? 'Mostrar el toque correcto' : 'Grabar el camino correcto'}</span>
-            <span className="block text-xs leading-relaxed text-muted-foreground">
-              {tools.recording ? 'Haz la tarea en el teléfono y pulsa "Usar este camino".' : 'Haz la tarea tú en el teléfono y llenamos por ti la pantalla de inicio, el camino y la regla.'}
+        {kind === 'first-click' ? (
+          // Primer clic: no hay camino que grabar, solo un lugar que tocar. El toque no navega.
+          <button
+            type="button"
+            onClick={tools.picking ? tools.onCancelPick : tools.onPick}
+            aria-pressed={tools.picking}
+            className={cn(
+              'flex cursor-pointer items-start gap-3 rounded-lg border bg-background p-3.5 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring/50',
+              tools.picking && 'border-primary bg-primary/5',
+            )}
+          >
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+              <Crosshair className="size-4.5" />
             </span>
-          </span>
-        </button>
+            <span className="min-w-0 text-sm">
+              <span className="block font-medium">{tools.picking ? 'Esperando tu toque…' : 'Elegir en el prototipo'}</span>
+              <span className="block text-xs leading-relaxed text-muted-foreground">
+                {tools.picking ? 'Toca en el teléfono el lugar correcto. Tu toque no cambia de pantalla. Pulsa aquí para cancelar.' : 'Toca en el teléfono el lugar correcto; Taptana anota el elemento.'}
+              </span>
+            </span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={tools.onRecord}
+            disabled={tools.recording}
+            className="flex cursor-pointer items-start gap-3 rounded-lg border bg-background p-3.5 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default disabled:border-primary disabled:bg-primary/5"
+          >
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-red-500/10 text-red-600">
+              <Video className="size-4.5" />
+            </span>
+            <span className="min-w-0 text-sm">
+              <span className="block font-medium">{tools.recording ? 'Grabando el camino…' : 'Grabar el camino correcto'}</span>
+              <span className="block text-xs leading-relaxed text-muted-foreground">
+                {tools.recording ? 'Haz la tarea en el teléfono y pulsa "Usar este camino".' : 'Haz la tarea tú en el teléfono y llenamos por ti la pantalla de inicio, el camino y la regla.'}
+              </span>
+            </span>
+          </button>
+        )}
         <button
           type="button"
           onClick={tools.onTryout}
@@ -426,8 +460,8 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
             <Play className="size-4.5" />
           </span>
           <span className="min-w-0 text-sm">
-            <span className="block font-medium">Probar esta tarea</span>
-            <span className="block text-xs leading-relaxed text-muted-foreground">Mírala como la verá el participante. No se graba nada.</span>
+            <span className="block font-medium">{kind === 'first-click' ? 'Probar este primer clic' : 'Probar esta tarea'}</span>
+            <span className="block text-xs leading-relaxed text-muted-foreground">{kind === 'first-click' ? 'Míralo como lo verá el participante. No se graba nada.' : 'Mírala como la verá el participante. No se graba nada.'}</span>
           </span>
         </button>
       </div>
@@ -482,6 +516,18 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
             {(p) => <ScreenPicker {...p} value={rule.path} onChange={(path) => setRule({ type: 'reached', path })} screens={tools.screens} phoneScreen={tools.phoneScreen} />}
           </Field>
         )}
+        {kind === 'task' && rule?.type === 'reached' && rule.path.trim() && tools.autoAdvance && endsOnGoal(block.expectedPath, rule.path) && (
+          <div className="flex gap-3 rounded-lg bg-muted/50 px-3.5 py-3 text-xs leading-relaxed text-muted-foreground" data-testid="auto-advance-hint">
+            <Lightbulb className="mt-0.5 size-4 shrink-0" />
+            <div className="space-y-2">
+              <p>Al llegar, la tarea termina sola y el participante pasa al siguiente paso sin detenerse en esa pantalla. Si quieres que la vea, elige «espera a que toque Listo».</p>
+              <Button type="button" size="sm" variant="outline" onClick={tools.onManualAdvance}>
+                Cambiar a «espera a que toque Listo»
+              </Button>
+              <p>Este ajuste vale para todo el estudio (está en «Ajustes del estudio»).</p>
+            </div>
+          </div>
+        )}
 
         {rule?.type === 'tapped' && (
           <div className="space-y-3">
@@ -493,7 +539,11 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
                 <MatchNote selector={rule.selector} matches={tools.matches} />
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Pulsa el botón y luego toca el elemento en el teléfono de la derecha. No hace falta saber de código.</p>
+              <p className="text-sm text-muted-foreground">
+                {kind === 'first-click'
+                  ? 'Pulsa «Elegir en el prototipo» y toca en el teléfono el lugar correcto; Taptana anota el elemento. No hace falta saber de código.'
+                  : 'Pulsa el botón y luego toca el elemento en el teléfono de la derecha. No hace falta saber de código.'}
+              </p>
             )}
             {!rule.selector && err('success.selector', 'success') && <p className="text-sm text-destructive">{err('success.selector', 'success')}</p>}
             <PickButton tools={tools} label={rule.selector ? 'Elegir otro en el prototipo' : 'Elegir en el prototipo'} />
@@ -533,7 +583,7 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
             <RouteIcon className="size-4 text-muted-foreground" /> Camino esperado <span className="text-xs font-normal text-muted-foreground">opcional</span>
           </legend>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Las pantallas del camino ideal, en orden. Quien lo sigue tal cual cuenta como <strong className="font-medium text-foreground">éxito directo</strong>; quien llega por otro lado, como indirecto. Si lo dejas vacío se usa el camino más corto de quienes lo lograron.
+            Las pantallas del camino ideal, en orden. Quien lo sigue tal cual cuenta como <strong className="font-medium text-foreground">éxito directo</strong>; quien llega por otro lado, como indirecto. Si lo dejas vacío se usa el camino más común de quienes lo lograron.
           </p>
           {err('expectedPath') && <p className="text-sm text-destructive">{err('expectedPath')}</p>}
           {missed.length > 0 && (

@@ -368,6 +368,11 @@ test('setSessionFields: label, notes, excluded and manual marks', () => {
   // Las marcas se suman a las que ya había.
   store.setSessionFields('s_1', { manual: { otra: 'success' } });
   assert.deepEqual(store.listReportSessions(saved.id)[0]?.manual, { t1: 'failure', otra: 'success' });
+  // null quita una marca y deja las demás.
+  store.setSessionFields('s_1', { manual: { t1: null } });
+  assert.deepEqual(store.listReportSessions(saved.id)[0]?.manual, { otra: 'success' });
+  store.setSessionFields('s_1', { manual: { otra: null, nunca: null } });
+  assert.deepEqual(store.listReportSessions(saved.id)[0]?.manual, {});
   assert.equal(store.setSessionFields('s_1', {}), true);
   store.close();
 });
@@ -401,10 +406,10 @@ test('listScreens merges the html files with the screens seen in sessions of tha
     { path: '/gracias.html', title: '' },
   ]);
   assert.deepEqual(screens, [
-    { id: '/index.html', label: 'inicio', source: 'file', title: 'Verde · Plantas' },
-    { id: '/gracias.html', label: 'gracias', source: 'file' },
-    { id: '/index.html#/carrito', label: 'carrito', source: 'seen', title: 'Tu carrito' },
-    { id: '/index.html~checkout', label: 'checkout', source: 'seen', title: 'Pago' },
+    { id: '/index.html', label: 'inicio', name: 'Verde · Plantas', source: 'file', title: 'Verde · Plantas' },
+    { id: '/gracias.html', label: 'gracias', name: 'gracias', source: 'file' },
+    { id: '/index.html#/carrito', label: 'carrito', name: 'Tu carrito', source: 'seen', title: 'Tu carrito' },
+    { id: '/index.html~checkout', label: 'checkout', name: 'Pago', source: 'seen', title: 'Pago' },
   ]);
   assert.deepEqual(store.listScreens('vacio'), []);
   store.close();
