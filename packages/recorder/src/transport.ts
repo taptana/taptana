@@ -1,18 +1,37 @@
 /**
  * Cómo salen los lotes del celular.
  *
- * - http: fetch a /api/v1/events; al cerrar la página, sendBeacon.
+ * - http: fetch a /api/v1/events, con tiempo límite; al cerrar la página, sendBeacon.
  * - local: IndexedDB del navegador + botón "Terminar y exportar" (sin servidor).
  */
 
-import { API_PREFIX, BEACON_MAX_BYTES, type EventBatch } from '@taptana/shared';
+import { API_PREFIX, REQUEST_TIMEOUT_MS, type EventBatch } from '@taptana/shared';
+
+/**
+ * - ok: entregado y confirmado.
+ * - sent: entregado al navegador para que lo mande al cerrar (sin confirmación).
+ * - retry: no llegó (sin red, tiempo agotado, error del servidor): se reintenta igual.
+ * - reject: el servidor no lo acepta (400 / 413) y no lo aceptará: no se reintenta igual.
+ */
+export type SendResult = 'ok' | 'sent' | 'retry' | 'reject';
+
+/** Un lote listo para viajar: su texto JSON ya armado. */
+export interface Wire {
+  sessionId: string;
+  pageId: string;
+  seq: number;
+  /** El EventBatch completo, serializado. */
+  json: string;
+  /**
+   * La petición puede seguir viva aunque la página se cierre (`keepalive`). El transporte lo
+   * apaga si el navegador no la aceptó así.
+   */
+  keepalive: boolean;
+}
 
 export interface Transport {
-  /**
-   * Envía un lote. `final` es true cuando la página se está cerrando y no habrá otra
-   * oportunidad. Devuelve true si se puede dar por entregado.
-   */
-  send(batch: EventBatch, final: boolean): Promise<boolean>;
+  /** `final`: la página se está cerrando o escondiendo y puede no haber otra oportunidad. */
+  send(wire: Wire, final: boolean): Promise<SendResult>;
 }
 
 // ── HTTP ────────────────────────────────────────────────────────────────
@@ -24,65 +43,55 @@ export class HttpTransport implements Transport {
     this.url = `${endpoint}${API_PREFIX}/events`;
   }
 
-  async send(batch: EventBatch, final: boolean): Promise<boolean> {
-    const body = JSON.stringify(batch);
-    if (final) return this.beacon(batch, body);
+  async send(wire: Wire, final: boolean): Promise<SendResult> {
+    if (final) return this.beacon(wire.json);
+    let result = await this.post(wire.json, wire.keepalive);
+    if (result === 'refused') {
+      // El navegador limita cuánto puede quedar "vivo" a la vez: se manda como petición normal.
+      wire.keepalive = false;
+      result = await this.post(wire.json, false);
+    }
+    return result === 'refused' ? 'retry' : result;
+  }
+
+  private async post(body: string, keepalive: boolean): Promise<SendResult | 'refused'> {
+    const abort = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      abort.abort();
+    }, REQUEST_TIMEOUT_MS);
     try {
       const res = await fetch(this.url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body,
-        keepalive: body.length < BEACON_MAX_BYTES,
+        keepalive,
         credentials: 'omit',
+        signal: abort.signal,
       });
-      return res.ok;
+      if (res.ok) return 'ok';
+      return res.status === 400 || res.status === 413 ? 'reject' : 'retry';
     } catch {
-      return false;
+      return keepalive && !timedOut && navigator.onLine !== false ? 'refused' : 'retry';
+    } finally {
+      clearTimeout(timer);
     }
   }
 
-  private beacon(batch: EventBatch, body: string): boolean {
-    if (typeof navigator.sendBeacon !== 'function') {
-      void fetch(this.url, { method: 'POST', headers: { 'content-type': 'application/json' }, body, keepalive: true }).catch(() => {});
-      return true;
+  private beacon(body: string): SendResult {
+    try {
+      if (typeof navigator.sendBeacon === 'function' && navigator.sendBeacon(this.url, new Blob([body], { type: 'application/json' }))) {
+        return 'sent';
+      }
+      void fetch(this.url, { method: 'POST', headers: { 'content-type': 'application/json' }, body, keepalive: true, credentials: 'omit' }).catch(
+        () => {},
+      );
+      return 'sent';
+    } catch {
+      return 'retry';
     }
-    if (body.length <= BEACON_MAX_BYTES) {
-      return navigator.sendBeacon(this.url, new Blob([body], { type: 'application/json' }));
-    }
-    // Más grande que el límite de sendBeacon: partir en varios lotes con el mismo seq base.
-    let ok = true;
-    const chunks = splitBatch(batch, BEACON_MAX_BYTES);
-    for (const chunk of chunks) {
-      const b = new Blob([JSON.stringify(chunk)], { type: 'application/json' });
-      ok = navigator.sendBeacon(this.url, b) && ok;
-    }
-    return ok;
   }
-}
-
-/** Divide un lote en varios que quepan en `maxBytes`. Un evento más grande que el límite va solo. */
-export function splitBatch(batch: EventBatch, maxBytes: number): EventBatch[] {
-  const out: EventBatch[] = [];
-  const base = { ...batch, events: [] as EventBatch['events'] };
-  const overhead = JSON.stringify(base).length;
-  let current: EventBatch = { ...base, events: [] };
-  let size = overhead;
-  let seq = batch.seq;
-  for (const ev of batch.events) {
-    const evSize = JSON.stringify(ev).length + 1;
-    if (current.events.length > 0 && size + evSize > maxBytes) {
-      out.push(current);
-      seq += 1;
-      // page y device solo viajan en el primer trozo.
-      const { page: _p, device: _d, ...rest } = base;
-      current = { ...rest, seq, events: [] };
-      size = JSON.stringify(current).length;
-    }
-    current.events.push(ev);
-    size += evSize;
-  }
-  out.push(current);
-  return out;
 }
 
 // ── Local (sin servidor) ───────────────────────────────────────────────
@@ -124,6 +133,7 @@ export class LocalTransport implements Transport {
     return this.db;
   }
 
+  /** La clave es (sessionId, pageId, seq): guardar dos veces el mismo lote no lo duplica. */
   private put(batch: EventBatch): Promise<void> {
     return this.getDb().then(
       (db) =>
@@ -158,27 +168,37 @@ export class LocalTransport implements Transport {
     }
   }
 
-  async send(batch: EventBatch, final: boolean): Promise<boolean> {
+  async send(wire: Wire, final: boolean): Promise<SendResult> {
+    let batch: EventBatch;
+    try {
+      batch = JSON.parse(wire.json) as EventBatch;
+    } catch {
+      return 'reject';
+    }
     if (final) {
+      const key = `${PENDING_PREFIX}${wire.sessionId}:${wire.pageId}:${wire.seq}`;
       try {
-        localStorage.setItem(`${PENDING_PREFIX}${batch.sessionId}:${batch.pageId}:${batch.seq}`, JSON.stringify(batch));
+        localStorage.setItem(key, wire.json);
       } catch {
         /* sin espacio: igual intentamos IndexedDB */
       }
-      void this.put(batch).then(() => {
-        try {
-          localStorage.removeItem(`${PENDING_PREFIX}${batch.sessionId}:${batch.pageId}:${batch.seq}`);
-        } catch {
-          /* nada */
-        }
-      });
-      return true;
+      void this.put(batch).then(
+        () => {
+          try {
+            localStorage.removeItem(key);
+          } catch {
+            /* nada */
+          }
+        },
+        () => {},
+      );
+      return 'sent';
     }
     try {
       await this.put(batch);
-      return true;
+      return 'ok';
     } catch {
-      return false;
+      return 'retry';
     }
   }
 

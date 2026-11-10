@@ -1,47 +1,97 @@
 /**
  * Registra scroll como máximo una vez cada 250 ms mientras se hace scroll, y una vez más al
  * detenerse. `depth` dice qué tan abajo llegó (0 a 1).
+ *
+ * Mide la ventana y también el contenedor principal con scroll propio: muchas apps de una sola
+ * página fijan el <body> y desplazan un <main> con `overflow: auto`.
  */
 
 import { GESTURE_THRESHOLDS, type ScrollEvent } from '@taptana/shared';
+import { isOurs } from './screens.js';
 
 type Emit = (event: ScrollEvent) => void;
 
-function snapshot(): ScrollEvent {
+interface Throttle {
+  last: number;
+  trailing: number | undefined;
+}
+
+function round(depth: number): number {
+  return Math.round(Math.min(1, Math.max(0, depth)) * 1000) / 1000;
+}
+
+function windowScroll(): ScrollEvent {
   const doc = document.documentElement;
   const total = Math.max(doc.scrollHeight, document.body?.scrollHeight ?? 0, 1);
-  const depth = Math.min(1, (window.scrollY + window.innerHeight) / total);
   return {
     kind: 'taptana',
     type: 'scroll',
     t: Date.now(),
     x: Math.round(window.scrollX),
     y: Math.round(window.scrollY),
-    depth: Math.round(depth * 1000) / 1000,
+    depth: round((window.scrollY + window.innerHeight) / total),
   };
 }
 
-export function watchScroll(emit: Emit): () => void {
-  let lastEmit = 0;
-  let trailing: number | undefined;
+function elementScroll(el: Element): ScrollEvent {
+  return {
+    kind: 'taptana',
+    type: 'scroll',
+    t: Date.now(),
+    x: Math.round(el.scrollLeft),
+    y: Math.round(el.scrollTop),
+    depth: round((el.scrollTop + el.clientHeight) / Math.max(el.scrollHeight, 1)),
+  };
+}
 
-  const onScroll = (): void => {
-    const now = Date.now();
-    if (trailing !== undefined) clearTimeout(trailing);
-    if (now - lastEmit >= GESTURE_THRESHOLDS.scrollThrottleMs) {
-      lastEmit = now;
-      emit(snapshot());
+/** ¿Es el contenedor principal? Ocupa casi todo el ancho y al menos media pantalla, y desplaza hacia abajo. */
+function isMainScroller(el: Element): boolean {
+  return (
+    el.clientWidth >= window.innerWidth * 0.8 &&
+    el.clientHeight >= window.innerHeight * 0.5 &&
+    el.scrollHeight > el.clientHeight + 4
+  );
+}
+
+export function watchScroll(emit: Emit): () => void {
+  const throttles = new Map<EventTarget, Throttle>();
+
+  const onScroll = (e: Event): void => {
+    const target = e.target;
+    let read: () => ScrollEvent;
+    if (target === document || target === document.documentElement || target === document.body || target === window) {
+      read = windowScroll;
+    } else if (target instanceof Element && !isOurs(target) && isMainScroller(target)) {
+      read = () => elementScroll(target);
+    } else {
+      return;
     }
-    trailing = window.setTimeout(() => {
-      trailing = undefined;
-      lastEmit = Date.now();
-      emit(snapshot());
+    const key = read === windowScroll ? window : (target as EventTarget);
+    let state = throttles.get(key);
+    if (!state) {
+      state = { last: 0, trailing: undefined };
+      throttles.set(key, state);
+    }
+    const s = state;
+    const now = Date.now();
+    if (s.trailing !== undefined) clearTimeout(s.trailing);
+    if (now - s.last >= GESTURE_THRESHOLDS.scrollThrottleMs) {
+      s.last = now;
+      emit(read());
+    }
+    s.trailing = window.setTimeout(() => {
+      s.trailing = undefined;
+      s.last = Date.now();
+      emit(read());
     }, GESTURE_THRESHOLDS.scrollThrottleMs + 50);
   };
 
-  window.addEventListener('scroll', onScroll, { passive: true });
+  // El scroll de un elemento no burbujea: se escucha en captura desde el documento.
+  const options: AddEventListenerOptions = { capture: true, passive: true };
+  document.addEventListener('scroll', onScroll, options);
   return () => {
-    window.removeEventListener('scroll', onScroll);
-    if (trailing !== undefined) clearTimeout(trailing);
+    document.removeEventListener('scroll', onScroll, options);
+    for (const s of throttles.values()) if (s.trailing !== undefined) clearTimeout(s.trailing);
+    throttles.clear();
   };
 }
