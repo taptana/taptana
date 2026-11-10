@@ -1,0 +1,98 @@
+/*
+ * Estilos del reporte que no salen de Tailwind: la foto de la pantalla (rrweb) dentro de los
+ * mapas de calor y la versión para imprimir o guardar como PDF.
+ */
+
+/* La foto: el reproductor de rrweb sin controles, a tamaño de documento completo y reducido. */
+.tt-snapshot {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tt-snapshot .rr-player {
+  float: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+.tt-snapshot .rr-player__frame {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+.tt-snapshot .replayer-wrapper {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  float: none !important;
+  transform-origin: top left !important;
+  transform: scale(var(--tt-scale, 1)) !important;
+}
+.tt-snapshot .replayer-wrapper > iframe {
+  border: 0 !important;
+  background: #fff;
+}
+.tt-snapshot .replayer-mouse,
+.tt-snapshot .replayer-mouse-tail,
+.tt-snapshot .rr-controller {
+  display: none !important;
+}
+
+@media print {
+  @page {
+    margin: 14mm 12mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  body aside,
+  [data-print='hide'] {
+    display: none !important;
+  }
+  /* El panel pinta un fondo gris y limita el ancho: al imprimir, hoja blanca y todo el ancho. */
+  #contenido > div {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .min-h-dvh {
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  [data-report-block] {
+    break-before: auto;
+  }
+  [data-print='keep'] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  [data-print='heading'] {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  /* Los mapas largos se recortan a una hoja en vez de partirse a la mitad. */
+  /* Una cuadrícula no se parte bien entre hojas: las tarjetas de pantalla van como bloques en línea. */
+  .tt-screens {
+    display: block !important;
+  }
+  .tt-screens > article {
+    display: inline-block;
+    vertical-align: top;
+    width: 48%;
+    margin: 0 1% 4mm 0;
+  }
+  .tt-map-scroll {
+    max-height: 150mm !important;
+    overflow: hidden !important;
+  }
+  [data-slot='card'] {
+    box-shadow: none !important;
+  }
+}

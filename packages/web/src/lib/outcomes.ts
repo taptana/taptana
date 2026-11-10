@@ -1,12 +1,16 @@
-import type { TaskOutcome, TaskResult } from '@taptana/shared';
+import { needsReview, type Block, type TaskOutcome, type TaskResult } from '@taptana/shared';
+export { taskTally as summarizeTasks } from './sessions.ts';
 
+/** Resultado de una tarea para una sesión, con las mismas palabras que el reporte. */
 export const OUTCOME_LABEL: Record<TaskOutcome, string> = {
-  success: 'Logró',
+  success: 'Lo logró',
   reported: 'Dijo que terminó',
   failed: 'No pudo',
   incomplete: 'Sin terminar',
   pending: 'No empezó',
 };
+
+const REVIEW_CLASS = 'border-sky-600/40 text-sky-700 dark:text-sky-400 bg-sky-500/10';
 
 /** Clases de color por resultado, pensadas para Badge variant="outline". */
 export const OUTCOME_CLASS: Record<TaskOutcome, string> = {
@@ -17,8 +21,8 @@ export const OUTCOME_CLASS: Record<TaskOutcome, string> = {
   pending: 'border-border text-muted-foreground',
 };
 
-/** "2/3" logradas, para la lista de sesiones. */
-export function summarizeTasks(tasks: TaskResult[] | undefined): { done: number; total: number } | null {
-  if (!tasks || tasks.length === 0) return null;
-  return { done: tasks.filter((t) => t.outcome === 'success').length, total: tasks.length };
+/** Etiqueta y color del resultado; una tarea manual sin decidir sale como "Por revisar". */
+export function outcomeBadge(block: Block | undefined, result: TaskResult): { label: string; className: string } {
+  if (needsReview(block, result)) return { label: 'Por revisar', className: REVIEW_CLASS };
+  return { label: OUTCOME_LABEL[result.outcome], className: OUTCOME_CLASS[result.outcome] };
 }

@@ -1,6 +1,6 @@
 {
   "name": "@taptana/recorder",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Script que se inyecta en el prototipo y graba la sesión del participante.",
   "license": "MIT",
   "type": "module",
@@ -8,7 +8,7 @@
   "scripts": {
     "build": "node build.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "echo \"recorder: se prueba end-to-end desde el server\"",
+    "test": "node test.mjs",
     "clean": "rm -rf dist"
   },
   "dependencies": {

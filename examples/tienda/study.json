@@ -1,17 +1,35 @@
 {
-  "v": 1,
+  "v": 2,
   "name": "Compra en Verde",
-  "description": "Saber si el flujo de compra se entiende sin ayuda y si el carrito se encuentra",
-  "prototypeId": "local",
-  "welcome": "Gracias por ayudarnos. Vas a usar un prototipo de una tienda de plantas: nada es real y no hay respuestas incorrectas. Piensa en voz alta mientras lo usas.",
-  "tasks": [
+  "description": "Saber si el flujo de compra se entiende sin ayuda y si el carrito y el costo de envío se encuentran",
+  "prototypeId": "pr_ejemplo",
+  "welcome": "Gracias por ayudarnos. Vas a usar el prototipo de una tienda de plantas: nada es real y no vas a pagar nada. Toma unos 5 minutos.",
+  "thanks": "Eso era todo. Tus respuestas nos ayudan a mejorar la tienda. Ya puedes cerrar esta página.",
+  "settings": { "advance": "auto", "askName": true },
+  "blocks": [
+    {
+      "id": "contexto",
+      "kind": "context",
+      "title": "Antes de empezar",
+      "text": "Imagina que se acerca el cumpleaños de tu mamá y quieres regalarle una planta. Usa la tienda como lo harías normalmente. Si te piden datos, inventa cualquiera."
+    },
     {
       "id": "t1",
       "kind": "task",
       "title": "Comprar una planta grande",
-      "instruction": "Quieres regalar una planta a tu mamá. Encuentra una grande y cómprala.",
+      "instruction": "Quieres regalarle a tu mamá una planta grande. Encuentra una y cómprala.",
       "startPath": "/index.html",
-      "success": { "type": "reached", "path": "/gracias.html" }
+      "success": { "type": "reached", "path": "/gracias.html" },
+      "expectedPath": ["/index.html", "/producto.html", "/carrito.html", "/gracias.html"]
+    },
+    {
+      "id": "facilidad",
+      "kind": "scale",
+      "question": "¿Qué tan fácil fue comprar la planta?",
+      "max": 5,
+      "minLabel": "Muy difícil",
+      "maxLabel": "Muy fácil",
+      "required": true
     },
     {
       "id": "t2",
@@ -22,11 +40,30 @@
       "success": { "type": "tapped", "selector": ".cart-link" }
     },
     {
+      "id": "volveria",
+      "kind": "yesno",
+      "question": "¿Comprarías en una tienda como esta desde tu celular?"
+    },
+    {
+      "id": "decision",
+      "kind": "choice",
+      "question": "¿Qué te ayudaría a decidirte por una planta?",
+      "description": "Elige todas las que quieras.",
+      "multiple": true,
+      "options": ["Fotos reales de la planta", "Opiniones de otras personas", "Saber cuánto mide", "Consejos de cuidado", "Ver el costo de envío antes"]
+    },
+    {
       "id": "t3",
       "kind": "task",
       "title": "Costo del envío",
-      "instruction": "Averigua cuánto cuesta el envío a tu casa.",
+      "instruction": "Averigua cuánto cuesta el envío de una planta pequeña a tu casa. Cuando lo sepas, toca «Tarea» y luego «Listo, terminé».",
       "success": { "type": "manual" }
+    },
+    {
+      "id": "mejora",
+      "kind": "text",
+      "question": "Si pudieras cambiar una sola cosa de esta tienda, ¿cuál sería?",
+      "placeholder": "Cuéntanos con tus palabras"
     }
   ]
 }

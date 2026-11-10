@@ -1,96 +1,130 @@
-# Estudios creados con IA: formato, skill y MCP
+# Estudios creados con IA
 
-Meta: que un diseñador pueda decirle a una IA "arma un estudio de usabilidad para este
-prototipo" y que el resultado se importe en Taptana sin trabajo manual. Y, más adelante,
-que la IA lea las sesiones grabadas y resuma qué pasó.
+Meta: que puedas decirle a una IA "arma un estudio de usabilidad para este prototipo" y que el
+resultado entre a Taptana sin trabajo manual.
 
-## La idea en una línea
+**Taptana nunca llama a un modelo de IA.** La IA la pones tú, con tu herramienta y tu cuenta
+(Claude, ChatGPT, Cursor, la que uses). Taptana solo define un formato de estudio que cualquier
+IA puede escribir, y lo importa. Así el servidor sigue simple, local y sin llaves que cuidar.
 
-Un MCP y una skill son dos puertas a lo mismo. Las dos necesitan que exista un **archivo de
-estudio** con formato conocido que Taptana importe. Primero el formato, después las puertas.
+## Dos formas de hacerlo
 
-## Las tres piezas y cuándo llegan
+### 1. Desde el panel: "Armar con IA"
 
-| Pieza | Qué es | Versión |
-|---|---|---|
-| Formato `Study` | JSON con nombre, prototipo, tareas y criterio de éxito de cada una | Tipos en `shared` desde v0.1 |
-| Importación | `POST /api/v1/studies` y botón "Importar estudio" en el panel | v0.3 (con tareas) |
-| Skill | Archivo markdown con instrucciones y el esquema. Cualquier IA lo lee | v0.3 |
-| MCP | Paquete `packages/mcp`: expone la API de Taptana como herramientas | v0.3 o v0.4 |
+Para cualquier chat de IA, sin instalar nada.
 
-### Por qué la skill primero
+1. En el panel, abre o crea un estudio y toca **Armar con IA**.
+2. Escribe en una línea qué quieres averiguar (opcional) y toca **Copiar prompt para IA**. El prompt ya
+   lleva el nombre de tu prototipo, sus pantallas y el formato exacto.
+3. Pégalo en tu IA. Te responde con un JSON.
+4. Copia ese JSON y **pégalo** en el mismo cuadro del panel. Taptana lo revisa, te muestra
+   cualquier problema en español y arma los bloques.
+5. Revisa cada tarea en el constructor, pruébala con **Probar estudio** y ajusta lo que haga
+   falta. La IA propone; tú decides.
 
-Es texto. Se le dice a Claude Code, Cursor o cualquier asistente "usa la skill de Taptana para
-armar un estudio de este prototipo". La IA lee los HTML, entiende qué páginas y botones hay, y
-escribe el `study.json` con tareas realistas y criterios de éxito verificables. Se importa y
-listo. Sin código extra y sin depender de un modelo específico.
+### 2. Desde un asistente que lee tus archivos: la skill
 
-### Qué suma el MCP
+Para Claude Code, Cursor y similares, que pueden leer la carpeta de tu prototipo.
 
-- La IA crea el estudio directo en Taptana, sin pasar por un archivo.
-- **Lee las sesiones grabadas.** "Resume las cinco pruebas de hoy", "dónde se trabaron en la
-  tarea 2". Esta dirección es la más valiosa a mediano plazo.
-- Es delgado: solo envuelve la API HTTP que el servidor ya expone. Herramientas iniciales:
-  `list_prototypes`, `create_study`, `list_sessions`, `get_session_summary`.
-- MCP es un estándar abierto. No nos ata a ningún proveedor, coherente con el resto del proyecto.
+La skill es un archivo de instrucciones: [`skills/taptana-study/SKILL.md`](../skills/taptana-study/SKILL.md).
+Cópiala a las skills de tu asistente (o pásale el archivo) y pide: "usa la skill de Taptana
+para armar un estudio de este prototipo". El asistente lee los HTML, escribe un `study.json` y
+tú lo importas en Estudios → **Importar** (archivo o pegando el JSON). Si el prototipo que
+nombra el archivo no existe en tu Taptana, el panel te pregunta cuál usar.
 
-## Formato propuesto
+## El formato (v2, por bloques)
 
-```ts
-interface Study {
-  v: 1;
-  name: string;                 // "Compra en la tienda móvil"
-  description?: string;
-  prototypeId: string;          // a qué prototipo pertenece
-  welcome?: string;             // texto que ve el participante al empezar
-  tasks: Task[];
+Un estudio es un JSON con datos generales y una lista de `blocks` en el orden en que los ve el
+participante. Ejemplo completo y real: [`examples/tienda/study.json`](../examples/tienda/study.json).
+
+```json
+{
+  "v": 2,
+  "name": "Compra en Verde",
+  "prototypeId": "pr_ejemplo",
+  "welcome": "Gracias por ayudarnos. Nada es real y no hay respuestas incorrectas.",
+  "thanks": "Eso era todo. Ya puedes cerrar esta página.",
+  "settings": { "advance": "auto", "askName": true },
+  "blocks": [
+    { "id": "contexto", "kind": "context", "title": "Antes de empezar",
+      "text": "Imagina que quieres regalarle una planta a tu mamá." },
+    { "id": "t1", "kind": "task", "title": "Comprar una planta grande",
+      "instruction": "Quieres regalarle a tu mamá una planta grande. Encuentra una y cómprala.",
+      "startPath": "/index.html",
+      "success": { "type": "reached", "path": "/gracias.html" },
+      "expectedPath": ["/index.html", "/producto.html", "/carrito.html", "/gracias.html"] },
+    { "id": "facilidad", "kind": "scale", "question": "¿Qué tan fácil fue comprar la planta?",
+      "max": 5, "minLabel": "Muy difícil", "maxLabel": "Muy fácil" },
+    { "id": "t2", "kind": "first-click", "title": "Encontrar el carrito",
+      "instruction": "¿Dónde tocarías para ver lo que llevas en tu carrito?",
+      "startPath": "/index.html",
+      "success": { "type": "tapped", "selector": ".cart-link" } },
+    { "id": "volveria", "kind": "yesno", "question": "¿Comprarías aquí desde tu celular?" },
+    { "id": "decision", "kind": "choice", "question": "¿Qué te ayudaría a decidirte?",
+      "multiple": true, "options": ["Fotos reales", "Opiniones", "Saber cuánto mide"] },
+    { "id": "t3", "kind": "task", "title": "Costo del envío",
+      "instruction": "Averigua cuánto cuesta el envío a tu casa.",
+      "success": { "type": "manual" } },
+    { "id": "mejora", "kind": "text", "question": "Si pudieras cambiar una sola cosa, ¿cuál sería?" }
+  ]
 }
-
-interface Task {
-  id: string;                   // "t1"
-  title: string;                // "Comprar el producto rojo"
-  instruction: string;          // lo que lee el participante, en sus palabras
-  startPath?: string;           // "/index.html"; si falta, donde esté
-  success: SuccessRule;         // cómo Taptana sabe que terminó bien
-}
-
-type SuccessRule =
-  | { type: 'reached'; path: string }                 // llegó a esta página
-  | { type: 'tapped'; selector: string }               // tocó este elemento
-  | { type: 'manual' };                                // lo marca el moderador
 ```
 
-Reglas de diseño del formato:
+### Bloques
 
-- **Los criterios de éxito solo usan cosas que ya grabamos.** `reached` se verifica con los
-  eventos `navigation`; `tapped` con los `tap` y su `selector`. Nada nuevo que grabar.
-- **`manual` existe desde el principio.** Muchas tareas no se pueden verificar sola la
-  máquina ("encuentra el precio de envío"). El moderador marca éxito o fracaso.
-- **Un estudio apunta a un prototipo.** Por eso `prototypeId` existe desde v0.1.
-- **Versionado con `v`,** como los lotes de eventos. Las skills viejas siguen funcionando.
+| `kind` | Para qué | Campos propios |
+|---|---|---|
+| `context` | Situar a la persona antes de una tarea | `title`, `text` |
+| `task` | Tarea sobre el prototipo | `title`, `instruction`, `startPath`, `success`, `expectedPath` |
+| `first-click` | "¿Dónde tocarías para…?" Solo cuenta el primer toque | `title`, `instruction`, `startPath`, `success` |
+| `scale` | Opinión de 1 a `max` (5, 7 o 10) | `question`, `max`, `minLabel`, `maxLabel` |
+| `choice` | Opción múltiple (2 a 12 opciones) | `question`, `options`, `multiple` |
+| `yesno` | Sí o no | `question` |
+| `text` | Respuesta abierta | `question`, `placeholder` |
 
-## Qué hace la skill
+Cada bloque lleva un `id` único. Las preguntas aceptan `description` y `required`.
 
-1. Lee los HTML del prototipo (páginas, enlaces, botones, formularios).
-2. Propone entre 3 y 5 tareas que recorran los flujos principales, en lenguaje de participante
-   (sin nombres de botones ni jerga de la interfaz).
-3. Elige el criterio de éxito más verificable posible para cada una.
-4. Escribe `study.json` siguiendo el esquema y lo valida.
-5. Dice cómo importarlo: `taptana import study.json` o el botón del panel.
+### Cómo se sabe que una tarea se logró
 
-La skill vive en el repo (`skills/taptana-study/SKILL.md`) para que cualquiera la copie a su
-herramienta. Formato de skill: markdown con frontmatter, compatible con Claude Code y adaptable
-a otros asistentes.
+| Regla | Significa | Úsala cuando |
+|---|---|---|
+| `{ "type": "reached", "path": "/gracias.html" }` | Llegó a esa pantalla | El flujo termina en una pantalla clara |
+| `{ "type": "tapped", "selector": "#agregar" }` | Tocó ese elemento | La tarea es encontrar algo concreto |
+| `{ "type": "visible", "text": "Pedido confirmado" }` | Apareció ese texto (o un `selector`) | El prototipo no cambia de pantalla |
+| `{ "type": "manual" }` | Lo decides tú al revisar | Ninguna de las anteriores alcanza |
+
+Las pantallas se nombran así: `/producto.html` (una página), `/index.html#/carrito` (ruta por
+hash) o `/index.html~checkout` (una pantalla que se muestra y oculta en la misma página). Más
+en [prototipos.md](prototipos.md).
+
+### Ajustes
+
+- `settings.advance`: `"auto"` (por defecto) termina la tarea sola cuando se cumple la regla;
+  `"manual"` espera a que la persona toque "Listo, terminé".
+- `settings.askName`: pide un nombre o apodo (opcional para la persona) en la bienvenida.
+- `consent`: el texto de la casilla de consentimiento. Si falta, se usa el estándar.
+- `variants`: versiones A/B con distinta pantalla de inicio.
+- `closed: true`: el estudio ya no recibe respuestas.
+
+### Compatibilidad
+
+El formato anterior (`"v": 1` con una lista `tasks`) se sigue importando: Taptana lo convierte
+a bloques conservando los ids. Hay una copia para pruebas en
+[`examples/tienda/study-v1.json`](../examples/tienda/study-v1.json).
+
+Al importar, Taptana valida todo y explica los problemas en español, con el bloque y el campo
+("La tarea 2 no tiene instrucción"). Algunos son solo avisos: por ejemplo, un selector que es
+solo una etiqueta (`a`) se acepta, pero avisa que cualquier enlace contaría como acierto.
+
+## Lo que viene después: MCP
+
+Un MCP (`packages/mcp`, todavía no existe) expondrá la API de Taptana como herramientas para
+que una IA cree el estudio directo y, sobre todo, lea las sesiones: "resume las pruebas de
+hoy", "dónde se trabaron en la tarea 2". Será delgado, sobre la API que ya existe, y opcional.
 
 ## Lo que no hacemos
 
-- No metemos una IA dentro de Taptana. El servidor no llama a ningún modelo. La IA la pone el
-  usuario con su herramienta y su cuenta. Mantiene el servidor simple y sin llaves que cuidar.
-- No generamos el prototipo. Eso ya lo hace la herramienta de vibe coding del diseñador.
-
-## Decisiones abiertas
-
-1. ¿El estudio se importa por CLI, por panel, o ambos? Propongo ambos: CLI para la IA, panel
-   para la persona.
-2. ¿Preguntas post-tarea (escala de dificultad, comentario)? Son útiles y simples. Propongo
-   dejarlas fuera del formato v1 y agregarlas en v0.4 con las métricas.
+- No metemos una IA dentro de Taptana.
+- No generamos el prototipo: eso ya lo hace tu herramienta de diseño o de código.
+- No mandamos tus grabaciones a ningún lado. Si quieres que una IA las lea, tú exportas el CSV
+  o las sesiones y decides con quién compartirlas.

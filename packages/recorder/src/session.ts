@@ -142,6 +142,11 @@ export function saveLastScreen(screen: string): void {
   storageSet(KEY_LAST_SCREEN, screen);
 }
 
+/** Última pantalla que vio esta pestaña dentro de la sesión, o "". */
+export function lastScreen(): string {
+  return storageGet(KEY_LAST_SCREEN) ?? '';
+}
+
 /** `title` ya viene sin lo que el participante escribió (ver privacy.ts). */
 export function startSession(title: string): SessionContext {
   let sessionId = storageGet(KEY_SESSION);

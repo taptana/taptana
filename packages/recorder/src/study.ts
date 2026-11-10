@@ -1,434 +1,572 @@
 /**
- * El estudio desde el lado del participante.
+ * El estudio desde el lado del participante, bloque por bloque.
  *
- * - Lee `?study=<id>` en la primera página y lo guarda en sessionStorage.
- * - Pide el estudio a la API y muestra: bienvenida + consentimiento, barra de tarea con
- *   "Listo" / "No pude", y "Gracias" al final.
- * - Emite los eventos `study` y `task`. Hasta el consentimiento, nada sale del celular.
- * - Si el estudio tiene variantes (A/B), asigna una al azar y la guarda en la sesión.
+ * - Bienvenida con consentimiento. Hasta aceptar, nada se graba; si rechaza, tampoco después.
+ * - Tareas: lleva a la pantalla de inicio, muestra la instrucción, y al tocar "Empezar tarea"
+ *   deja una píldora pequeña. Vigila la regla de éxito y emite `goal` cuando se cumple.
+ * - Preguntas y bloques de contexto en hojas.
+ * - Al final agradece, emite `study finish` y apaga la grabación.
+ *
+ * Esta clase decide qué mostrar y cuándo; el dibujo está en study-ui.ts y el estado (que
+ * sobrevive a recargas y navegación) en study-state.ts.
  */
 
 import {
   API_PREFIX,
   DEFAULT_CONSENT_TEXT,
+  DEFAULT_THANKS_TEXT,
+  FIRST_CLICK_REACH_MS,
+  GESTURE_THRESHOLDS,
+  REQUEST_TIMEOUT_MS,
+  SESSION_LIMITS,
+  STUDY_PARAM,
+  isContextBlock,
+  isTaskBlock,
+  normalizeStudy,
+  sameScreen,
+  screenParts,
+  screenUrl,
+  tapMatches,
+  taskBlocks,
+  type AnswerValue,
+  type QuestionBlock,
   type StudyEvent,
   type StudyRecord,
+  type SuccessRule,
   type TapEvent,
-  type TaptanaEvent,
-  type Task,
+  type TaptanaOwnEvent,
+  type TaskBlock,
   type TaskEvent,
 } from '@taptana/shared';
-import { currentPath, withBase } from './session.js';
+import { queryParam } from './config.js';
+import { isOurs, isShown } from './screens.js';
+import { urlScreen, withBase } from './session.js';
+import { freshState, persistSilence, resetBlock, type StudyState, type StudyStore } from './study-state.js';
+import type { Step, StudyUi } from './study-ui.js';
 
-const KEY_STATE = 'taptana:study';
-const KEY_DATA = 'taptana:studyData';
+/** Cuánto se ve "¡Listo!" antes de pasar al siguiente bloque. */
+const AUTO_DONE_MS = 900;
+/** Margen para dar por bueno un cambio de pantalla después del primer toque. */
+const REACH_SLACK_MS = 300;
 
-interface StudyState {
-  studyId: string;
-  consented: boolean;
-  declined: boolean;
-  variantId?: string;
-  taskIndex: number;
-  /** El evento `start` de la tarea actual ya se emitió (sobrevive a la navegación). */
-  taskStarted: boolean;
-  /** En first-click: el participante ya leyó la instrucción y el próximo toque cierra la tarea. */
-  armed: boolean;
-  finished: boolean;
+/** Lo que el estudio necesita del resto del recorder. */
+export interface StudyHost {
+  /** Origen del servidor, sin barra final. */
+  endpoint: string;
+  /** Prueba sin grabar: nada se emite ni se envía. */
+  tryout: boolean;
+  /** El participante aceptó: empezar a grabar. */
+  begin(): void;
+  emit(event: TaptanaOwnEvent): void;
+  /** Fin del estudio: enviar lo pendiente y dejar de grabar. */
+  finish(): void;
+  /** ScreenId de la pantalla que el participante tiene delante. */
+  screen(): string;
+  /** Aviso al panel (solo en la prueba sin grabar). */
+  notify?(event: 'block' | 'finish', blockId?: string): void;
 }
 
-function readState(): StudyState | null {
+type Loaded = StudyRecord | 'closed' | null;
+
+/** Baja el estudio de la API. `null`: no existe o no hay conexión. */
+async function fetchStudy(endpoint: string, id: string): Promise<Loaded> {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const raw = sessionStorage.getItem(KEY_STATE);
-    return raw ? (JSON.parse(raw) as StudyState) : null;
+    const res = await fetch(`${endpoint}${API_PREFIX}/studies/${encodeURIComponent(id)}`, { credentials: 'omit', signal: abort.signal });
+    if (!res.ok) return null;
+    const raw = (await res.json()) as Partial<StudyRecord> | null;
+    if (!raw || typeof raw !== 'object' || (!Array.isArray(raw.blocks) && !Array.isArray((raw as { tasks?: unknown }).tasks))) return null;
+    const study = normalizeStudy({ ...(raw as StudyRecord), id: typeof raw.id === 'string' && raw.id ? raw.id : id });
+    return study.closed ? 'closed' : study;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
-function writeState(state: StudyState): void {
-  try {
-    sessionStorage.setItem(KEY_STATE, JSON.stringify(state));
-  } catch {
-    /* sin storage: el estudio dura una página */
-  }
+function flat(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
-/**
- * Decide si esta página forma parte de un estudio. Se llama antes de crear el batcher,
- * para saber si hay que retener los eventos hasta el consentimiento.
- */
-export function detectStudy(): StudyState | null {
-  let fromUrl: string | null = null;
-  try {
-    fromUrl = new URLSearchParams(location.search).get('study');
-  } catch {
-    /* nada */
-  }
-  const saved = readState();
-  if (fromUrl && (!saved || saved.studyId !== fromUrl)) {
-    const fresh: StudyState = { studyId: fromUrl, consented: false, declined: false, taskIndex: 0, taskStarted: false, armed: false, finished: false };
-    writeState(fresh);
+/** Regla `visible`: hay un elemento que se ve y/o un texto a la vista (sin distinguir mayúsculas). */
+export function ruleVisible(rule: Extract<SuccessRule, { type: 'visible' }>): boolean {
+  const text = rule.text ? flat(rule.text) : '';
+  const selector = rule.selector?.trim();
+  if (selector) {
+    let found: NodeListOf<Element>;
     try {
-      sessionStorage.removeItem(KEY_DATA);
+      found = document.querySelectorAll(selector);
     } catch {
-      /* nada */
+      return false;
     }
-    return fresh;
+    for (const el of found) {
+      if (isOurs(el) || !isShown(el)) continue;
+      if (!text || flat(el instanceof HTMLElement ? el.innerText : (el.textContent ?? '')).includes(text)) return true;
+    }
+    return false;
   }
-  return saved;
+  return text !== '' && flat(document.body?.innerText ?? '').includes(text);
 }
 
-export interface StudyControllerOptions {
-  endpoint: string;
-  state: StudyState;
-  emit: (event: TaptanaEvent) => void;
-  /** Libera los eventos retenidos (consentimiento dado). */
-  onConsent: () => void;
-  /** Tira todo y deja de grabar (consentimiento negado). */
-  onDecline: () => void;
-  /** Manda lo pendiente ahora (fin del estudio). */
-  onFinish: () => void;
+/** ¿El toque cayó en lo que pide el selector? Con el DOM delante vale cualquier selector CSS. */
+function tapHits(element: Element, tap: TapEvent, selector: string): boolean {
+  try {
+    if (element.closest(selector)) return true;
+  } catch {
+    /* selector que el navegador no entiende: queda la comparación simple */
+  }
+  return tapMatches(tap, selector);
 }
 
 export class StudyController {
   private study: StudyRecord | null = null;
-  private state: StudyState;
-  private host: HTMLElement | null = null;
-  private root: ShadowRoot | null = null;
+  private timer: number | undefined;
 
-  constructor(private readonly opts: StudyControllerOptions) {
-    this.state = opts.state;
+  constructor(
+    private readonly host: StudyHost,
+    private readonly store: StudyStore,
+    private readonly ui: StudyUi,
+    private state: StudyState,
+    preloaded?: StudyRecord,
+  ) {
+    this.study = preloaded ?? null;
   }
 
+  get studyId(): string {
+    return this.state.studyId;
+  }
+
+  /** Muestra lo que toque según el estado guardado. */
   async start(): Promise<void> {
-    this.study = await this.loadStudy();
-    if (!this.study) {
-      // Sin estudio no hay por qué retener nada.
-      this.opts.onConsent();
+    const state = this.state;
+    if (state.status === 'declined' || state.status === 'finished') {
+      // Solo se recuerda en la página del link (al recargarla); el resto del prototipo queda libre.
+      if (queryParam(STUDY_PARAM) === null && !this.host.tryout) return;
+      if (state.status === 'declined') this.showDeclined();
+      else {
+        this.study ??= this.store.readStudy(state.studyId);
+        this.showThanks();
+      }
       return;
     }
-    this.mount();
-    if (this.state.declined) return this.renderDeclined();
-    if (!this.state.consented) return this.renderWelcome();
-    if (this.state.finished) return this.renderThanks();
-    if (!this.state.taskStarted) this.startTask();
-    else this.renderTask();
-  }
-
-  /** Llamado por el recorder con cada toque en el prototipo (no en nuestra interfaz). */
-  onTap(tap: TapEvent): void {
-    if (!this.study || !this.state.consented || this.state.finished || !this.state.armed) return;
-    const task = this.currentTask();
-    if (!task || (task.kind ?? 'task') !== 'first-click') return;
-    void tap;
-    this.completeTask('done');
-  }
-
-  // ── Datos ─────────────────────────────────────────────────────────
-
-  private async loadStudy(): Promise<StudyRecord | null> {
-    try {
-      const cached = sessionStorage.getItem(KEY_DATA);
-      if (cached) return JSON.parse(cached) as StudyRecord;
-    } catch {
-      /* seguimos */
-    }
-    try {
-      const res = await fetch(`${this.opts.endpoint}${API_PREFIX}/studies/${encodeURIComponent(this.state.studyId)}`, { credentials: 'omit' });
-      if (!res.ok) return null;
-      const study = (await res.json()) as StudyRecord;
-      try {
-        sessionStorage.setItem(KEY_DATA, JSON.stringify(study));
-      } catch {
-        /* nada */
+    // A media sesión se sigue con la versión del estudio con la que se empezó.
+    if (!this.study && state.status === 'active') this.study = this.store.readStudy(state.studyId);
+    if (!this.study) {
+      this.ui.waiting();
+      const loaded = await fetchStudy(this.host.endpoint, state.studyId);
+      if (loaded === 'closed') {
+        this.ui.notice({ tone: 'calm', title: 'Este estudio ya no recibe respuestas', text: 'Gracias por tu interés. Puedes cerrar esta página.' });
+        return;
       }
-      return study;
-    } catch {
-      return null;
+      if (!loaded) {
+        this.ui.notice(
+          {
+            tone: 'warn',
+            title: 'No pudimos cargar el estudio',
+            text: 'Revisa tu conexión y vuelve a intentarlo. Si sigue sin abrir, pide el link de nuevo a quien te lo compartió. No se está grabando nada.',
+            action: 'Reintentar',
+            primary: true,
+          },
+          () => void this.start(),
+        );
+        return;
+      }
+      this.study = loaded;
+      this.store.writeStudy(loaded);
     }
+    this.resume();
   }
 
-  private save(): void {
-    writeState(this.state);
+  /** Prueba sin grabar: empieza de cero con este estudio, opcionalmente en un bloque. */
+  load(study: StudyRecord, startAt?: string): void {
+    this.cancel();
+    this.ui.clear();
+    this.study = study;
+    this.state = freshState(study.id);
+    const at = startAt ? study.blocks.findIndex((b) => b.id === startAt) : -1;
+    if (at !== -1) {
+      this.state.status = 'active';
+      this.state.announced = true;
+      this.state.index = at;
+    }
+    this.store.clear();
+    this.store.write(this.state);
+    this.store.writeStudy(study);
+    this.resume();
   }
 
-  private currentTask(): Task | null {
-    return this.study?.tasks[this.state.taskIndex] ?? null;
+  /** Un toque en el prototipo (no en nuestra interfaz). */
+  onTap(tap: TapEvent, element: Element): void {
+    const block = this.runningTask();
+    if (!block) return;
+    const rule = block.success;
+    if (block.kind === 'first-click') {
+      if (this.state.tapAt) return;
+      this.state.tapAt = tap.t;
+      if (rule.type === 'tapped' && tapHits(element, tap, rule.selector)) this.markGoal(block);
+      this.emitTask(block, 'done', true);
+      // Con regla "llega a una pantalla" se espera a ver a dónde lleva el toque.
+      this.close(rule.type === 'reached' ? FIRST_CLICK_REACH_MS : AUTO_DONE_MS, 'Toque registrado');
+      return;
+    }
+    if (rule.type === 'tapped' && tapHits(element, tap, rule.selector)) this.goal(block);
   }
 
-  // ── Flujo ─────────────────────────────────────────────────────────
+  /** Cambió la pantalla. */
+  onScreen(): void {
+    this.checkGoal();
+  }
 
-  private consent(): void {
+  /** Terminó una revisión del DOM. */
+  onCheck(): void {
+    this.checkGoal();
+  }
+
+  // ── Flujo ───────────────────────────────────────────────────────────
+
+  private resume(): void {
     if (!this.study) return;
-    this.state.consented = true;
-    const variants = this.study.variants ?? [];
-    if (variants.length > 0) {
-      const pick = variants[Math.floor(Math.random() * variants.length)];
-      if (pick) this.state.variantId = pick.id;
+    if (this.state.status === 'new') {
+      this.showWelcome(this.study);
+      return;
     }
+    if (!this.state.announced) this.announce(this.study);
+    this.enterBlock();
+  }
+
+  private showWelcome(study: StudyRecord): void {
+    this.ui.welcome(
+      {
+        name: study.name,
+        text: study.welcome?.trim() ?? '',
+        consent: study.consent?.trim() || DEFAULT_CONSENT_TEXT,
+        steps: study.blocks.length,
+        askName: study.settings?.askName === true,
+      },
+      { onStart: (name) => this.consent(study, name), onDecline: () => this.decline() },
+    );
+  }
+
+  private consent(study: StudyRecord, name: string): void {
+    const state = this.state;
+    if (state.status !== 'new') return;
+    state.status = 'active';
+    if (name) state.participant = name.slice(0, SESSION_LIMITS.participant);
+    const variants = study.variants ?? [];
+    const pick = variants[Math.floor(Math.random() * variants.length)];
+    if (pick) state.variantId = pick.id;
     this.save();
-    const ev: StudyEvent = { kind: 'taptana', type: 'study', t: Date.now(), studyId: this.study.id, action: 'start' };
-    if (this.state.variantId) ev.variantId = this.state.variantId;
-    this.opts.emit(ev);
-    this.opts.onConsent();
-    this.startTask();
+    this.store.writeStudy(study);
+    this.host.begin();
+    this.announce(study);
+    this.enterBlock();
+  }
+
+  private announce(study: StudyRecord): void {
+    const state = this.state;
+    const event: StudyEvent = { kind: 'taptana', type: 'study', t: Date.now(), studyId: study.id, action: 'start' };
+    if (state.variantId) event.variantId = state.variantId;
+    if (state.participant) event.participant = state.participant;
+    this.host.emit(event);
+    state.announced = true;
+    this.save();
   }
 
   private decline(): void {
-    this.state.declined = true;
-    this.save();
-    this.opts.onDecline();
-    this.renderDeclined();
+    if (this.state.status !== 'new') return;
+    this.state.status = 'declined';
+    persistSilence(this.store, this.state);
+    this.showDeclined();
   }
 
-  private startTask(): void {
-    const task = this.currentTask();
-    if (!this.study || !task) return this.finish();
-    const ev: TaskEvent = { kind: 'taptana', type: 'task', t: Date.now(), taskId: task.id, action: 'start' };
-    this.opts.emit(ev);
-    this.state.taskStarted = true;
-    this.state.armed = false;
-    this.save();
-
-    // ¿Hay que llevar al participante a otra página?
-    let startPath = task.startPath;
-    if (this.state.taskIndex === 0 && !startPath && this.state.variantId) {
-      startPath = this.study.variants?.find((v) => v.id === this.state.variantId)?.startPath;
-    }
-    if (startPath && !samePath(startPath, currentPath())) {
-      location.assign(withBase(startPath));
-      return;
-    }
-    this.renderTask();
+  private showDeclined(): void {
+    this.ui.notice(
+      { tone: 'calm', title: 'Gracias igual', text: 'No se grabó nada y no se grabará nada en esta pestaña. Puedes cerrar esta página.', action: 'Cerrar' },
+      () => this.ui.clear(),
+    );
   }
 
-  private completeTask(action: 'done' | 'skip'): void {
-    const task = this.currentTask();
-    if (!task) return;
-    this.opts.emit({ kind: 'taptana', type: 'task', t: Date.now(), taskId: task.id, action });
-    this.state.taskIndex += 1;
-    this.state.taskStarted = false;
-    this.state.armed = false;
-    this.save();
-    if (this.state.taskIndex >= (this.study?.tasks.length ?? 0)) return this.finish();
-    this.toast(action === 'done' ? 'Listo. Siguiente tarea.' : 'Ok, pasamos a la siguiente.');
-    // Un respiro antes de redibujar: si este toque también navega (un enlace), el clic debe
-    // llegar al prototipo y no a nuestra barra recién dibujada. Si la página cambia antes,
-    // la siguiente página arranca la tarea al cargar (taskStarted sigue en false).
-    window.setTimeout(() => {
-      if (!this.state.taskStarted && !this.state.finished) this.startTask();
-    }, 350);
+  private showThanks(): void {
+    this.ui.clear();
+    const text = this.study?.thanks?.trim() || DEFAULT_THANKS_TEXT;
+    const study = this.study;
+    if (this.host.tryout && study) {
+      this.ui.notice({ tone: 'ok', title: '¡Gracias!', text, action: 'Probar de nuevo' }, () => this.load(study));
+    } else {
+      this.ui.notice({ tone: 'ok', title: '¡Gracias!', text });
+    }
   }
 
   private finish(): void {
-    if (!this.study) return;
-    if (!this.state.finished) {
-      this.state.finished = true;
+    const state = this.state;
+    if (state.status !== 'finished') {
+      state.status = 'finished';
+      persistSilence(this.store, state);
+      this.host.emit({ kind: 'taptana', type: 'study', t: Date.now(), studyId: state.studyId, action: 'finish' });
+      this.host.finish();
+      this.host.notify?.('finish');
+    }
+    this.showThanks();
+  }
+
+  private enterBlock(): void {
+    const study = this.study;
+    if (!study) return;
+    const state = this.state;
+    const block = study.blocks[state.index];
+    if (!block) {
+      this.finish();
+      return;
+    }
+    this.host.notify?.('block', block.id);
+    const step: Step = { n: state.index + 1, total: study.blocks.length };
+    if (isTaskBlock(block)) {
+      this.enterTask(study, block, step);
+      return;
+    }
+    this.ui.hidePill();
+    if (!state.shownAt) {
+      state.shownAt = Date.now();
       this.save();
-      this.opts.emit({ kind: 'taptana', type: 'study', t: Date.now(), studyId: this.study.id, action: 'finish' });
-      this.opts.onFinish();
     }
-    this.renderThanks();
+    if (isContextBlock(block)) this.ui.context({ step, title: block.title, text: block.text }, () => this.advance());
+    else this.ui.question({ step, block }, (value) => this.answer(block, value));
   }
 
-  // ── Interfaz ──────────────────────────────────────────────────────
-
-  private mount(): void {
-    if (this.host) return;
-    const host = document.createElement('div');
-    host.className = 'rr-block';
-    host.setAttribute('data-taptana-ui', 'study');
-    const root = host.attachShadow({ mode: 'open' });
-    root.innerHTML = `<style>${CSS}</style><div id="ui"></div>`;
-    const append = (): void => {
-      document.body.appendChild(host);
-    };
-    if (document.body) append();
-    else document.addEventListener('DOMContentLoaded', append);
-    this.host = host;
-    this.root = root;
-  }
-
-  private ui(): HTMLElement {
-    return this.root!.getElementById('ui')!;
-  }
-
-  private renderWelcome(): void {
-    if (!this.study) return;
-    const consentText = this.study.consent?.trim() || DEFAULT_CONSENT_TEXT;
-    const n = this.study.tasks.length;
-    this.ui().innerHTML = `
-      <div class="backdrop"></div>
-      <div class="sheet" role="dialog" aria-labelledby="t">
-        <p class="eyebrow">Prueba de usabilidad</p>
-        <h1 id="t">${esc(this.study.name)}</h1>
-        ${this.study.welcome ? `<p class="body">${esc(this.study.welcome)}</p>` : ''}
-        <p class="muted">${n} tarea${n === 1 ? '' : 's'}. No hay respuestas correctas ni incorrectas: queremos ver cómo se usa el prototipo.</p>
-        <label class="consent"><input type="checkbox" id="ok"> <span>${esc(consentText)}</span></label>
-        <button class="btn primary" id="go" disabled>Empezar</button>
-        <button class="btn ghost" id="no">Prefiero no participar</button>
-      </div>`;
-    const ok = this.root!.getElementById('ok') as HTMLInputElement;
-    const go = this.root!.getElementById('go') as HTMLButtonElement;
-    ok.addEventListener('change', () => {
-      go.disabled = !ok.checked;
+  private answer(block: QuestionBlock, value: AnswerValue): void {
+    const now = Date.now();
+    this.host.emit({
+      kind: 'taptana',
+      type: 'answer',
+      t: now,
+      blockId: block.id,
+      value,
+      durationMs: Math.max(0, now - (this.state.shownAt ?? now)),
     });
-    go.addEventListener('click', () => this.consent());
-    this.root!.getElementById('no')!.addEventListener('click', () => this.decline());
+    this.advance();
   }
 
-  private renderDeclined(): void {
-    this.ui().innerHTML = `
-      <div class="backdrop"></div>
-      <div class="sheet">
-        <h1>Gracias igual</h1>
-        <p class="body">No se grabó nada. Puedes cerrar esta página.</p>
-      </div>`;
+  private advance(): void {
+    this.cancel();
+    this.ui.hideToast();
+    resetBlock(this.state, this.state.index + 1);
+    this.save();
+    this.enterBlock();
   }
 
-  private renderThanks(): void {
-    this.ui().innerHTML = `
-      <div class="backdrop"></div>
-      <div class="sheet">
-        <p class="eyebrow">Terminaste</p>
-        <h1>¡Gracias!</h1>
-        <p class="body">Eso era todo. Puedes cerrar esta página.</p>
-      </div>`;
+  // ── Tareas ──────────────────────────────────────────────────────────
+
+  private enterTask(study: StudyRecord, block: TaskBlock, step: Step): void {
+    const state = this.state;
+    if (state.phase === 'intro') {
+      this.ui.hidePill();
+      if (this.moveToStart(study, block)) return;
+      this.ui.intro({ step, instruction: block.instruction, firstClick: block.kind === 'first-click' }, () => this.startTask(block, step));
+      return;
+    }
+    if (state.phase === 'closing') {
+      // La página cambió mientras se cerraba el bloque: se termina la espera aquí.
+      this.checkGoal();
+      this.later(() => this.advance(), Math.max(0, (state.closeAt ?? 0) - Date.now()));
+      return;
+    }
+    this.showPill(block, step);
+    this.checkGoal();
   }
 
-  private renderTask(): void {
-    const task = this.currentTask();
-    if (!this.study || !task) return;
-    const n = this.study.tasks.length;
-    const i = this.state.taskIndex + 1;
-    const firstClick = (task.kind ?? 'task') === 'first-click';
+  /**
+   * Lleva al participante a la pantalla de inicio del bloque. Devuelve true si la página se va
+   * a recargar (la siguiente página continúa). Una ruta por hash en la misma página no recarga.
+   */
+  private moveToStart(study: StudyRecord, block: TaskBlock): boolean {
+    const state = this.state;
+    let startPath = block.startPath;
+    if (!startPath && state.variantId && taskBlocks(study)[0] === block) {
+      startPath = study.variants?.find((v) => v.id === state.variantId)?.startPath;
+    }
+    if (!startPath || state.movedFor === block.id) return false;
+    const here = urlScreen();
+    if (sameScreen(screenUrl(startPath), here)) return false;
+    // Se anota antes de moverse: si la pantalla no existe, no se intenta en bucle.
+    state.movedFor = block.id;
+    this.save();
+    const target = screenParts(startPath);
+    if (target.hash && sameScreen(target.path, screenParts(here).path)) {
+      location.hash = target.hash;
+      return false;
+    }
+    // "/carpeta/index.html" se pide como "/carpeta/": cualquier servidor lo entiende y un router
+    // de History reconoce su ruta de inicio.
+    const path = target.path.replace(/\/index\.html$/, '/');
+    location.assign(withBase(path) + (target.hash ?? ''));
+    return true;
+  }
 
-    if (firstClick && !this.state.armed) {
-      // Primero la instrucción a pantalla completa; al tocar "Entendido", el próximo toque cuenta.
-      this.ui().innerHTML = `
-        <div class="backdrop"></div>
-        <div class="sheet">
-          <p class="eyebrow">Tarea ${i} de ${n}</p>
-          <h1>${esc(task.instruction)}</h1>
-          <p class="muted">Cuando toques "Entendido", toca en el prototipo el lugar donde irías. Solo cuenta el primer toque.</p>
-          <button class="btn primary" id="armed">Entendido</button>
-        </div>`;
-      this.root!.getElementById('armed')!.addEventListener('click', () => {
-        this.state.armed = true;
+  private startTask(block: TaskBlock, step: Step): void {
+    const state = this.state;
+    if (state.phase !== 'intro') return;
+    state.phase = 'run';
+    state.startedAt = Date.now();
+    delete state.goalAt;
+    delete state.tapAt;
+    // Si la meta ya está a la vista al empezar, no cuenta hasta que deje de estarlo y vuelva.
+    state.armed = !this.ruleHolds(block.success);
+    this.emitTask(block, 'start');
+    this.save();
+    this.ui.closeSheet(true);
+    this.showPill(block, step);
+  }
+
+  private showPill(block: TaskBlock, step: Step): void {
+    const state = this.state;
+    this.ui.pill(
+      { position: state.pill, hint: !state.hinted },
+      {
+        onOpen: () => this.openInstruction(block, step),
+        onMove: (position) => {
+          state.pill = position;
+          this.save();
+        },
+      },
+    );
+    if (!state.hinted) {
+      state.hinted = true;
+      this.save();
+    }
+  }
+
+  private openInstruction(block: TaskBlock, step: Step): void {
+    if (this.state.phase !== 'run') return;
+    this.ui.hidePill();
+    this.ui.instruction(
+      { step, instruction: block.instruction, firstClick: block.kind === 'first-click' },
+      {
+        onDone: () => this.complete(block, 'done'),
+        onSkip: () => this.complete(block, 'skip'),
+        onClose: () => {
+          this.ui.closeSheet(true);
+          if (this.state.phase === 'run') this.showPill(block, step);
+        },
+      },
+    );
+  }
+
+  /** La tarea en curso, si el participante ya tocó "Empezar tarea" y no se ha cerrado. */
+  private runningTask(): TaskBlock | null {
+    const state = this.state;
+    if (state.status !== 'active' || state.phase !== 'run') return null;
+    const block = this.study?.blocks[state.index];
+    return block && isTaskBlock(block) ? block : null;
+  }
+
+  /** Reglas que dependen de lo que hay en pantalla: `reached` y `visible`. */
+  private ruleHolds(rule: SuccessRule): boolean {
+    if (rule.type === 'reached') return sameScreen(rule.path, this.host.screen());
+    if (rule.type === 'visible') return ruleVisible(rule);
+    return false;
+  }
+
+  private checkGoal(): void {
+    const state = this.state;
+    if (state.status !== 'active' || state.goalAt) return;
+    const block = this.study?.blocks[state.index];
+    if (!block || !isTaskBlock(block)) return;
+    const rule = block.success;
+
+    if (block.kind === 'first-click') {
+      // Primer clic con "llega a una pantalla": vale si el toque lleva ahí en los 2 s siguientes.
+      if (rule.type !== 'reached' || !state.tapAt || state.phase === 'intro') return;
+      if (Date.now() > state.tapAt + FIRST_CLICK_REACH_MS + REACH_SLACK_MS) return;
+      if (!sameScreen(rule.path, this.host.screen())) return;
+      this.markGoal(block);
+      // Ya se sabe a dónde llevó: no hace falta esperar más.
+      if (state.phase === 'closing') {
+        state.closeAt = Math.min(state.closeAt ?? Infinity, Date.now() + GESTURE_THRESHOLDS.tapEffectMs);
         this.save();
-        this.renderTask();
-      });
+        this.later(() => this.advance(), Math.max(0, state.closeAt - Date.now()));
+      }
       return;
     }
 
-    if (firstClick) {
-      // Ya leyó la instrucción: una cinta abajo que no intercepta toques. El próximo toque cuenta.
-      this.ui().innerHTML = `<div class="strip" id="bar">Tarea ${i} de ${n} · toca en el prototipo el lugar donde irías</div>`;
+    if (state.phase !== 'run' || (rule.type !== 'reached' && rule.type !== 'visible')) return;
+    if (!this.ruleHolds(rule)) {
+      if (!state.armed) {
+        state.armed = true;
+        this.save();
+      }
       return;
     }
-
-    this.ui().innerHTML = `
-      <div class="bar" id="bar">
-        <button class="bar-head" id="toggle" aria-expanded="true">
-          <span class="step">Tarea ${i} de ${n}</span>
-          <span class="title">${esc(task.title || task.instruction)}</span>
-          <span class="chev">⌄</span>
-        </button>
-        <div class="bar-body" id="body">
-          <p class="instruction">${esc(task.instruction)}</p>
-          <div class="actions">
-            <button class="btn small ghost" id="skip">No pude</button>
-            <button class="btn small primary" id="done">Listo</button>
-          </div>
-        </div>
-      </div>`;
-    const bar = this.root!.getElementById('bar')!;
-    const toggle = this.root!.getElementById('toggle')!;
-    const setCollapsed = (collapsed: boolean): void => {
-      bar.classList.toggle('collapsed', collapsed);
-      toggle.setAttribute('aria-expanded', String(!collapsed));
-    };
-    toggle.addEventListener('click', () => setCollapsed(!bar.classList.contains('collapsed')));
-    // La barra se achica sola para no tapar el prototipo; el participante la abre cuando quiera.
-    window.setTimeout(() => setCollapsed(true), 5000);
-    this.root!.getElementById('done')?.addEventListener('click', () => this.completeTask('done'));
-    this.root!.getElementById('skip')?.addEventListener('click', () => this.completeTask('skip'));
+    if (state.armed) this.goal(block);
   }
 
-  private toast(text: string): void {
-    const el = document.createElement('div');
-    el.className = 'toast';
-    el.textContent = text;
-    this.root!.appendChild(el);
-    setTimeout(() => el.remove(), 1800);
+  /** Anota que la regla se cumplió y emite `goal`. */
+  private markGoal(block: TaskBlock): void {
+    const state = this.state;
+    if (state.goalAt) return;
+    state.goalAt = Date.now();
+    this.emitTask(block, 'goal');
+    this.save();
+  }
+
+  /** La regla se cumplió en una tarea normal: con avance automático, la tarea termina sola. */
+  private goal(block: TaskBlock): void {
+    if (this.state.goalAt || this.state.phase !== 'run') return;
+    this.markGoal(block);
+    if (this.study?.settings?.advance === 'manual') return;
+    this.emitTask(block, 'done', true);
+    this.close(AUTO_DONE_MS, '¡Listo!');
+  }
+
+  /** "Listo, terminé" o "No pude". */
+  private complete(block: TaskBlock, action: 'done' | 'skip'): void {
+    // Un segundo toque (doble toque) ya encuentra la tarea cerrada.
+    if (this.state.phase !== 'run') return;
+    this.emitTask(block, action);
+    this.close(GESTURE_THRESHOLDS.tapEffectMs);
+  }
+
+  /**
+   * Cierra la tarea y espera un momento antes del siguiente bloque: si el toque que la cerró
+   * también hace algo en el prototipo (un enlace), el clic le llega a él y no a nuestra hoja.
+   */
+  private close(delay: number, toast?: string): void {
+    // Solo si la cerró un botón nuestro hace falta el escudo contra el doble toque. Si la cerró
+    // un toque en el prototipo, su clic todavía está por llegar y no debe caer en nuestra capa.
+    const ours = toast === undefined;
+    const state = this.state;
+    state.phase = 'closing';
+    state.closeAt = Date.now() + delay;
+    this.save();
+    this.ui.hidePill();
+    this.ui.closeSheet(ours);
+    if (toast) this.ui.toast(toast);
+    this.later(() => this.advance(), delay);
+  }
+
+  private emitTask(block: TaskBlock, action: TaskEvent['action'], auto = false): void {
+    const event: TaskEvent = { kind: 'taptana', type: 'task', t: Date.now(), taskId: block.id, action };
+    if (auto) event.auto = true;
+    this.host.emit(event);
+  }
+
+  // ── Interno ─────────────────────────────────────────────────────────
+
+  private save(): void {
+    this.store.write(this.state);
+  }
+
+  private later(fn: () => void, ms: number): void {
+    this.cancel();
+    this.timer = window.setTimeout(() => {
+      this.timer = undefined;
+      fn();
+    }, ms);
+  }
+
+  private cancel(): void {
+    if (this.timer !== undefined) clearTimeout(this.timer);
+    this.timer = undefined;
   }
 }
-
-function samePath(a: string, b: string): boolean {
-  const norm = (p: string): string => {
-    const noQuery = p.split('?')[0] ?? '';
-    const noSlash = noQuery.replace(/\/+$/, '') || '/';
-    return noSlash.replace(/\/index\.html$/, '') || '/';
-  };
-  return norm(a) === norm(b);
-}
-
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-const CSS = `
-  :host { all: initial; }
-  * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 2147483646; }
-  .sheet {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 2147483647;
-    background: #fff; color: #111; border-radius: 20px 20px 0 0;
-    padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); max-height: 88vh; overflow: auto;
-    box-shadow: 0 -8px 30px rgba(0,0,0,.2);
-  }
-  @media (min-width: 640px) { .sheet { left: 50%; right: auto; bottom: 24px; width: 420px; transform: translateX(-50%); border-radius: 20px; } }
-  .eyebrow { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #6b7266; }
-  h1 { margin: 0 0 10px; font-size: 22px; line-height: 1.25; }
-  .body { margin: 0 0 10px; font-size: 16px; line-height: 1.45; }
-  .muted { margin: 0 0 14px; font-size: 14px; line-height: 1.4; color: #6b7266; }
-  .muted.small { font-size: 13px; margin: 0; }
-  .consent { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.4; margin: 0 0 16px; padding: 12px; background: #f4f5f2; border-radius: 12px; }
-  .consent input { width: 20px; height: 20px; margin: 1px 0 0; flex: 0 0 auto; }
-  .btn { display: block; width: 100%; border: 0; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; }
-  .btn.primary { background: #111; color: #fff; }
-  .btn.primary:disabled { opacity: .4; cursor: default; }
-  .btn.ghost { background: transparent; color: #6b7266; margin-top: 6px; }
-  .btn.small { padding: 10px 14px; font-size: 14px; width: auto; }
-  .bar {
-    position: fixed; top: 8px; left: 8px; right: 8px; z-index: 2147483647;
-    background: #111; color: #fff; border-radius: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.3);
-    overflow: hidden;
-  }
-  @media (min-width: 640px) { .bar { left: 50%; right: auto; width: 420px; transform: translateX(-50%); } }
-  .bar-head { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; color: inherit; padding: 12px 14px; text-align: left; cursor: pointer; }
-  .step { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #9ccc9c; white-space: nowrap; }
-  .title { flex: 1; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chev { font-size: 18px; line-height: 1; transition: transform .2s; }
-  .collapsed { top: auto; bottom: 12px; left: 12px; right: auto; width: auto; max-width: 60vw; transform: none; border-radius: 999px; }
-  .strip {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 2147483647; pointer-events: none;
-    background: rgba(17,17,17,.9); color: #fff; text-align: center; font-size: 12px; font-weight: 600;
-    padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
-  }
-  .collapsed .bar-head { padding: 8px 12px; gap: 8px; }
-  .collapsed .title { display: none; }
-  .collapsed .chev { transform: rotate(180deg); }
-  .collapsed .bar-body { display: none; }
-  .bar-body { padding: 0 14px 14px; }
-  .instruction { margin: 0 0 12px; font-size: 15px; line-height: 1.45; }
-  .actions { display: flex; gap: 8px; justify-content: flex-end; }
-  .bar .btn.primary { background: #2f7d4f; }
-  .bar .btn.ghost { color: #bbb; margin: 0; }
-  .toast {
-    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 2147483647;
-    background: #2f7d4f; color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 600;
-    box-shadow: 0 6px 20px rgba(0,0,0,.25); animation: fade 1.8s forwards;
-  }
-  @keyframes fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
-`;

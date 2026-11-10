@@ -67,7 +67,7 @@ export async function readSeedFiles(seedDir: string): Promise<SessionExport[]> {
   return out;
 }
 
-const SKIP_FILES = new Set(['study.json', 'README.md']);
+const SKIP_FILES = new Set(['study.json', 'study-v1.json', 'README.md']);
 
 /**
  * Deja el ejemplo listo: prototipo `pr_ejemplo`, estudio `st_demo_compra` apuntando a él y las

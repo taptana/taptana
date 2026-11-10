@@ -1,6 +1,6 @@
 {
   "name": "@taptana/server",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "CLI y servidor de Taptana: sirve tus prototipos, graba sesiones en SQLite y muestra el panel.",
   "license": "MIT",
   "type": "module",

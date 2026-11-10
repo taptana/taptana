@@ -9,224 +9,235 @@ El dueño del proyecto es diseñador, no programador: explicar cada paso en leng
 sin asumir conocimiento de backend, y justificar las decisiones técnicas en términos de
 qué resuelven para la prueba de usabilidad.
 
-## Cómo se usa (v0.1)
+## Cómo se usa (v1)
 
-1. El diseñador corre `taptana dev ./mi-prototipo` en su laptop.
-2. La terminal muestra la IP local y un código QR.
-3. El participante escanea el QR con su celular (misma red Wi-Fi) y usa el prototipo.
-4. Todo lo que hace se graba. El diseñador abre `http://<ip>:4321/sessions` y lo reproduce.
+1. `pnpm start` compila si hace falta, arranca el servidor y abre el panel en **Inicio**.
+2. El diseñador sube su prototipo (`.html` o `.zip`), arma un estudio por bloques y lo prueba
+   sin grabar.
+3. Comparte el link o el QR del estudio. El participante lo abre en su celular (misma red
+   Wi-Fi), acepta el consentimiento y recorre los bloques.
+4. El diseñador lee el reporte: puntaje, éxito, embudo, mapas de calor, respuestas y qué arreglar.
 
-Es una prueba moderada en local: diseñador y participante están en el mismo lugar.
+"Ver un ejemplo" (Inicio) carga la tienda de ejemplo, su estudio y sesiones ya grabadas.
 
 ## Posicionamiento y modelo
 
 - Alternativa open source a Maze, para prototipos HTML reales en celulares reales.
 - Modelo tipo Penpot: todo el código es abierto y cualquiera lo instala en su infraestructura.
-  Nosotros ofreceremos además un servidor hospedado (para probar en vivo sin instalar y, a
-  futuro, para monetizar). Ver `docs/servidor-hospedado.md`.
+  A futuro, un servidor hospedado. Ver `docs/servidor-hospedado.md`.
 - **Licencia: MIT en todos los paquetes.** Decidido. No se cambia sin discutirlo explícitamente.
-- No competimos en reportes el primer año. Ganamos en "funciona con cualquier HTML, lo instalo
-  donde quiera, mis datos son míos".
+- Ganamos en "funciona con cualquier HTML, lo instalo donde quiera, mis datos son míos".
 
 ## Hoja de ruta
 
-- **v0.1 (actual):** grabación local, una laptop, una red Wi-Fi, HTTP simple.
-- **v0.2:** modo servidor (`taptana serve`): subir un zip del prototipo, obtener un link,
-  imagen Docker. Recorder usable como script independiente en cualquier HTML.
-- **v0.3 (hecho, salvo MCP):** tareas y consentimiento, formato `Study` importable, constructor
-  en el panel, skill para que una IA arme el estudio. Pendiente: `packages/mcp`.
-  Ver `docs/estudios-con-ia.md` y `docs/constructor-de-estudios.md`.
-- **v0.4:** métricas: tiempo por tarea, éxito, mapas de toques.
-- **v0.5:** cuentas y equipos. Recién aquí tiene sentido el hospedado con pago.
-- **Fuera de v0.1:** tareas, consentimiento, panel completo, mapas de calor, login, HTTPS.
-- Servidor compartido instalable en cualquier lado (Node, Docker, Azure). Por eso: cero
-  dependencias de un proveedor específico, nada de servicios cloud propietarios.
+- **v1 (actual): lista para piloto.** Estudios por bloques, apps de una sola página, reporte
+  con puntaje y resumen, privacidad sin huecos, guardia del panel, Docker, demo en Pages.
+  El plan y el contrato entre paquetes: `docs/plan-v1.md`.
+- **Después:** `packages/mcp` (la API como herramientas para una IA), cuentas y equipos,
+  servidor hospedado público.
+- **Fuera de alcance por ahora** (plan, sección 6): HTTPS propio, reclutamiento, card sorting,
+  tree testing, test de 5 segundos, clips de video, comparar versiones, Postgres.
 
 ## Stack y decisiones técnicas
 
 | Decisión | Elección | Por qué |
 |---|---|---|
-| Lenguaje | TypeScript en todo el monorepo | Tipos compartidos entre recorder y server |
+| Lenguaje | TypeScript en todo el monorepo | Tipos compartidos entre recorder, panel y server |
 | Monorepo | pnpm workspaces | Un solo repo, varios paquetes, sin herramientas extra |
-| Runtime | Node 22+ | Trae SQLite nativo (`node:sqlite`) |
-| Base de datos | `node:sqlite` (DatabaseSync) | Sin dependencias que requieran compilar (nada de better-sqlite3) |
-| Servidor HTTP | Hono + `@hono/node-server` | Liviano, portable, mismo código sirve para Node y Docker después |
+| Runtime | Node 22.5+ | Trae SQLite nativo (`node:sqlite`) |
+| Base de datos | `node:sqlite` (DatabaseSync) | Sin dependencias que requieran compilar |
+| Servidor HTTP | Hono + `@hono/node-server` | Liviano, portable, mismo código en Node y Docker |
 | Grabación | rrweb 2.x | Graba el DOM y lo reproduce fielmente, sin video |
 | Reproducción | rrweb-player 2.x | Reproductor listo con línea de tiempo |
-| Panel | React + Vite + Tailwind v4 + shadcn en `packages/web` | Sin construir un sistema de diseño; se compila a estáticos que Hono sirve |
-| QR en terminal | qrcode-terminal | Sin dependencias nativas |
-| Red | Escucha en `0.0.0.0`, puerto 4321 por defecto | Accesible desde el celular en la misma Wi-Fi |
-| Privacidad | `maskAllInputs: true` en rrweb | Todo texto escrito por el participante se enmascara |
+| Panel | React + Vite + Tailwind v4 + shadcn en `packages/web` | Se compila a estáticos que Hono sirve |
+| Zip | `fflate` | JavaScript puro |
+| Red | Escucha en `0.0.0.0`, puerto 4321 (o el siguiente libre) | Accesible desde el celular en la misma Wi-Fi |
+| Pruebas con navegador | Playwright (devDependency de la raíz) | Solo para e2e, semillas y capturas; nunca en producción |
 
 Reglas duras:
 
 - **Nunca** agregar una dependencia nativa a lo que ejecuta el servidor (nada de node-gyp ni
   prebuilds en `server`, `recorder` o `shared`). Herramientas de build con binarios
-  precompilados (esbuild, Tailwind v4) están bien: solo corren al construir, nunca en producción.
+  precompilados (esbuild, Tailwind v4) y Playwright están bien: no corren en producción.
 - **Nunca** acoplar a un proveedor cloud. Todo tiene que correr con `node` y una carpeta.
-- Las entradas de texto siempre van enmascaradas. No hay opción para desactivarlo en v0.1.
+- **El servidor nunca llama a un modelo de IA.** La IA la pone el usuario; Taptana da un
+  formato importable y un prompt para copiar.
+- **Privacidad** (no hay opciones para desactivarla):
+  - En un estudio nada sale del celular antes del consentimiento; si rechaza o termina, esa
+    pestaña no graba más.
+  - Lo escrito en el prototipo se enmascara en el celular: campos, `contenteditable`, texto que
+    el prototipo repite, y valores de la URL (`maskUrl`). `target.text` de un campo es su etiqueta.
+  - El panel y la API pasan por la guardia (`panel-guard.ts`); solo son públicos
+    `POST /events`, `GET /studies/:id` y `GET /info` reducido.
+- Textos de interfaz en español, de tú. Identificadores de código en inglés.
 
-## Decisiones de arquitectura pensando en el servidor hospedado
+## Decisiones de arquitectura
 
-Son baratas en v0.1 y caras después. Se aplican desde el primer commit de código:
-
-1. **Un solo binario, dos modos.** `taptana dev <carpeta>` (local) y, más adelante,
-   `taptana serve` (compartido). Mismo código, misma base, misma página de sesiones.
-   Solo cambia de dónde salen los prototipos: carpeta local hoy, zip subido mañana.
-2. **El recorder funciona solo.** Se puede pegar como `<script>` en cualquier HTML alojado
-   en cualquier lado. Lee el endpoint y el prototipo de atributos `data-*` del script.
-   Nunca asume que el servidor es el mismo origen. El server responde CORS en `/api/`.
-3. **Los datos pertenecen a un prototipo.** Tabla `prototypes`; cada sesión apunta a una.
-   En v0.1 hay un solo prototipo (la carpeta servida), creado automáticamente.
-4. **Base de datos detrás de una interfaz.** `Store` con pocas funciones. Implementación
-   SQLite hoy; Postgres mañana sin tocar rutas.
-5. **Configuración por variables de entorno y flags.** `TAPTANA_PORT`, `TAPTANA_DATA_DIR`,
-   `TAPTANA_HOST`. Los flags del CLI las sobreescriben. Sin archivos de configuración.
+1. **Un solo binario.** `taptana start [carpeta]` (abre el navegador), `taptana dev [carpeta]`
+   (no lo abre), `taptana seed [archivos]`. Sin carpeta, sirve el panel y los prototipos subidos.
+2. **El recorder funciona solo.** Se pega como `<script>` en cualquier HTML. Lee
+   `data-endpoint`, `data-prototype`, `data-transport`, `data-base`, `data-export`. Nunca asume
+   que el servidor es el mismo origen.
+3. **Los datos pertenecen a un prototipo.** Tabla `prototypes`; cada sesión y estudio apunta a uno.
+4. **Base de datos detrás de una interfaz** (`Store`). SQLite hoy.
+5. **Configuración por variables de entorno y flags**: `TAPTANA_PORT`, `TAPTANA_HOST`,
+   `TAPTANA_DATA_DIR`, `TAPTANA_PANEL=open`, `TAPTANA_PUBLIC_URL`. Flags: `--port`, `--host`,
+   `--data-dir`, `--no-open`, `--no-qr`, `--open-panel`, `--record-self`. Sin archivos de configuración.
 6. **API con versión.** Todo bajo `/api/v1/`.
-
-Lo que NO se hace antes de v0.4: usuarios y login, multi-tenant real, planes de pago, Postgres.
+7. **`packages/shared` es el contrato.** Formato del estudio, eventos, pantallas, resultados y
+   reporte viven ahí como funciones puras con pruebas. Servidor y demo calculan con lo mismo.
 
 ## Estructura del monorepo
 
 ```
 taptana/
 ├── packages/
-│   ├── shared/      Tipos y formato de eventos (sin dependencias)
-│   ├── recorder/    Script que se inyecta en el prototipo (corre en el celular)
+│   ├── shared/      Contrato: study.ts, validate.ts, events.ts, screen.ts, results.ts,
+│   │                report.ts, insights.ts, preview.ts, api.ts (sin dependencias)
+│   ├── recorder/    Script que corre en el celular: rrweb, gestos, pantallas (screens.ts),
+│   │                flujo del participante (study.ts, study-ui.ts), privacidad, cola de envío
 │   ├── web/         Panel: React + Vite + shadcn. Modo http (servidor) y modo demo (Pages)
-│   └── server/      CLI `taptana`, servidor Hono, SQLite, sirve el panel compilado
-├── examples/
-│   └── tienda/      Prototipo HTML de ejemplo con varias páginas (+ study.json de muestra)
-├── skills/
-│   └── taptana-study/   Skill para que una IA escriba un study.json leyendo el prototipo
-├── .github/workflows/pages.yml   Publica panel + ejemplo en GitHub Pages en cada push a main
-├── .devcontainer/   Codespaces con Node 22 y pnpm, para correr el servidor real sin instalar
-└── docs/            Propuestas y decisiones de diseño
-    ├── propuesta-v0.1.md       Carpetas, formato de eventos, esquema SQLite
-    ├── servidor-hospedado.md   Cómo será la versión para probar en vivo sin instalar
-    └── estudios-con-ia.md      Formato Study, skill y MCP para crear estudios con IA
+│   └── server/      CLI `taptana`, Hono, SQLite, guardia del panel, subidas, ejemplo
+│       └── seed/    Sesiones de ejemplo (*.json), grabadas con scripts/record-seed.mjs
+├── examples/tienda/ Prototipo de ejemplo + study.json (v2) + study-v1.json (formato viejo)
+├── skills/taptana-study/   Skill para que una IA escriba un study.json
+├── scripts/
+│   ├── start.mjs         `pnpm start`: revisa Node, instala/compila si hace falta, arranca
+│   ├── build-site.mjs    Demo estática para Pages en ./site (TAPTANA_BASE)
+│   ├── serve-site.mjs    Sirve ./site como Pages, para revisarla en local
+│   ├── record-seed.mjs   Regenera packages/server/seed con participantes de Playwright
+│   ├── screenshots.mjs   Regenera docs/img
+│   └── lib/              Arranque del servidor y carga de Playwright para los scripts
+├── tests/e2e/       Pruebas de punta a punta (`node --test` + Playwright), `pnpm e2e`
+├── Dockerfile, docker-compose.yml   Servidor en contenedor, datos en /data
+├── .github/workflows/   ci.yml (build + pruebas), pages.yml (publica la demo desde main)
+├── .devcontainer/   Codespaces con Node 22 y pnpm
+└── docs/
+    ├── plan-v1.md              Plan y contrato de v1 (la referencia)
+    ├── guia.md                 Guía para diseñadores: prueba moderada y no moderada, métricas
+    ├── prototipos.md           Qué HTML funciona, apps de una página, data-screen
+    ├── estudios-con-ia.md      Formato de bloques, prompt, skill
+    ├── servidor-hospedado.md   A dónde vamos con el hospedado
+    ├── img/                    Capturas (generadas)
+    └── propuesta-v0.1.md, constructor-de-estudios.md   Históricos
 ```
 
-El servidor nunca llama a un modelo de IA. La IA la pone el usuario con su herramienta; Taptana
-solo expone un formato de estudio importable y, después, un MCP sobre su propia API.
-
 Dependencias entre paquetes: `shared` no depende de nadie. `recorder`, `web` y `server`
-dependen de `shared`. `server` empaqueta el bundle de `recorder` para inyectarlo y los
-estáticos de `web` para servir el panel.
+dependen de `shared`. El build de `server` copia a su carpeta el bundle de `recorder`
+(`public/recorder.js`), el panel compilado (`public/panel`) y el ejemplo (`example/tienda`),
+con `packages/server/scripts/copy-assets.mjs`. Por eso el orden de build importa (`pnpm build`
+lo respeta) y, tras cambiar `web` o `recorder`, hay que volver a compilar `server`.
 
-## Probar sin servidor
+## Formato del estudio (v2, bloques)
 
-- El recorder tiene dos transportes: `http` (lotes a la API) y `local` (IndexedDB + botón
-  "exportar sesión" que descarga un `.json`). Se elige con `data-transport` en el `<script>`.
-- El panel tiene dos fuentes de datos: `http.ts` (API real) y `static.ts` (JSON incluidos en
-  el sitio, modo demo). El panel también importa un `.json` exportado por el recorder.
-- GitHub Pages publica el panel en modo demo y el prototipo de ejemplo con recorder local.
-- Codespaces corre el servidor real con URL pública. Es la forma de probar `taptana dev`
-  desde un celular sin instalar nada.
+`Study { v: 2, name, prototypeId, welcome?, consent?, thanks?, blocks, variants?, settings?, closed? }`.
+Bloques: `context`, `task`, `first-click`, `scale`, `choice`, `yesno`, `text`. Reglas de éxito:
+`reached` (pantalla), `tapped` (selector), `visible` (selector o texto), `manual`.
 
-Detalle completo de carpetas y del formato de eventos en `docs/propuesta-v0.1.md`.
+- `validateStudy` acepta v1 (`tasks`) y v2 y devuelve siempre v2, con errores y avisos en
+  español. `normalizeStudy` hace lo mismo con lo ya guardado. **Fuera de `shared` nadie lee
+  `study.tasks`**: usar `study.blocks`, `taskBlocks(study)`, `questionBlocks(study)`.
+- Los ids de bloque no se reutilizan (`newBlockId`).
+- Una pantalla es un `ScreenId` (`screen.ts`): `/producto.html`, `/index.html#/carrito` o
+  `/index.html~checkout` (virtual). Comparar siempre con `sameScreen`.
 
-## Formato de eventos (resumen)
+## Eventos (resumen)
 
-Todo lo que graba el recorder viaja en lotes (`EventBatch`) a `POST /api/v1/events`.
-Cada lote lleva `prototypeId`, `sessionId`, `pageId`, y una lista de `events`. Hay dos familias:
+El recorder manda lotes (`EventBatch`) a `POST /api/v1/events` con `prototypeId`, `sessionId`,
+`pageId`, `seq` y `events`. Un lote repetido (misma sesión, página y `seq`) se ignora.
 
-- `rrweb`: eventos crudos de rrweb (snapshot del DOM, mutaciones, scroll, etc.). Son los que
-  alimentan al reproductor.
-- `taptana`: eventos propios de interés para usabilidad: `tap`, `swipe`, `scroll`, `viewport`,
-  `navigation`. Son resúmenes legibles para después listar, buscar y analizar.
+- `rrweb`: eventos crudos para el reproductor y para el fondo de los mapas de calor.
+- `taptana`: `tap`, `swipe`, `scroll`, `viewport`, `navigation` (con `via` y `title`), `study`
+  (start, finish), `task` (start, goal, done, skip) y `answer`.
 
-La sesión se mantiene al navegar entre páginas con `sessionStorage` (vive mientras la
-pestaña esté abierta). Cada carga de página es un `pageId` nuevo dentro de la misma sesión.
+La sesión vive en `sessionStorage` (una pestaña). Cada carga de página es un `pageId` nuevo.
+`pageCount` cuenta cargas; `screenCount`, pantallas distintas.
+
+## Servidor
+
+- **Rutas de página**: `/panel` (el panel; `/sessions` redirige), `/p/<id>/` (prototipos
+  subidos, con respaldo de app de una página y redirección por `Referer` para rutas
+  absolutas), `/` (la carpeta servida, el prototipo marcado "Abrir en la raíz" o una página
+  amable), `/__taptana/recorder.js`.
+- **API** (`routes/api.ts`): `/info`, `/events`, `/sessions` (lista, detalle, eventos,
+  export, import con 409 salvo `?replace=1`, PATCH con `manual`/`label`/`notes`/`excluded`),
+  `/studies` (CRUD, `/report?variant=&device=`, `/export.csv`, `/duplicate`), `/prototypes`
+  (subir, nueva versión, PATCH `name`/`root`, `/screens`), `/example`, `/qr.svg`.
+- **Guardia del panel**: pasa la conexión local, la que trae la llave (`?key=` → cookie) o
+  todo si el modo es abierto. Bloquea peticiones entre sitios. La llave está en
+  `<dataDir>/panel.key` y la terminal imprime el link. En Docker no hay conexión "local": el
+  panel se abre siempre con el link con llave de los registros.
+- **Datos**: `<dataDir>/taptana.db` y `<dataDir>/prototypes/<id>/`. Con `pnpm start`, `./.taptana`.
+- **Ejemplo**: `POST /example` y `taptana seed` crean el prototipo `pr_ejemplo`, el estudio
+  `st_demo_compra` y las sesiones de `seed/`. Es idempotente.
+
+## Recorder: modos
+
+- **record**: lo normal. Con `?study=<id>` corre el estudio (bienvenida, consentimiento, bloques).
+- **preview** (`window.name = 'taptana-preview'` o `?taptana-preview`): no hace nada.
+- **demo** (`taptana-demo`): no graba; avisa pantallas y toques al panel por `postMessage`
+  (así el constructor graba el camino correcto y elige elementos).
+- **tryout** (`taptana-tryout` o `?tryout=1`): corre el estudio completo sin grabar ni enviar.
+- Transportes: `http` (lotes a la API) y `local` (IndexedDB en el navegador; la demo).
+
+## Panel
+
+- Rutas (bajo `/panel` en local, la base del sitio en la demo): Inicio, `prototypes`,
+  `studies`, `studies/new`, `studies/:id` (constructor a tres columnas), `studies/:id/report`,
+  `recordings`, `recordings/:id?t=<ms>`.
+- **Nunca accede a datos directamente**: siempre por `api/client.ts`, con `http.ts` (API real)
+  y `static.ts` (demo). Cada método existe en los dos.
+- Componentes de shadcn copiados a `src/components/ui/`, no instalados. Sin `window.confirm`.
+- Las etiquetas de resultados y tipos de bloque salen de `shared` (`OUTCOME_LABELS`,
+  `BLOCK_KIND_LABELS`) para que todo el panel diga lo mismo.
+
+## Demo en GitHub Pages
+
+`scripts/build-site.mjs` arma `./site`: el panel en modo demo, `demo/*.json` (sesiones,
+`events.json` con los eventos propios, `studies.json`, `pages.json`), el prototipo de ejemplo
+en `prototipo/` con el recorder en modo local y `404.html` para enlaces profundos (Pages
+responde 404 en la consola aunque la página se vea bien: limitación documentada). Los
+prototipos que el visitante sube viven en IndexedDB y los sirve `public/sw.js`. Todo queda en
+ese navegador.
 
 ## Convenciones de código
 
 - ESM en todos los paquetes (`"type": "module"`).
-- `pnpm -r build` compila todo. `pnpm -r test` corre pruebas con `node --test` (sin frameworks).
+- Pruebas con `node --test`, junto al código como `*.test.ts`. Lógica pura siempre con prueba.
 - El recorder se compila con esbuild a un solo archivo IIFE: `recorder.js`.
-- El panel es React con shadcn. Los componentes de shadcn se copian a `packages/web/src/components/ui/`,
-  no se instalan como dependencia.
-- El panel nunca accede a datos directamente: siempre a través de `api/client.ts`, para que el
-  modo demo y el modo real sean intercambiables.
+- Comentarios en español, solo donde agregan información.
 - Mensajes de commit en inglés, imperativo, cortos. Documentación para el dueño en español.
-- Nombres de código (variables, tipos, rutas) en inglés.
 
 ## Git
 
 - Se trabaja directamente en `main`. Sin ramas de feature mientras seamos un equipo chico.
-  Las ramas y los pull requests llegan cuando haya contribuidores externos.
 - Commits pequeños y frecuentes, uno por paso explicable.
 
 ## Comandos
 
 ```
-pnpm install
-pnpm -r build
-pnpm --filter @taptana/server dev ./examples/tienda   # arranca el servidor en desarrollo
-pnpm --filter @taptana/web dev                        # panel con recarga instantánea
-pnpm seed                                             # sesiones de ejemplo en la base local
-pnpm site                                             # sitio estático para GitHub Pages en ./site
-pnpm -r test
+pnpm start                      # instala/compila si hace falta, arranca y abre el panel
+pnpm start ./examples/tienda    # lo mismo, sirviendo una carpeta
+pnpm build                      # compila todo, en orden
+pnpm test                       # pruebas unitarias de todos los paquetes
+pnpm e2e                        # pruebas de punta a punta (necesita Chromium de Playwright)
+pnpm dev                        # servidor con la tienda de ejemplo, sin abrir el navegador
+pnpm --filter @taptana/web dev  # panel con recarga instantánea (contra un servidor en 4321)
+pnpm seed                       # carga el ejemplo en la base local
+pnpm seed:record                # vuelve a grabar packages/server/seed (Playwright)
+pnpm screenshots                # vuelve a tomar docs/img (Playwright)
+pnpm site                       # demo estática en ./site (TAPTANA_BASE=/taptana/)
+docker compose up -d            # servidor en contenedor; el link del panel sale en los logs
 ```
 
-Las sesiones de ejemplo viven en `packages/server/seed/*.json`. Son grabaciones reales del
-prototipo de ejemplo hechas con Playwright; se usan para `pnpm seed` y para la demo en Pages.
+Los scripts con navegador usan el Playwright del proyecto; `TAPTANA_CHROMIUM` apunta a un
+Chromium ya instalado. Después de `pnpm seed:record`, correr `pnpm build` y revisar el reporte
+del ejemplo.
 
-## Prototipos subidos (implementado)
+## Limitaciones conocidas
 
-- `taptana dev` sin carpeta abre el panel; `pnpm start` hace eso con datos en `./.taptana`.
-- Panel → Prototipos: subir `.html` o `.zip` (hasta 50 MB), nueva versión, borrar, link y QR.
-- Se guardan en `<dataDir>/prototypes/<id>/` (`uploads.ts`, con `fflate`, JS puro) y se sirven
-  en `/p/<id>/` con el recorder inyectado con `data-base="/p/<id>"`. El recorder quita ese
-  prefijo de las rutas registradas, así las reglas de las tareas usan `/gracias.html` igual
-  que en una carpeta local.
-- Todo local: no hay subida a ningún servicio externo.
-- En la demo de Pages también se puede subir: `api/static.ts` descomprime en el navegador
-  (`lib/unzip.ts`), guarda los archivos en IndexedDB y `public/sw.js` (service worker) los
-  sirve en `<base>local/<id>/` con el recorder en modo local, y responde el estudio en
-  `<base>__local/api/v1/studies/<id>`. El panel lee las sesiones de la base del recorder en el
-  mismo navegador y calcula resultados con `computeTaskResults` (ahora en `shared`). Límite:
-  solo funciona en ese navegador.
-- Seguridad: lo subido se sirve en el mismo origen que el panel. Está bien en local (son tus
-  archivos); para el hospedado hace falta un dominio aparte (ver `docs/servidor-hospedado.md`).
-
-## Estudios (v0.3, implementado)
-
-- Formato `Study` en `shared` (`study.ts`), validado con `validateStudy`. Tareas con `kind`
-  (`task`, `first-click`) y `success` (`reached`, `tapped`, `manual`). Variantes A/B opcionales.
-- Server: tabla `studies`, columnas `study_id`, `variant_id`, `manual_results` en `sessions`.
-  Resultados por tarea en `results.ts` (función pura, probada). Rutas `/api/v1/studies`,
-  `/api/v1/prototypes/:id/pages`, `/api/v1/qr.svg`, `PATCH /api/v1/sessions/:id`.
-- Recorder: `study.ts`. `?study=<id>` → bienvenida + consentimiento (lotes retenidos hasta
-  aceptar), barra de tarea, first click con cinta inferior que no intercepta toques, eventos
-  `study` y `task`. Tras un toque que cierra una tarea, la siguiente se dibuja 350 ms después
-  para que el clic llegue al prototipo y no a nuestra barra.
-- Panel: `pages/Studies.tsx`, `pages/StudyEditor.tsx` (constructor, link con QR, "Copiar prompt
-  para IA"), resultados en `Sessions.tsx` y `Player.tsx` con marcas manuales.
-- `skills/taptana-study/SKILL.md`: skill para que una IA escriba el `study.json`.
-- Detalles y decisiones en `docs/constructor-de-estudios.md`.
-
-## Reporte del estudio (v0.4, implementado)
-
-- `shared/report.ts` → `computeStudyReport(study, sessions)`, función pura con pruebas. Por
-  tarea: éxito directo (siguió el camino esperado) e indirecto, "dijo que terminó", no pudo, sin
-  terminar; tiempo mediano; misclicks (toques con `target.interactive === false`); embudo del
-  camino esperado; caminos más comunes; toques por pantalla con `pageX/pageY`; comparación A/B.
-- Camino esperado: `Task.expectedPath` opcional (editor en Diseño). Si falta, el camino más
-  corto de quienes lo lograron. En first click, un toque equivocado cuenta como "no pudo".
-- Recorder: marca `interactive` (enlace, botón, campo o cursor de mano) y guarda `pageX/pageY`.
-  Con `?taptana-preview` o `window.name === 'taptana-preview'` no graba (vista previa).
-- Panel: `/studies/:id/report` (`pages/Report.tsx`) con indicadores, embudo, mapas de calor
-  (`components/heatmap.tsx`: la pantalla real en un iframe sin grabar + canvas encima), caminos y
-  participantes. Menú lateral, `PageHeader`, `RouteTabs` (Diseño | Resultados), `EmptyState`.
-- Limitación conocida: el mapa de calor dibuja la pantalla en su estado inicial; si la pantalla
-  cambia mucho según lo que hizo el participante (carrito lleno vs. vacío), los puntos pueden no
-  caer sobre lo que vio. A futuro: usar la foto de rrweb de esa sesión como fondo.
-- Demo: `packages/server/seed/04-09-estudio-*.json` son seis participantes del estudio de ejemplo.
-
-## Estado de v0.1
-
-Implementado y probado end-to-end (Playwright emulando iPhone y Android): grabación con la
-misma sesión entre páginas, enmascarado de inputs, lotes por HTTP y sendBeacon, modo local con
-exportar e importar, panel con reproductor y marcas en la línea de tiempo, `pnpm seed`,
-`--record-self`, sitio estático para Pages, devcontainer para Codespaces.
+- Prototipos subidos comparten origen con el panel: aceptado en local; el hospedado necesita
+  un dominio aparte (`docs/servidor-hospedado.md`).
+- El mapa de calor usa como fondo lo que vio un participante; en pantallas que cambian mucho
+  según el estado, los toques de otros pueden no caer sobre lo mismo.
+- Sin HTTPS propio, sin cuentas. Una sola red Wi-Fi salvo que se despliegue en un servidor.

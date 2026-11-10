@@ -113,7 +113,7 @@ export class StudyStore {
 }
 
 /** ¿Esta página se cargó recargando o con atrás/adelante (y no abriendo un link)? */
-function isReturn(): boolean {
+export function isReturn(): boolean {
   try {
     const entry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
     return entry?.type === 'reload' || entry?.type === 'back_forward';

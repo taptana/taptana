@@ -26,3 +26,8 @@ export function formatRelative(ts: number): string {
   const d = Math.round(h / 24);
   return d === 1 ? 'ayer' : `hace ${d} días`;
 }
+
+/** "14 mar, 10:32": fecha corta para tarjetas y listas. */
+export function formatShortDate(ts: number): string {
+  return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(ts));
+}

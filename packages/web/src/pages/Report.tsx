@@ -1,390 +1,465 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BarChart3, Clock, MousePointerClick, Pencil, Users, CheckCircle2, Route as RouteIcon, Flame, Smartphone } from 'lucide-react';
-import type { Prototype, StudyRecord, StudyReport, TaskReport, TaskOutcomeCounts } from '@taptana/shared';
-import { getClient } from '@/api/client';
-import { Button } from '@/components/ui/button';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, ClipboardCheck, Copy, Download, Pencil, Printer, Users } from 'lucide-react';
+import {
+  BLOCK_KIND_LABELS,
+  blockTitle,
+  studyBlocks,
+  taskBlocks,
+  type Prototype,
+  type ReportFilter,
+  type ServerInfo,
+  type SessionSummary,
+  type StudyRecord,
+  type StudyReport,
+} from '@taptana/shared';
+import { getClient, IS_DEMO } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyState, Layout, PageHeader, RouteTabs } from '@/components/layout';
-import { Heatmap } from '@/components/heatmap';
+import { Button } from '@/components/ui/button';
+import { Label, NativeSelect } from '@/components/ui/input';
+import { toast } from '@/components/ui/toast';
+import { EmptyState, ErrorState, Layout, PageHeader, PageSkeleton } from '@/components/layout';
+import { BlockIndex, blockAnchor, type IndexEntry } from '@/components/report/block-index';
+import { ReportContext, type ReportContextValue } from '@/components/report/context';
+import { InsightsCard, Overview, ScoreChip, VariantsCard } from '@/components/report/overview';
+import { QuestionBody } from '@/components/report/question-section';
+import { ReviewDialog } from '@/components/report/review-dialog';
+import { clearSnapshotCache, whenSnapshotsReady } from '@/components/report/snapshot-view';
+import { StudyTabs } from '@/components/report/study-tabs';
+import { TaskBody } from '@/components/report/task-section';
+import { copyText, downloadText } from '@/lib/download';
+import { friendlyError } from '@/lib/errors';
+import { plural } from '@/lib/format';
+import { participantUrl } from '@/lib/links';
+import { fileSlug, sessionName } from '@/lib/sessions';
 import { cn } from '@/lib/utils';
-import { pct, screenName, seconds } from '@/lib/format';
-import { Link, useRouter } from '@/router';
+import { Link } from '@/router';
+import '@/report.css';
 
-const OUTCOMES: Array<{ key: keyof TaskOutcomeCounts; label: string; color: string; help: string }> = [
-  { key: 'direct', label: 'Éxito directo', color: 'bg-emerald-500', help: 'Lo logró siguiendo el camino esperado' },
-  { key: 'indirect', label: 'Éxito indirecto', color: 'bg-emerald-300', help: 'Lo logró, pero dando vueltas' },
-  { key: 'reported', label: 'Dijo que terminó', color: 'bg-amber-400', help: 'Tocó "Listo" sin cumplir la tarea' },
-  { key: 'failed', label: 'No pudo', color: 'bg-red-500', help: 'Tocó "No pude"' },
-  { key: 'incomplete', label: 'Sin terminar', color: 'bg-zinc-300', help: 'Abandonó a mitad' },
-];
+export { StudyTabs };
 
-export function previewUrl(proto: Prototype | undefined, path: string): string | null {
-  if (!proto?.url) return null;
-  const base = proto.url.endsWith('/') ? proto.url : `${proto.url}/`;
-  return `${base}${path.replace(/^\//, '')}?taptana-preview`;
+interface Base {
+  study: StudyRecord;
+  proto: Prototype | undefined;
+  info: ServerInfo | null;
+  sessions: SessionSummary[];
 }
 
-export function StudyTabs({ id, active }: { id: string; active: 'design' | 'report' }) {
-  return (
-    <RouteTabs
-      tabs={[
-        { label: 'Diseño', to: { name: 'study', id }, active: active === 'design', icon: <Pencil className="size-3.5" /> },
-        { label: 'Resultados', to: { name: 'report', id }, active: active === 'report', icon: <BarChart3 className="size-3.5" /> },
-      ]}
-    />
-  );
+/** true mientras se imprime (o se emula la impresión): el reporte dibuja todo. */
+function usePrinting(): [boolean, (value: boolean) => void] {
+  const [printing, setPrinting] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia('print');
+    const onMedia = (): void => setPrinting(media.matches);
+    const on = (): void => setPrinting(true);
+    const off = (): void => setPrinting(false);
+    if (media.matches) setPrinting(true);
+    media.addEventListener('change', onMedia);
+    window.addEventListener('beforeprint', on);
+    window.addEventListener('afterprint', off);
+    return () => {
+      media.removeEventListener('change', onMedia);
+      window.removeEventListener('beforeprint', on);
+      window.removeEventListener('afterprint', off);
+    };
+  }, []);
+  return [printing, setPrinting];
 }
 
 export function ReportPage({ id }: { id: string }) {
-  const [study, setStudy] = useState<StudyRecord | null | undefined>(undefined);
+  const [base, setBase] = useState<Base | null | undefined>(undefined);
   const [report, setReport] = useState<StudyReport | null>(null);
-  const [proto, setProto] = useState<Prototype | undefined>(undefined);
+  const [filter, setFilter] = useState<ReportFilter>({});
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [focus, setFocus] = useState<{ blockId: string; screen?: string; n: number } | null>(null);
+  const [printing, setPrinting] = usePrinting();
+  const [preparingPrint, setPreparingPrint] = useState(false);
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+  const request = useRef(0);
 
-  useEffect(() => {
-    void (async () => {
+  /** Pide estudio, sesiones y reporte. Si llega una respuesta vieja (cambió el filtro), se descarta. */
+  const load = useCallback(
+    async (next: ReportFilter, opts: { first?: boolean } = {}): Promise<void> => {
+      const mine = ++request.current;
+      if (opts.first) {
+        setBase(undefined);
+        setError(null);
+      } else setRefreshing(true);
       try {
         const client = await getClient();
-        const s = await client.getStudy(id);
-        setStudy(s);
-        if (!s) return;
-        const [r, protos] = await Promise.all([client.getStudyReport(id), client.listPrototypes()]);
-        setReport(r);
-        setProto(protos.find((p) => p.id === s.prototypeId));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      }
-    })();
-  }, [id]);
-
-  if (error) return <Layout><p className="text-destructive">{error}</p></Layout>;
-  if (study === undefined || (study && !report)) return <Layout><p className="text-muted-foreground">Cargando resultados…</p></Layout>;
-  if (study === null || !report) return <Layout><p>No existe este estudio.</p></Layout>;
-
-  return (
-    <Layout wide>
-      <PageHeader
-        back={
-          <Button variant="ghost" size="icon" asChild className="mt-1">
-            <Link to={{ name: 'studies' }}>
-              <ArrowLeft />
-            </Link>
-          </Button>
+        const study = await client.getStudy(id);
+        if (mine !== request.current) return;
+        if (!study) {
+          setBase(null);
+          return;
         }
-        title={study.name}
-        description={study.description ?? `${study.tasks.length} tareas · prototipo ${proto?.name ?? study.prototypeId}`}
-        actions={<StudyTabs id={id} active="report" />}
-      />
+        const [r, protos, sessions, info] = await Promise.all([
+          client.getStudyReport(id, next),
+          client.listPrototypes(),
+          client.listSessions(id),
+          client.info().catch(() => null),
+        ]);
+        if (mine !== request.current) return;
+        setBase({ study, proto: protos.find((p) => p.id === study.prototypeId), info, sessions });
+        setReport(r);
+        setError(null);
+      } catch (e) {
+        if (mine !== request.current) return;
+        const message = friendlyError(e, 'No pudimos cargar los resultados. Revisa que el servidor de Taptana siga abierto y vuelve a intentarlo.');
+        if (opts.first) setError(message);
+        else toast.error(message);
+      } finally {
+        if (mine === request.current) setRefreshing(false);
+      }
+    },
+    [id],
+  );
 
-      {report.participants === 0 ? (
-        <EmptyState icon={<Users className="size-5" />} title="Todavía nadie hizo este estudio">
-          Comparte el link del estudio (en Diseño) y los resultados aparecen aquí solos, por tarea y por pantalla.
+  useEffect(() => {
+    void load({}, { first: true });
+    return () => {
+      request.current++;
+      clearSnapshotCache();
+    };
+  }, [load]);
+
+  const changeFilter = (next: ReportFilter): void => {
+    setFilter(next);
+    void load(next);
+  };
+
+  const reload = useCallback(() => load(filterRef.current), [load]);
+
+  const context = useMemo((): ReportContextValue | null => {
+    if (!base) return null;
+    const ordered = [...base.sessions].sort((a, b) => a.startedAt - b.startedAt);
+    const names = new Map<string, string>();
+    ordered.forEach((s, i) => names.set(s.id, sessionName(s) ?? `Participante ${i + 1}`));
+    return { study: base.study, proto: base.proto, sessions: new Map(base.sessions.map((s) => [s.id, s])), names, printing, reload };
+  }, [base, printing, reload]);
+
+  const entries = useMemo((): IndexEntry[] => {
+    if (!base || !report) return [];
+    const blocks = new Map(studyBlocks(base.study).map((b) => [b.id, b]));
+    const out: IndexEntry[] = [];
+    for (const item of report.order) {
+      if (item.kind === 'context') continue;
+      const block = blocks.get(item.blockId);
+      const task = report.tasks.find((t) => t.taskId === item.blockId);
+      const question = report.questions.find((q) => q.blockId === item.blockId);
+      if (!task && !question) continue;
+      const entry: IndexEntry = {
+        id: item.blockId,
+        number: out.length + 1,
+        title: task?.title || question?.question || (block ? blockTitle(block) : '') || 'Sin título',
+        kindLabel: BLOCK_KIND_LABELS[item.kind],
+      };
+      if (task) entry.score = task.score;
+      if (question) entry.hint = question.kind === 'scale' && typeof question.average === 'number' ? `${question.average.toFixed(1).replace('.', ',')} de ${question.max ?? ''}`.trim() : plural(question.responses, 'respuesta', 'respuestas');
+      out.push(entry);
+    }
+    return out;
+  }, [base, report]);
+
+  const jump = useCallback((blockId: string, screen?: string): void => {
+    setFocus((f) => ({ blockId, ...(screen ? { screen } : {}), n: (f?.n ?? 0) + 1 }));
+    document.getElementById(blockAnchor(blockId))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  if (error) {
+    return (
+      <Layout wide>
+        <ErrorState message={error} onRetry={() => void load(filter, { first: true })} home />
+      </Layout>
+    );
+  }
+  if (base === undefined || (base && !report)) {
+    return (
+      <Layout wide>
+        <PageSkeleton variant="cards" />
+      </Layout>
+    );
+  }
+  if (base === null || !report || !context) {
+    return (
+      <Layout>
+        <EmptyState
+          icon={<Users className="size-5" />}
+          title="Este estudio no existe"
+          action={
+            <Button asChild>
+              <Link to={{ name: 'studies' }}>Ver mis estudios</Link>
+            </Button>
+          }
+        >
+          Puede que lo hayan borrado o que el link esté incompleto.
         </EmptyState>
-      ) : (
-        <>
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-            <Kpi icon={<Users />} label="Participantes" value={String(report.participants)} sub={`${report.completed} terminaron todo`} />
-            <Kpi icon={<CheckCircle2 />} label="Éxito promedio" value={pct(report.successRate)} sub="de todas las tareas" tone={report.successRate >= 0.7 ? 'good' : report.successRate >= 0.4 ? 'mid' : 'bad'} />
-            <Kpi icon={<Clock />} label="Duración mediana" value={seconds(report.medianDurationMs)} sub="por participante" />
-            <Kpi icon={<MousePointerClick />} label="Misclicks" value={pct(report.avgMisclickRate)} sub="de los toques no tocaron nada" tone={report.avgMisclickRate <= 0.15 ? 'good' : report.avgMisclickRate <= 0.3 ? 'mid' : 'bad'} />
-          </div>
+      </Layout>
+    );
+  }
 
-          {report.variants.length > 0 && <VariantsCard report={report} />}
+  const { study, proto } = base;
+  const filtered = Boolean(filter.variantId || filter.device);
+  const tasks = taskBlocks(study);
+  const variantName = filter.variantId ? (study.variants?.find((v) => v.id === filter.variantId)?.name ?? filter.variantId) : null;
 
-          <div className="space-y-10">
-            {report.tasks.map((t, i) => (
-              <TaskSection key={t.taskId} index={i} task={t} proto={proto} />
-            ))}
-          </div>
-        </>
-      )}
-    </Layout>
-  );
-}
+  const exportCsv = async (): Promise<void> => {
+    try {
+      const client = await getClient();
+      const csv = await client.exportStudyCsv(id);
+      if (csv === null) throw new Error('El estudio ya no existe.');
+      downloadText(`${fileSlug(study.name) || 'estudio'}-resultados.csv`, csv, 'text/csv;charset=utf-8');
+      toast.success('CSV descargado: una fila por participante.');
+    } catch (e) {
+      toast.error(friendlyError(e, 'No se pudo exportar el CSV. Inténtalo de nuevo.'));
+    }
+  };
 
-function Kpi({ icon, label, value, sub, tone }: { icon: React.ReactNode; label: string; value: string; sub: string; tone?: 'good' | 'mid' | 'bad' }) {
+  const print = async (): Promise<void> => {
+    // Primero se dibujan todas las pestañas y todos los mapas; después se abre el diálogo.
+    setPreparingPrint(true);
+    setPrinting(true);
+    await new Promise((r) => setTimeout(r, 200));
+    await whenSnapshotsReady();
+    setPreparingPrint(false);
+    window.print();
+    if (!window.matchMedia('print').matches) setPrinting(false);
+  };
+
   return (
-    <Card className="py-5 gap-2">
-      <CardContent className="px-5 space-y-2">
-        <div className="flex items-center gap-2 text-muted-foreground text-sm [&_svg]:size-4">
-          {icon}
-          {label}
-        </div>
-        <div className={cn('text-3xl font-semibold tabular-nums', tone === 'good' && 'text-emerald-600', tone === 'mid' && 'text-amber-600', tone === 'bad' && 'text-red-600')}>{value}</div>
-        <div className="text-xs text-muted-foreground">{sub}</div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function VariantsCard({ report }: { report: StudyReport }) {
-  const best = [...report.variants].sort((a, b) => b.successRate - a.successRate)[0];
-  return (
-    <Card className="py-6 gap-4">
-      <CardHeader className="px-6">
-        <CardTitle>Comparación A/B</CardTitle>
-        <CardDescription>Mismas tareas, distinta variante. Con pocos participantes, tómalo como señal y no como certeza.</CardDescription>
-      </CardHeader>
-      <CardContent className="px-6 grid gap-4 sm:grid-cols-2">
-        {report.variants.map((v) => (
-          <div key={v.id} className={cn('rounded-xl border p-5 space-y-3', v.id === best?.id && v.participants > 0 && 'border-emerald-500/60 bg-emerald-500/5')}>
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">
-                {v.id} · {v.name}
+    <ReportContext.Provider value={context}>
+      <Layout wide>
+        <PageHeader
+          back={
+            <Button variant="ghost" size="icon" asChild className="mt-1 print:hidden">
+              <Link to={{ name: 'studies' }} aria-label="Volver a estudios">
+                <ArrowLeft />
+              </Link>
+            </Button>
+          }
+          title={study.name}
+          description={
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>
+                Resultados · {plural(tasks.length, 'tarea', 'tareas')} · prototipo {proto?.name ?? study.prototypeId}
               </span>
-              <Badge variant="secondary">{v.participants} participantes</Badge>
-            </div>
-            <Bar value={v.successRate} label="Éxito" />
-            <Bar value={v.directRate} label="Éxito directo" />
-            <div className="text-sm text-muted-foreground">Tiempo mediano por tarea: {seconds(v.medianTimeMs)}</div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
+              {study.closed && <Badge variant="outline">Cerrado: ya no recibe respuestas</Badge>}
+            </span>
+          }
+          actions={<StudyTabs id={id} active="report" />}
+        />
 
-function Bar({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-sm">
-        <span>{label}</span>
-        <span className="tabular-nums font-medium">{pct(value)}</span>
-      </div>
-      <div className="h-2 rounded-full bg-muted overflow-hidden">
-        <div className="h-full bg-emerald-500 rounded-full" style={{ width: pct(value) }} />
-      </div>
-    </div>
-  );
-}
-
-function TaskSection({ index, task, proto }: { index: number; task: TaskReport; proto: Prototype | undefined }) {
-  const [tab, setTab] = useState<'screens' | 'paths' | 'people'>('screens');
-  return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="size-8 rounded-lg bg-primary text-primary-foreground grid place-items-center text-sm font-semibold">{index + 1}</span>
-        <h2 className="text-xl font-semibold tracking-tight">{task.title}</h2>
-        {task.kind === 'first-click' && <Badge variant="secondary">First click</Badge>}
-        <span className="text-muted-foreground text-sm">{task.participants} participantes</span>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        <Card className="py-6 gap-5">
-          <CardContent className="px-6 space-y-5">
-            <div className="flex items-end gap-6 flex-wrap">
-              <div>
-                <div className="text-sm text-muted-foreground">Tasa de éxito</div>
-                <div className="text-4xl font-semibold tabular-nums">{pct(task.successRate)}</div>
+        <div className="flex flex-wrap items-end justify-between gap-3" data-print="hide">
+          <div className="flex flex-wrap items-end gap-3">
+            {(study.variants?.length ?? 0) > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="filtro-variante">Variante</Label>
+                <NativeSelect
+                  id="filtro-variante"
+                  className="w-44"
+                  value={filter.variantId ?? ''}
+                  onChange={(e) => changeFilter({ ...(e.target.value ? { variantId: e.target.value } : {}), ...(filter.device ? { device: filter.device } : {}) })}
+                >
+                  <option value="">Todas</option>
+                  {study.variants?.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                </NativeSelect>
               </div>
-              <Metric label="Directo" value={pct(task.directRate)} />
-              <Metric label="Tiempo mediano" value={seconds(task.medianTimeMs)} />
-              <Metric label="Misclicks por persona" value={task.avgMisclicks.toFixed(1)} />
-            </div>
-            <div className="flex h-4 rounded-full overflow-hidden bg-muted">
-              {OUTCOMES.map((o) =>
-                task.outcomes[o.key] ? (
-                  <div key={o.key} className={o.color} style={{ width: `${(task.outcomes[o.key] / Math.max(task.participants, 1)) * 100}%` }} title={`${o.label}: ${task.outcomes[o.key]}`} />
-                ) : null,
-              )}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
-              {OUTCOMES.map((o) => (
-                <div key={o.key} className="flex items-start gap-2 text-sm" title={o.help}>
-                  <span className={cn('size-3 rounded-sm mt-1 shrink-0', o.color)} />
-                  <span>
-                    {o.label} <span className="text-muted-foreground tabular-nums">· {task.outcomes[o.key]}</span>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="py-6 gap-4">
-          <CardHeader className="px-6">
-            <CardTitle className="text-base flex items-center gap-2">
-              <RouteIcon className="size-4" /> Embudo del camino esperado
-            </CardTitle>
-            <CardDescription>
-              {task.expectedPath.length === 0
-                ? 'Nadie lo logró todavía, así que no hay camino esperado. Puedes definirlo en Diseño.'
-                : task.expectedPathInferred
-                  ? 'Deducido del camino más corto de quienes lo lograron. Puedes fijarlo en Diseño.'
-                  : 'Definido en el diseño del estudio.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-6 space-y-2.5">
-            {task.funnel.map((step, i) => {
-              const ratio = task.participants ? step.reached / task.participants : 0;
-              const prev = i === 0 ? task.participants : task.funnel[i - 1]!.reached;
-              const drop = prev - step.reached;
-              return (
-                <div key={step.path + i} className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium">
-                      {i + 1}. {screenName(step.path)}
-                    </span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {step.reached} · {pct(ratio)}
-                      {drop > 0 && i > 0 && <span className="text-red-600 ml-2">−{drop}</span>}
-                    </span>
-                  </div>
-                  <div className="h-7 rounded-md bg-muted overflow-hidden">
-                    <div className="h-full rounded-md bg-primary/80 transition-all" style={{ width: pct(ratio) }} />
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="py-6 gap-5">
-        <CardHeader className="px-6 flex flex-row flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex rounded-lg bg-muted p-1 gap-1">
-            {(
-              [
-                ['screens', 'Pantallas y mapas de calor', <Flame key="f" className="size-3.5" />],
-                ['paths', 'Caminos', <RouteIcon key="r" className="size-3.5" />],
-                ['people', 'Participantes', <Users key="u" className="size-3.5" />],
-              ] as const
-            ).map(([key, label, icon]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTab(key)}
-                className={cn('inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium', tab === key ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="filtro-dispositivo">Dispositivo</Label>
+              <NativeSelect
+                id="filtro-dispositivo"
+                className="w-52"
+                value={filter.device ?? ''}
+                onChange={(e) => {
+                  const device = e.target.value as '' | 'touch' | 'desktop';
+                  changeFilter({ ...(filter.variantId ? { variantId: filter.variantId } : {}), ...(device ? { device } : {}) });
+                }}
               >
-                {icon}
-                {label}
-              </button>
-            ))}
-          </div>
-        </CardHeader>
-        <CardContent className="px-6">
-          {tab === 'screens' && <Screens task={task} proto={proto} />}
-          {tab === 'paths' && <Paths task={task} />}
-          {tab === 'people' && <People task={task} />}
-        </CardContent>
-      </Card>
-    </section>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="text-xl font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-
-function Screens({ task, proto }: { task: TaskReport; proto: Prototype | undefined }) {
-  const [mode, setMode] = useState<'heat' | 'dots' | 'misclicks'>('heat');
-  if (task.screens.length === 0) return <p className="text-muted-foreground text-sm">Sin pantallas registradas.</p>;
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <span className="text-muted-foreground">Ver:</span>
-        {(
-          [
-            ['heat', 'Mapa de calor'],
-            ['dots', 'Cada toque'],
-            ['misclicks', 'Solo misclicks'],
-          ] as const
-        ).map(([k, label]) => (
-          <button key={k} type="button" onClick={() => setMode(k)} className={cn('rounded-full border px-3 py-1', mode === k ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent')}>
-            {label}
-          </button>
-        ))}
-        {mode !== 'heat' && (
-          <span className="flex items-center gap-3 text-xs text-muted-foreground ml-auto">
-            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-blue-600" /> tocó algo</span>
-            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-red-600" /> misclick</span>
-          </span>
-        )}
-      </div>
-      <div className="flex gap-6 overflow-x-auto pb-3 -mx-1 px-1">
-        {task.screens.map((s, i) => {
-          const onPath = task.expectedPath.includes(s.path);
-          return (
-            <div key={s.path} className="shrink-0 space-y-3" style={{ width: 260 }}>
-              <div className="flex items-center gap-2">
-                {onPath && <span className="size-5 rounded-full bg-primary text-primary-foreground grid place-items-center text-[11px] font-semibold">{task.expectedPath.indexOf(s.path) + 1}</span>}
-                <span className="font-medium truncate">{screenName(s.path)}</span>
-                {!onPath && <Badge variant="outline" className="text-xs">fuera del camino</Badge>}
-              </div>
-              <Heatmap key={`${s.path}-${i}`} src={previewUrl(proto, s.path)} points={s.taps} viewportWidth={s.viewportWidth} mode={mode} />
-              <dl className="grid grid-cols-3 gap-2 text-center">
-                <Stat label="visitas" value={String(s.visitors)} />
-                <Stat label="tiempo prom." value={seconds(s.avgTimeMs)} />
-                <Stat label="misclicks" value={String(s.misclicks)} warn={s.misclicks > 0} />
-              </dl>
+                <option value="">Todos ({report.devices.touch + report.devices.desktop})</option>
+                <option value="touch">Celular o tablet ({report.devices.touch})</option>
+                <option value="desktop">Escritorio ({report.devices.desktop})</option>
+              </NativeSelect>
             </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
-  return (
-    <div className="rounded-lg bg-muted/60 py-2">
-      <dd className={cn('font-semibold tabular-nums', warn && 'text-red-600')}>{value}</dd>
-      <dt className="text-[11px] text-muted-foreground">{label}</dt>
-    </div>
-  );
-}
-
-function Paths({ task }: { task: TaskReport }) {
-  const expected = task.expectedPath.join('>');
-  return (
-    <div className="space-y-3">
-      {task.paths.map((p) => (
-        <div key={p.pages.join('>')} className="flex flex-wrap items-center gap-3 rounded-lg border p-3">
-          <span className="tabular-nums font-semibold w-14">{pct(p.count / Math.max(task.participants, 1))}</span>
-          <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
-            {p.pages.map((page, i) => (
-              <span key={i} className="flex items-center gap-1.5">
-                {i > 0 && <ArrowRight className="size-3.5 text-muted-foreground" />}
-                <Badge variant="secondary" className="font-normal">{screenName(page)}</Badge>
-              </span>
-            ))}
           </div>
-          <span className="text-sm text-muted-foreground">
-            {p.count} {p.count === 1 ? 'persona' : 'personas'} · {p.successes} lo lograron
-          </span>
-          {p.pages.join('>') === expected && <Badge className="bg-emerald-600">camino esperado</Badge>}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => void exportCsv()} disabled={report.participants === 0 && !filtered}>
+              <Download />
+              Exportar CSV
+            </Button>
+            <Button variant="outline" onClick={() => void print()} disabled={preparingPrint || report.participants === 0}>
+              <Printer />
+              {preparingPrint ? 'Preparando…' : 'Imprimir / PDF'}
+            </Button>
+          </div>
         </div>
-      ))}
-    </div>
+
+        {filtered && (
+          <p className="hidden print:block text-sm text-muted-foreground">
+            Filtro: {[variantName && `variante ${variantName}`, filter.device === 'touch' && 'celular o tablet', filter.device === 'desktop' && 'escritorio'].filter(Boolean).join(' · ')}
+          </p>
+        )}
+
+        {report.participants === 0 ? (
+          filtered ? (
+            <EmptyState
+              icon={<Users className="size-5" />}
+              title="Nadie coincide con este filtro"
+              action={
+                <Button variant="outline" onClick={() => changeFilter({})}>
+                  Quitar filtros
+                </Button>
+              }
+            >
+              Prueba con otra variante u otro dispositivo.
+            </EmptyState>
+          ) : (
+            <NoParticipants base={base} excluded={report.excluded} />
+          )
+        ) : (
+          <div className={cn('space-y-8 transition-opacity', refreshing && 'opacity-60')} aria-busy={refreshing}>
+            <Overview report={report} />
+
+            {report.pendingReview > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-600/30 bg-sky-500/10 px-4 py-3" data-print="keep">
+                <p className="flex items-start gap-2.5 text-sm min-w-0">
+                  <ClipboardCheck className="size-4.5 mt-0.5 shrink-0 text-sky-700 dark:text-sky-400" />
+                  <span>
+                    <span className="font-medium">{plural(report.pendingReview, 'resultado por revisar', 'resultados por revisar')}.</span> Son tareas que decides tú; no cuentan en el éxito ni en el puntaje
+                    hasta que las marques.
+                  </span>
+                </p>
+                <Button size="sm" onClick={() => setReviewOpen(true)} data-print="hide">
+                  Revisar pendientes
+                </Button>
+              </div>
+            )}
+
+            <InsightsCard insights={report.insights} onJump={jump} />
+            <VariantsCard report={report} />
+
+            <BlockIndex entries={entries} onJump={jump} variant="bar" />
+            <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_15rem] xl:gap-8 print:block">
+              <div className="space-y-8 min-w-0">
+                {entries.map((entry) => {
+                  const task = report.tasks.find((t) => t.taskId === entry.id);
+                  const question = report.questions.find((q) => q.blockId === entry.id);
+                  return (
+                    <section
+                      key={entry.id}
+                      id={blockAnchor(entry.id)}
+                      data-report-block
+                      aria-labelledby={`titulo-${entry.id}`}
+                      className="scroll-mt-16 xl:scroll-mt-6 rounded-xl border bg-card p-4 sm:p-6 space-y-5 min-w-0"
+                    >
+                      <header className="flex items-start gap-3" data-print="heading">
+                        <span className="size-8 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-sm font-semibold tabular-nums">{entry.number}</span>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{entry.kindLabel}</p>
+                          <h2 id={`titulo-${entry.id}`} className="text-xl font-semibold tracking-tight break-words">
+                            {entry.title}
+                          </h2>
+                        </div>
+                        {task && task.participants > 0 && (
+                          <div className="text-right shrink-0">
+                            <ScoreChip score={task.score} className="text-2xl" />
+                            <p className="text-xs text-muted-foreground">{plural(task.participants, 'participante', 'participantes')}</p>
+                          </div>
+                        )}
+                      </header>
+                      {task && <TaskBody task={task} block={tasks.find((b) => b.id === task.taskId)} focusScreen={focus?.blockId === task.taskId ? focus.screen : undefined} />}
+                      {question && <QuestionBody question={question} />}
+                    </section>
+                  );
+                })}
+                {entries.length === 0 && (
+                  <EmptyState
+                    icon={<Pencil className="size-5" />}
+                    title="Este estudio no tiene tareas ni preguntas"
+                    action={
+                      <Button asChild>
+                        <Link to={{ name: 'study', id }}>Ir a Diseño</Link>
+                      </Button>
+                    }
+                  >
+                    Agrega bloques en Diseño para ver resultados aquí.
+                  </EmptyState>
+                )}
+                <p className="text-sm text-muted-foreground" data-print="hide">
+                  ¿Buscas una grabación completa?{' '}
+                  <Link to={{ name: 'recordings', study: id }} className="underline underline-offset-4 hover:text-foreground">
+                    Ver las sesiones de este estudio
+                  </Link>
+                </p>
+              </div>
+              <BlockIndex entries={entries} onJump={jump} variant="side" />
+            </div>
+            <ReviewDialog report={report} open={reviewOpen} onOpenChange={setReviewOpen} />
+          </div>
+        )}
+      </Layout>
+    </ReportContext.Provider>
   );
 }
 
-function People({ task }: { task: TaskReport }) {
-  const { navigate } = useRouter();
-  const label = useMemo(() => Object.fromEntries(OUTCOMES.map((o) => [o.key, o])), []);
+/** Todavía sin participantes: cómo compartir el estudio. */
+function NoParticipants({ base, excluded }: { base: Base; excluded: number }) {
+  const { study, proto, info } = base;
+  const link = info && proto ? participantUrl(info, proto, study.id) : null;
+  const [qr, setQr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!link) return;
+    let alive = true;
+    void getClient().then((c) => alive && setQr(c.qrImageUrl(link)));
+    return () => {
+      alive = false;
+    };
+  }, [link]);
+
+  const copy = async (): Promise<void> => {
+    if (!link) return;
+    if (await copyText(link)) toast.success('Link copiado.');
+    else toast.error('No se pudo copiar. Selecciona el link y cópialo a mano.');
+  };
+
   return (
-    <div className="divide-y rounded-lg border">
-      {task.results.map((r) => (
-        <button key={r.sessionId} type="button" onClick={() => navigate({ name: 'player', id: r.sessionId })} className="w-full flex flex-wrap items-center gap-3 p-3 text-left hover:bg-accent/50">
-          <Smartphone className="size-4 text-muted-foreground" />
-          <span className="font-mono text-xs text-muted-foreground w-28 truncate">{r.sessionId}</span>
-          <span className="flex items-center gap-1.5 text-sm">
-            <span className={cn('size-2.5 rounded-full', label[r.outcome]?.color)} />
-            {label[r.outcome]?.label}
-          </span>
-          {r.variantId && <Badge variant="outline">{r.variantId}</Badge>}
-          <span className="text-sm text-muted-foreground ml-auto">
-            {seconds(r.durationMs)} · {r.misclicks} misclicks · {r.pages.length} pantallas
-          </span>
-          <span className="text-sm text-primary">Ver grabación →</span>
-        </button>
-      ))}
-    </div>
+    <EmptyState
+      icon={<Users className="size-5" />}
+      title="Todavía nadie hizo este estudio"
+      action={
+        <>
+          {link && (
+            <Button onClick={() => void copy()}>
+              <Copy />
+              Copiar link
+            </Button>
+          )}
+          <Button variant="outline" asChild>
+            <Link to={{ name: 'study', id: study.id }}>Ir a Diseño</Link>
+          </Button>
+        </>
+      }
+    >
+      {study.closed ? (
+        <p>El estudio está cerrado y no recibe respuestas. Ábrelo de nuevo desde Diseño para compartirlo.</p>
+      ) : link ? (
+        <>
+          <p>Comparte este link con tus participantes (o muéstrales el código QR). Cuando alguien termine, los resultados aparecen aquí solos.</p>
+          <p className="rounded-md border bg-muted/50 px-3 py-2 font-mono text-xs break-all select-all text-foreground">{link}</p>
+          {qr && <img src={qr} alt="Código QR del link del estudio" className="mx-auto size-40 rounded-lg border bg-white p-2" />}
+          <p className="text-xs">{IS_DEMO ? 'En esta demo el link solo funciona en este mismo navegador.' : 'El celular del participante tiene que estar en la misma red Wi-Fi que esta computadora.'}</p>
+        </>
+      ) : (
+        <p>Este estudio no tiene un prototipo disponible aquí. Elige uno en Diseño para obtener el link que se comparte.</p>
+      )}
+      {excluded > 0 && <p>Hay {plural(excluded, 'sesión excluida', 'sesiones excluidas')} del reporte. Puedes volver a incluirlas desde Sesiones.</p>}
+    </EmptyState>
   );
 }

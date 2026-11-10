@@ -34,7 +34,7 @@ if (existsSync(web)) {
 // El ejemplo: los archivos del prototipo, sin lo que no es parte de él.
 const example = resolve(root, '../../examples/tienda');
 const exampleDest = resolve(root, 'example', 'tienda');
-const skip = new Set(['study.json', 'README.md']);
+const skip = new Set(['study.json', 'study-v1.json', 'README.md']);
 if (existsSync(example)) {
   rmSync(exampleDest, { recursive: true, force: true });
   cpSync(example, exampleDest, {

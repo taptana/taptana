@@ -1,0 +1,17 @@
+**/node_modules
+**/dist
+**/dist-pages
+packages/server/public
+packages/server/example
+.git
+.github
+.devcontainer
+.taptana
+site
+docs
+tests
+scripts
+*.db
+*.db-journal
+*.db-wal
+.DS_Store

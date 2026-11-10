@@ -1,5 +1,7 @@
 # Constructor de estudios (v0.3)
 
+> **Documento histórico (v0.3).** El constructor actual trabaja por bloques y a tres columnas: ver [plan-v1.md](plan-v1.md), sección 4, y la [guía](guia.md).
+
 **Estado: implementado.** Los cinco pasos están en `main` y probados end-to-end con Playwright.
 Este documento fue la propuesta; Parte del formato `Study` que ya existe en
 `shared` (ver `docs/estudios-con-ia.md`).

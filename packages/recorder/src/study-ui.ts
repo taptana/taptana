@@ -113,6 +113,7 @@ export class StudyUi {
 
   /** Quita todo lo que haya en pantalla (la cinta de vista previa se queda). */
   clear(): void {
+    if (!this.host) return;
     this.closeSheet(false);
     this.hidePill();
     this.toastSlot.innerHTML = '';
@@ -351,6 +352,7 @@ export class StudyUi {
 
   /** El botón pequeño de la tarea: arriba al centro, se puede arrastrar. */
   pill(view: { position: [number, number] | undefined; hint: boolean }, handlers: { onOpen(): void; onMove(position: [number, number]): void }): void {
+    this.mount();
     this.hidePill();
     this.pillSlot.innerHTML =
       '<button type="button" class="pill" aria-haspopup="dialog" aria-label="Ver la tarea, terminarla o decir que no pudiste"><i class="dot"></i><span>Tarea</span><span class="see">· ver</span></button>' +
@@ -430,6 +432,7 @@ export class StudyUi {
 
   /** Aviso corto arriba ("¡Listo!"). No intercepta toques. */
   toast(text: string): void {
+    this.mount();
     this.toastSlot.innerHTML = `<div class="toast">${ICON_CHECK}<span>${esc(text)}</span></div>`;
   }
 

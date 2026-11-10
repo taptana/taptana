@@ -1,0 +1,32 @@
+{
+  "v": 1,
+  "name": "Compra en Verde",
+  "description": "Saber si el flujo de compra se entiende sin ayuda y si el carrito se encuentra",
+  "prototypeId": "local",
+  "welcome": "Gracias por ayudarnos. Vas a usar un prototipo de una tienda de plantas: nada es real y no hay respuestas incorrectas. Piensa en voz alta mientras lo usas.",
+  "tasks": [
+    {
+      "id": "t1",
+      "kind": "task",
+      "title": "Comprar una planta grande",
+      "instruction": "Quieres regalar una planta a tu mamá. Encuentra una grande y cómprala.",
+      "startPath": "/index.html",
+      "success": { "type": "reached", "path": "/gracias.html" }
+    },
+    {
+      "id": "t2",
+      "kind": "first-click",
+      "title": "Encontrar el carrito",
+      "instruction": "¿Dónde tocarías para ver lo que llevas en tu carrito?",
+      "startPath": "/index.html",
+      "success": { "type": "tapped", "selector": ".cart-link" }
+    },
+    {
+      "id": "t3",
+      "kind": "task",
+      "title": "Costo del envío",
+      "instruction": "Averigua cuánto cuesta el envío a tu casa.",
+      "success": { "type": "manual" }
+    }
+  ]
+}

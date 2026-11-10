@@ -4,10 +4,11 @@
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
-  "postCreateCommand": "corepack enable && corepack prepare pnpm@10.28.0 --activate && pnpm install && pnpm build && pnpm seed",
+  "postCreateCommand": "corepack enable && corepack prepare pnpm@10.28.0 --activate && pnpm install && pnpm build",
+  "postAttachCommand": "echo 'Corre: pnpm start   (el panel se abre con el link con llave que sale en la terminal)'",
   "forwardPorts": [4321, 5173],
   "portsAttributes": {
-    "4321": { "label": "Taptana (prototipo + panel)", "onAutoForward": "notify", "visibility": "public" },
+    "4321": { "label": "Taptana (panel y prototipos)", "onAutoForward": "notify", "visibility": "public" },
     "5173": { "label": "Panel (Vite dev)", "onAutoForward": "silent" }
   },
   "customizations": {

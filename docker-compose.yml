@@ -1,0 +1,19 @@
+# docker compose up -d   →  Taptana en http://<ip-de-esta-máquina>:4321
+# docker compose logs taptana   →  el link del panel con su llave (?key=…)
+services:
+  taptana:
+    build: .
+    image: taptana:local
+    restart: unless-stopped
+    ports:
+      - "4321:4321"
+    environment:
+      # La dirección con la que los celulares llegan a esta máquina. Dentro del contenedor
+      # Taptana no puede adivinarla: ponla para que los links y los QR salgan bien.
+      # Ejemplo: TAPTANA_PUBLIC_URL=http://192.168.1.20:4321 docker compose up -d
+      TAPTANA_PUBLIC_URL: ${TAPTANA_PUBLIC_URL:-}
+    volumes:
+      - taptana-data:/data
+
+volumes:
+  taptana-data:

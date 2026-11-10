@@ -1,534 +1,735 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, X, ArrowLeft, ArrowDown, ArrowUp, Copy, Check, Download, Plus, Trash2, Sparkles, QrCode } from 'lucide-react';
+/**
+ * Constructor de estudios, a tres columnas: bloques, editor del bloque y el teléfono con el
+ * prototipo. En pantallas angostas las columnas se apilan.
+ *
+ * Guardado: un estudio nuevo se crea con "Crear estudio"; después se guarda solo cada vez que
+ * el borrador es válido. Mientras haya cambios sin guardar, salir pide confirmación.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, BarChart3, CircleAlert, CircleCheck, Copy, Crosshair, Download, Ellipsis, LoaderCircle, PencilRuler, Play, Plus, Share2, Sparkles, TriangleAlert } from 'lucide-react';
 import {
-  DEFAULT_CONSENT_TEXT,
-  validateStudy,
+  sameScreen,
+  screenId,
+  screenLabel,
+  type BlockKind,
+  type ContextBlock,
   type Prototype,
+  type QuestionBlock,
+  type RecorderMessage,
+  type ScreenInfo,
   type ServerInfo,
   type Study,
+  type StudyIssue,
   type StudyRecord,
-  type StudyVariant,
+  type StudyReport,
   type SuccessRule,
-  type Task,
 } from '@taptana/shared';
-import { getClient, type PrototypePage } from '@/api/client';
-import { Button } from '@/components/ui/button';
+import { getClient, IS_DEMO, type ApiClient } from '@/api/client';
+import { AddBlockMenu, BlockList } from '@/components/builder/BlockList';
+import { ContextEditor, QuestionEditor, SettingsEditor, TaskEditor, ThanksEditor, WelcomeEditor, type TaskTools } from '@/components/builder/BlockEditor';
+import { AiDialog, RecordPanel, ShareDialog, TryoutDialog } from '@/components/builder/dialogs';
+import {
+  checkDraft,
+  cloneBlock,
+  emptyDraft,
+  isDraftTask,
+  issueSelection,
+  moveItem,
+  newBlock,
+  pushScreen,
+  reassignIds,
+  studyFileName,
+  toDraft,
+  tryoutStudy,
+  FIXED_SELECTIONS,
+  type DemoStep,
+  type DraftBlock,
+  type DraftStudy,
+  type Selection,
+} from '@/components/builder/draft';
+import { ShowErrorsContext } from '@/components/builder/fields';
+import { PhoneFrame, type PhoneHandle } from '@/components/builder/PhoneFrame';
+import { ErrorState, Layout, PageHeader, PageSkeleton, RouteTabs } from '@/components/layout';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input, Label, NativeSelect, Textarea } from '@/components/ui/input';
-import { Layout, PageHeader } from '@/components/layout';
-import { StudyTabs } from './Report';
-import { buildStudyPrompt } from '@/lib/prompt';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { toast } from '@/components/ui/toast';
+import { downloadText } from '@/lib/download';
+import { friendlyError } from '@/lib/errors';
+import { plural } from '@/lib/format';
 import { participantUrl } from '@/lib/links';
-import { cn } from '@/lib/utils';
-import { Link, useRouter } from '@/router';
-import { downloadStudy } from './Studies';
+import { Link, useNavigationBlocker, useRouter } from '@/router';
 
-function newTask(n: number): Task {
-  return { id: `t${n}`, kind: 'task', title: '', instruction: '', success: { type: 'manual' } };
+type PhoneMode = { type: 'record'; blockId: string; steps: DemoStep[] } | { type: 'pick'; blockId: string } | null;
+
+const AUTOSAVE_MS = 800;
+
+function useDebounced<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), ms);
+    return () => window.clearTimeout(timer);
+  }, [value, ms]);
+  return debounced;
 }
 
-function emptyStudy(prototypeId: string): Study {
-  return { v: 1, name: '', prototypeId, welcome: '', tasks: [newTask(1)] };
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = (): void => setMatches(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [query]);
+  return matches;
 }
 
 export function StudyEditorPage({ id }: { id: string | null }) {
-  const [study, setStudy] = useState<Study | null>(null);
-  const [record, setRecord] = useState<StudyRecord | null>(null);
-  const [info, setInfo] = useState<ServerInfo | null>(null);
-  const [pages, setPages] = useState<PrototypePage[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
-  const [goal, setGoal] = useState('');
-  const [copied, setCopied] = useState<'prompt' | 'link' | null>(null);
-  const [mode, setMode] = useState<'http' | 'static'>('http');
-  const [protos, setProtos] = useState<Prototype[]>([]);
   const { navigate } = useRouter();
+  const [client, setClient] = useState<ApiClient | null>(null);
+  const [info, setInfo] = useState<ServerInfo | null>(null);
+  const [protos, setProtos] = useState<Prototype[]>([]);
+  const [record, setRecord] = useState<StudyRecord | null>(null);
+  const [draft, setDraft] = useState<DraftStudy | null>(null);
+  const [savedJson, setSavedJson] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloads, setReloads] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [failedJson, setFailedJson] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection>('settings');
+  const [showAllErrors, setShowAllErrors] = useState(false);
 
+  const [apiScreens, setApiScreens] = useState<ScreenInfo[]>([]);
+  const [seenScreens, setSeenScreens] = useState<ScreenInfo[]>([]);
+  const [sessionCount, setSessionCount] = useState(0);
+  const [report, setReport] = useState<StudyReport | null>(null);
+
+  const [phoneScreen, setPhoneScreen] = useState<string | undefined>(undefined);
+  const [tick, setTick] = useState(0);
+  const [mode, setMode] = useState<PhoneMode>(null);
+  const [matches, setMatches] = useState<number | null>(null);
+
+  const [shareOpen, setShareOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [tryout, setTryout] = useState<{ study: Study; startAt?: string } | null>(null);
+  const [leave, setLeave] = useState<(() => void) | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const wide = useMediaQuery('(min-width: 1280px)');
+  const phone = useRef<PhoneHandle>(null);
+  const phoneBox = useRef<HTMLDivElement>(null);
+  const editorBox = useRef<HTMLDivElement>(null);
+  /** Todos los ids de bloque que han existido en este estudio: nunca se reutilizan. */
+  const usedIds = useRef(new Set<string>());
+  /** El id que acabamos de crear: al cambiar la dirección no hay que volver a cargar. */
+  const createdId = useRef<string | null>(null);
+
+  // ── Carga ──
   useEffect(() => {
+    if (id !== null && createdId.current === id) return;
     let cancelled = false;
+    setDraft(null);
+    setRecord(null);
+    setLoadError(null);
+    setMode(null);
+    setSessionCount(0);
+    setReport(null);
+    setShowAllErrors(id !== null);
+    setSelection('settings');
     (async () => {
       try {
-        const client = await getClient();
-        const serverInfo = await client.info();
+        const c = await getClient();
+        const [serverInfo, list, found] = await Promise.all([c.info(), c.listPrototypes(), id ? c.getStudy(id) : Promise.resolve(null)]);
         if (cancelled) return;
-        setMode(client.mode);
+        setClient(c);
         setInfo(serverInfo);
-        const list = await client.listPrototypes();
         setProtos(list);
+        let next: DraftStudy;
         if (id) {
-          const found = await client.getStudy(id);
           if (!found) {
-            setError('No existe este estudio.');
+            setLoadError('Este estudio no existe. Puede que se haya borrado.');
             return;
           }
           setRecord(found);
-          const { id: _i, createdAt: _c, updatedAt: _u, ...clean } = found;
-          setStudy(clean);
+          next = toDraft(found);
+          const first = next.blocks[0];
+          if (first) setSelection(first.id);
         } else {
           // Por defecto, el prototipo más reciente.
-          setStudy(emptyStudy(list[0]?.id ?? serverInfo.prototypeId));
+          const newest = [...list].sort((a, b) => b.createdAt - a.createdAt)[0];
+          next = emptyDraft(newest?.id ?? '');
+        }
+        usedIds.current = new Set(next.blocks.map((b) => b.id));
+        setDraft(next);
+        setSavedJson(JSON.stringify(next));
+        if (id) {
+          const sessions = await c.listSessions(id).catch(() => []);
+          if (cancelled) return;
+          setSessionCount(sessions.length);
+          if (sessions.length > 0) {
+            const r = await c.getStudyReport(id).catch(() => null);
+            if (!cancelled) setReport(r);
+          }
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setLoadError(friendlyError(e, 'No pudimos abrir el estudio.'));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloads]);
 
-  // Las páginas del desplegable dependen del prototipo elegido.
-  const prototypeId = study?.prototypeId;
+  const proto = useMemo(() => protos.find((p) => p.id === draft?.prototypeId), [protos, draft?.prototypeId]);
+
+  // ── Pantallas del prototipo ──
   useEffect(() => {
-    if (!prototypeId) return;
-    void getClient()
-      .then((c) => c.listPrototypePages(prototypeId))
-      .then(setPages)
-      .catch(() => setPages([]));
-  }, [prototypeId]);
+    setApiScreens([]);
+    setSeenScreens([]);
+    if (!client || !proto) return;
+    let cancelled = false;
+    client
+      .listPrototypeScreens(proto.id)
+      .then((list) => !cancelled && setApiScreens(list))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [client, proto]);
+  const screens = useMemo(() => [...apiScreens, ...seenScreens.filter((s) => !apiScreens.some((a) => sameScreen(a.id, s.id)))], [apiScreens, seenScreens]);
 
-  const update = (patch: Partial<Study>): void => {
-    setStudy((s) => (s ? { ...s, ...patch } : s));
-    setDirty(true);
-  };
-  const updateTask = (i: number, patch: Partial<Task>): void => {
-    setStudy((s) => (s ? { ...s, tasks: s.tasks.map((t, j) => (j === i ? { ...t, ...patch } : t)) } : s));
-    setDirty(true);
-  };
-  const moveTask = (i: number, dir: -1 | 1): void => {
-    setStudy((s) => {
-      if (!s) return s;
-      const tasks = [...s.tasks];
-      const j = i + dir;
-      if (j < 0 || j >= tasks.length) return s;
-      [tasks[i], tasks[j]] = [tasks[j]!, tasks[i]!];
-      return { ...s, tasks };
-    });
-    setDirty(true);
-  };
-  const removeTask = (i: number): void => {
-    setStudy((s) => (s ? { ...s, tasks: s.tasks.filter((_, j) => j !== i) } : s));
-    setDirty(true);
-  };
-  const addTask = (): void => {
-    setStudy((s) => {
-      if (!s) return s;
-      let n = s.tasks.length + 1;
-      while (s.tasks.some((t) => t.id === `t${n}`)) n++;
-      return { ...s, tasks: [...s.tasks, newTask(n)] };
-    });
-    setDirty(true);
-  };
+  // ── Validación y guardado ──
+  const check = useMemo(() => (draft ? checkDraft(draft) : null), [draft]);
+  const errors = useMemo<StudyIssue[]>(() => {
+    if (!draft || !check) return [];
+    const list = [...check.errors];
+    if (draft.prototypeId && !proto && !list.some((i) => i.field === 'prototypeId')) {
+      list.unshift({ message: 'El prototipo de este estudio ya no está aquí: elige otro', field: 'prototypeId', level: 'error' });
+    }
+    return list;
+  }, [draft, check, proto]);
+  const valid = check !== null && check.ok && errors.length === 0;
+  const json = useMemo(() => (draft ? JSON.stringify(draft) : ''), [draft]);
+  const dirty = draft !== null && json !== savedJson;
+  const incomplete = useMemo(() => new Set(errors.map(issueSelection)), [errors]);
 
-  const validation = useMemo(() => (study ? validateStudy(study) : null), [study]);
-
-  const onSave = async (): Promise<void> => {
-    if (!study || !validation?.ok) return;
+  const save = useCallback(async (): Promise<boolean> => {
+    if (!client || !record || !check?.value) return false;
+    const sending = json;
     setSaving(true);
     try {
-      const client = await getClient();
-      const saved = await client.saveStudy(validation.value, record?.id);
+      const saved = await client.saveStudy(check.value, record.id);
       setRecord(saved);
-      setDirty(false);
-      setError(null);
-      if (!record) navigate({ name: 'study', id: saved.id }, true);
+      setSavedJson(sending);
+      setFailedJson(null);
+      setSaveError(null);
+      return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setFailedJson(sending);
+      setSaveError(friendlyError(e, 'No se pudo guardar. Revisa que Taptana siga abierto.'));
+      return false;
     } finally {
       setSaving(false);
     }
-  };
+  }, [client, record, check, json]);
 
-  const copy = async (text: string, what: 'prompt' | 'link'): Promise<void> => {
+  useEffect(() => {
+    if (!record || !dirty || !valid || saving || failedJson === json) return;
+    const timer = window.setTimeout(() => void save(), AUTOSAVE_MS);
+    return () => window.clearTimeout(timer);
+  }, [record, dirty, valid, saving, failedJson, json, save]);
+
+  const create = async (): Promise<void> => {
+    if (!client || !check?.value || !valid) return;
+    setBusy(true);
     try {
-      await navigator.clipboard.writeText(text);
-      setCopied(what);
-      setTimeout(() => setCopied(null), 2000);
-    } catch {
-      prompt('Copia este texto:', text);
+      const saved = await client.saveStudy(check.value);
+      createdId.current = saved.id;
+      setRecord(saved);
+      setSavedJson(json);
+      setShowAllErrors(true);
+      toast.success('Estudio creado. Desde ahora se guarda solo.');
+      navigate({ name: 'study', id: saved.id }, { replace: true, force: true });
+    } catch (e) {
+      toast.error(friendlyError(e, 'No se pudo crear el estudio. Intenta de nuevo.'));
+    } finally {
+      setBusy(false);
     }
   };
 
-  if (error && !study) return <Layout><p className="text-destructive text-sm">{error}</p></Layout>;
-  if (!study || !info) return <Layout><p className="text-muted-foreground text-sm">Cargando…</p></Layout>;
+  useNavigationBlocker(dirty, (proceed) => {
+    // Con el estudio ya creado y sin errores basta con guardar antes de salir.
+    if (record && valid) {
+      void save().then((ok) => (ok ? proceed() : setLeave(() => proceed)));
+      return;
+    }
+    setLeave(() => proceed);
+  });
 
-  const proto = protos.find((p) => p.id === study.prototypeId);
-  const participantLink = record ? participantUrl(info, proto, record.id) : null;
+  // ── Cambios en el borrador ──
+  const update = (next: DraftStudy): void => setDraft(next);
+  const updateBlock = (next: DraftBlock): void => setDraft((d) => (d ? { ...d, blocks: d.blocks.map((b) => (b.id === next.id ? next : b)) } : d));
+
+  const select = (next: Selection, scroll = true): void => {
+    setSelection(next);
+    if (mode && mode.blockId !== next) setMode(null);
+    if (scroll && window.matchMedia('(max-width: 1023px)').matches) window.setTimeout(() => editorBox.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  };
+
+  const addBlock = (kind: BlockKind): void => {
+    if (!draft) return;
+    const block = newBlock(kind, usedIds.current);
+    usedIds.current.add(block.id);
+    const at = draft.blocks.findIndex((b) => b.id === selection);
+    const blocks = [...draft.blocks];
+    blocks.splice(at >= 0 ? at + 1 : blocks.length, 0, block);
+    setDraft({ ...draft, blocks });
+    select(block.id);
+  };
+
+  const duplicateBlock = (blockId: string): void => {
+    if (!draft) return;
+    const at = draft.blocks.findIndex((b) => b.id === blockId);
+    const source = draft.blocks[at];
+    if (!source) return;
+    const copy = cloneBlock(source, usedIds.current);
+    usedIds.current.add(copy.id);
+    const blocks = [...draft.blocks];
+    blocks.splice(at + 1, 0, copy);
+    setDraft({ ...draft, blocks });
+    select(copy.id);
+  };
+
+  const deleteBlock = (blockId: string): void => {
+    if (!draft) return;
+    const at = draft.blocks.findIndex((b) => b.id === blockId);
+    const removed = draft.blocks[at];
+    if (!removed) return;
+    const blocks = draft.blocks.filter((b) => b.id !== blockId);
+    setDraft({ ...draft, blocks });
+    if (selection === blockId) setSelection(blocks[Math.min(at, blocks.length - 1)]?.id ?? 'settings');
+    if (mode?.blockId === blockId) setMode(null);
+    toast('Bloque borrado', {
+      durationMs: 6000,
+      action: {
+        label: 'Deshacer',
+        onClick: () =>
+          setDraft((d) => {
+            if (!d || d.blocks.some((b) => b.id === removed.id)) return d;
+            const restored = [...d.blocks];
+            restored.splice(Math.min(at, restored.length), 0, removed);
+            return { ...d, blocks: restored };
+          }),
+      },
+    });
+  };
+
+  // ── Teléfono ──
+  const selected = draft?.blocks.find((b) => b.id === selection);
+  const selectedTask = selected && isDraftTask(selected) ? selected : undefined;
+  const wantedScreen = useDebounced(selectedTask?.startPath?.trim() || undefined, 600);
+  const selector = selectedTask?.success?.type === 'tapped' || selectedTask?.success?.type === 'visible' ? (selectedTask.success.selector ?? '') : '';
+
+  useEffect(() => {
+    if (!selector) {
+      setMatches(null);
+      return;
+    }
+    // Un momento después del último mensaje, para que la pantalla ya esté dibujada.
+    const timer = window.setTimeout(() => setMatches(phone.current?.countMatches(selector) ?? null), 250);
+    return () => window.clearTimeout(timer);
+  }, [selector, tick, phoneScreen]);
+
+  const showPhone = (): void => {
+    window.setTimeout(() => phoneBox.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 0);
+  };
+
+  const onPhoneMessage = (msg: RecorderMessage): void => {
+    setTick((t) => t + 1);
+    if (msg.type === 'ready' || msg.type === 'screen') {
+      const sid = screenId(msg.screen);
+      setPhoneScreen(sid);
+      // Las pantallas que aparecen al navegar se pueden elegir aunque no sean un archivo.
+      setSeenScreens((list) => (list.some((s) => sameScreen(s.id, sid)) ? list : [...list, { id: sid, label: screenLabel(sid), ...(msg.title ? { title: msg.title } : {}), source: 'seen' }]));
+      setMode((m) => (m?.type === 'record' ? { ...m, steps: pushScreen(m.steps, msg.screen, msg.title) } : m));
+      return;
+    }
+    if (msg.type !== 'tap') return;
+    if (mode?.type === 'record') {
+      setMode((m) => (m?.type === 'record' ? { ...m, steps: [...m.steps, { type: 'tap', screen: screenId(msg.screen), selector: msg.selector || msg.target.selector, text: msg.target.text ?? '' }] } : m));
+    } else if (mode?.type === 'pick') {
+      const picked = msg.selector || msg.target.selector;
+      const block = draft?.blocks.find((b) => b.id === mode.blockId);
+      if (block && isDraftTask(block) && picked) {
+        const success: SuccessRule = block.success?.type === 'visible' ? { ...block.success, selector: picked } : { type: 'tapped', selector: picked };
+        updateBlock({ ...block, success });
+        toast.success(msg.target.text ? `Elegiste "${msg.target.text.slice(0, 40)}"` : 'Elemento elegido');
+      }
+      setMode(null);
+      // El toque pudo cambiar de pantalla: el teléfono vuelve al inicio de la tarea, donde se comprueba el selector.
+      window.setTimeout(() => phone.current?.reload(), 700);
+    }
+  };
+
+  const startRecording = (blockId: string): void => {
+    setMode({ type: 'record', blockId, steps: [] });
+    phone.current?.reload();
+    showPhone();
+  };
+
+  const applyDemo = (result: { startPath: string; expectedPath: string[]; success: SuccessRule }): void => {
+    if (mode?.type !== 'record') return;
+    const block = draft?.blocks.find((b) => b.id === mode.blockId);
+    if (block && isDraftTask(block)) {
+      const next = { ...block, startPath: result.startPath, success: result.success };
+      if ((block.kind ?? 'task') === 'task' && result.expectedPath.length > 0) next.expectedPath = result.expectedPath;
+      updateBlock(next);
+      toast.success('Listo: llenamos la pantalla de inicio, el camino y la regla.');
+    }
+    setMode(null);
+  };
+
+  const openTryout = (blockId?: string): void => {
+    if (!draft) return;
+    if (!proto) {
+      toast.error('Elige un prototipo en "Ajustes del estudio" para poder probar.');
+      return;
+    }
+    const result = tryoutStudy(draft, blockId);
+    if (!result.study) {
+      setShowAllErrors(true);
+      toast.error(`Para probar, primero corrige esto: ${result.error ?? 'el estudio tiene errores'}.`);
+      return;
+    }
+    setMode(null);
+    setTryout({ study: result.study, ...(blockId ? { startAt: blockId } : {}) });
+  };
+
+  // ── Acciones del estudio ──
+  const applyImported = (study: Study): void => {
+    if (!draft) return;
+    const incoming = toDraft(study);
+    // En un estudio que ya existe los bloques reciben ids nuevos: así no heredan resultados.
+    const blocks = record ? reassignIds(incoming.blocks, usedIds.current) : incoming.blocks;
+    for (const b of blocks) usedIds.current.add(b.id);
+    const next: DraftStudy = { ...incoming, blocks, name: draft.name.trim() || incoming.name, prototypeId: proto ? draft.prototypeId : incoming.prototypeId };
+    if (draft.closed) next.closed = true;
+    setDraft(next);
+    setSelection(blocks[0]?.id ?? 'settings');
+    toast.success(`Listo: ${plural(blocks.length, 'bloque', 'bloques')} en el estudio. Revísalos antes de compartir.`);
+  };
+
+  const duplicateStudy = async (): Promise<void> => {
+    if (!client || !record) return;
+    setBusy(true);
+    try {
+      const copy = await client.duplicateStudy(record.id);
+      toast.success('Copia creada. Ahora estás editando la copia.');
+      navigate({ name: 'study', id: copy.id }, { force: true });
+    } catch (e) {
+      toast.error(friendlyError(e, 'No se pudo duplicar el estudio.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportJson = (): void => {
+    if (!draft) return;
+    downloadText(studyFileName(draft.name), JSON.stringify(check?.value ?? draft, null, 2));
+  };
+
+  // ── Vista ──
+  if (loadError) {
+    return (
+      <Layout>
+        <ErrorState message={loadError} onRetry={() => setReloads((n) => n + 1)} home />
+      </Layout>
+    );
+  }
+  if (!draft || !info || !client) {
+    return (
+      <Layout width="full">
+        <PageSkeleton />
+      </Layout>
+    );
+  }
+
+  const blockIndex = selected ? draft.blocks.indexOf(selected) : -1;
+  const current: Selection = selected || FIXED_SELECTIONS.includes(selection) ? selection : 'settings';
+  const link = record && proto ? participantUrl(info, proto, record.id) : null;
+  const firstError = errors[0];
+  const recording = mode?.type === 'record' ? mode : null;
+  const recordingBlock = recording ? draft.blocks.find((b) => b.id === recording.blockId) : undefined;
+
+  // Con tres columnas el panel de grabación va junto al teléfono (en el centro); apilado, encima de él.
+  const recordPanel = recording ? (
+    <RecordPanel
+      key={recording.blockId}
+      steps={recording.steps}
+      kind={recordingBlock && isDraftTask(recordingBlock) ? (recordingBlock.kind ?? 'task') : 'task'}
+      screens={screens}
+      onRestart={() => startRecording(recording.blockId)}
+      onCancel={() => setMode(null)}
+      onUse={applyDemo}
+    />
+  ) : null;
+
+  const tools: TaskTools = {
+    screens,
+    phoneScreen,
+    matches,
+    picking: mode?.type === 'pick' && mode.blockId === selection,
+    recording: recording?.blockId === selection,
+    onRecord: () => startRecording(selection),
+    onPick: () => {
+      setMode({ type: 'pick', blockId: selection });
+      showPhone();
+    },
+    onCancelPick: () => setMode(null),
+    onTryout: () => openTryout(selection),
+    report: report?.tasks.find((t) => t.taskId === selection),
+  };
+
+  const status = !record ? null : saving || (dirty && valid && failedJson !== json) ? (
+    <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground" role="status">
+      <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> Guardando…
+    </span>
+  ) : dirty && !valid ? (
+    <span className="inline-flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400" role="status">
+      <TriangleAlert className="size-4" /> Hay errores: los cambios no se han guardado
+    </span>
+  ) : dirty ? (
+    <span className="inline-flex items-center gap-2 text-sm text-destructive" role="alert">
+      <CircleAlert className="size-4" /> {saveError ?? 'No se pudo guardar'}
+      <Button size="sm" variant="outline" onClick={() => void save()}>
+        Reintentar
+      </Button>
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground" role="status">
+      <CircleCheck className="size-4 text-emerald-600" /> Guardado
+    </span>
+  );
 
   return (
-    <Layout wide>
+    <Layout width="full">
       <PageHeader
         back={
-          <Button variant="ghost" size="icon" asChild className="mt-1">
-            <Link to={{ name: 'studies' }}>
+          <Button variant="ghost" size="icon" asChild className="mt-0.5 shrink-0">
+            <Link to={{ name: 'studies' }} aria-label="Volver a Estudios">
               <ArrowLeft />
             </Link>
           </Button>
         }
-        title={record ? study.name || 'Estudio' : 'Nuevo estudio'}
-        description={
-          <span className="flex items-center gap-2">
-            Prototipo: {proto?.name ?? study.prototypeId} {dirty && <Badge variant="outline">cambios sin guardar</Badge>}
+        title={
+          <span className="flex flex-wrap items-center gap-3">
+            {draft.name.trim() || (record ? 'Estudio sin nombre' : 'Nuevo estudio')}
+            {record && draft.closed && <Badge variant="secondary">Cerrado</Badge>}
           </span>
         }
+        description={record ? status : 'Arma el estudio bloque por bloque. Puedes probarlo en el teléfono de la derecha antes de crearlo.'}
         actions={
           <>
-            {record && <StudyTabs id={record.id} active="design" />}
-            {record && (
-              <Button variant="outline" onClick={() => downloadStudy({ ...study, id: record.id, createdAt: record.createdAt, updatedAt: record.updatedAt })}>
-                <Download /> Exportar
+            <Button variant="outline" onClick={() => setAiOpen(true)}>
+              <Sparkles /> Armar con IA
+            </Button>
+            <Button variant="outline" onClick={() => openTryout()} disabled={draft.blocks.length === 0}>
+              <Play /> Probar estudio
+            </Button>
+            {record ? (
+              <Button onClick={() => setShareOpen(true)}>
+                <Share2 /> Compartir
+              </Button>
+            ) : (
+              <Button onClick={() => void create()} disabled={!valid || busy} aria-describedby={valid ? undefined : 'create-missing'}>
+                <Plus /> {busy ? 'Creando…' : 'Crear estudio'}
               </Button>
             )}
-            <Button onClick={() => void onSave()} disabled={!validation?.ok || saving || (!dirty && !!record)}>
-              {saving ? 'Guardando…' : record ? 'Guardar cambios' : 'Crear estudio'}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="Más acciones">
+                  <Ellipsis />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={exportJson}>
+                  <Download /> Exportar study.json
+                </DropdownMenuItem>
+                {record && (
+                  <DropdownMenuItem disabled={busy} onSelect={() => void duplicateStudy()}>
+                    <Copy /> Duplicar estudio
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         }
       />
 
-      {error && (
-        <Card className="border-destructive/40 py-4">
-          <CardContent className="text-sm text-destructive">{error}</CardContent>
-        </Card>
+      {record && (
+        <RouteTabs
+          tabs={[
+            { label: 'Diseño', to: { name: 'study', id: record.id }, active: true, icon: <PencilRuler className="size-4" /> },
+            { label: 'Resultados', to: { name: 'report', id: record.id }, active: false, icon: <BarChart3 className="size-4" /> },
+          ]}
+        />
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-4">
-          <Card className="py-5 gap-4">
-            <CardHeader className="px-5">
-              <CardTitle className="text-base">Lo básico</CardTitle>
-            </CardHeader>
-            <CardContent className="px-5 space-y-4">
-              <div>
-                <Label htmlFor="proto">Prototipo</Label>
-                {protos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Primero sube un prototipo en <Link to={{ name: 'prototypes' }} className="underline">Prototipos</Link>.
-                  </p>
-                ) : (
-                  <NativeSelect id="proto" value={study.prototypeId} onChange={(e) => update({ prototypeId: e.target.value })}>
-                    {!proto && <option value={study.prototypeId}>{study.prototypeId} (no disponible)</option>}
-                    {protos.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="name">Nombre</Label>
-                <Input id="name" value={study.name} onChange={(e) => update({ name: e.target.value })} placeholder="Compra en la tienda móvil" />
-              </div>
-              <div>
-                <Label htmlFor="description">Qué quieres aprender (opcional)</Label>
-                <Input id="description" value={study.description ?? ''} onChange={(e) => update({ description: e.target.value })} placeholder="Si el flujo de compra se entiende sin ayuda" />
-              </div>
-              <div>
-                <Label htmlFor="welcome">Bienvenida para el participante</Label>
-                <Textarea id="welcome" value={study.welcome ?? ''} onChange={(e) => update({ welcome: e.target.value })} placeholder="Gracias por ayudarnos. Vas a usar un prototipo: nada es real y no hay respuestas incorrectas. Piensa en voz alta." />
-              </div>
-              <div>
-                <Label htmlFor="consent">Texto de consentimiento</Label>
-                <Textarea id="consent" value={study.consent ?? ''} onChange={(e) => update({ consent: e.target.value })} placeholder={DEFAULT_CONSENT_TEXT} />
-                <p className="text-muted-foreground text-xs mt-1">Si lo dejas vacío se usa el texto por defecto. Hasta que el participante acepta, no se graba nada.</p>
-              </div>
-            </CardContent>
-          </Card>
+      {record && sessionCount > 0 && (
+        <Alert variant="warning">
+          <TriangleAlert />
+          <AlertTitle>Este estudio ya tiene {plural(sessionCount, 'sesión', 'sesiones')}</AlertTitle>
+          <AlertDescription>
+            <p>Cambiar las tareas afecta los resultados que ya tienes. Si quieres probar otra versión, mejor duplica el estudio y edita la copia.</p>
+            <Button size="sm" variant="outline" className="mt-1" disabled={busy} onClick={() => void duplicateStudy()}>
+              <Copy /> Duplicar estudio
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
-          <Card className="py-5 gap-4">
-            <CardHeader className="px-5 flex flex-row items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-base">Tareas</CardTitle>
-                <CardDescription>En orden. La instrucción es lo que el participante lee en su celular.</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" onClick={addTask} aria-label="Agregar tarea">
-                <Plus /> Tarea
-              </Button>
-            </CardHeader>
-            <CardContent className="px-5 space-y-3">
-              {study.tasks.map((task, i) => (
-                <TaskCard
-                  key={task.id}
-                  index={i}
-                  task={task}
-                  pages={pages}
-                  total={study.tasks.length}
-                  onChange={(patch) => updateTask(i, patch)}
-                  onMove={(dir) => moveTask(i, dir)}
-                  onRemove={() => removeTask(i)}
-                />
+      {errors.length > 0 && (
+        <Alert variant={record ? 'warning' : 'default'} id="create-missing">
+          <CircleAlert />
+          <AlertTitle>{record ? `${errors.length === 1 ? 'Hay 1 cosa por corregir' : `Hay ${errors.length} cosas por corregir`}. Los cambios se guardan cuando esté resuelto.` : 'Para crear el estudio falta:'}</AlertTitle>
+          <AlertDescription>
+            <ul className="w-full space-y-0.5">
+              {errors.slice(0, 6).map((issue, i) => (
+                <li key={i}>
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded text-left underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    onClick={() => {
+                      setShowAllErrors(true);
+                      select(issueSelection(issue));
+                    }}
+                  >
+                    {issue.message}
+                  </button>
+                </li>
               ))}
-              {validation && !validation.ok && <p className="text-destructive text-xs">{validation.error}</p>}
-            </CardContent>
-          </Card>
+            </ul>
+            {errors.length > 6 && <p>…y {errors.length - 6} más.</p>}
+          </AlertDescription>
+        </Alert>
+      )}
+      {!record && valid && firstError === undefined && (
+        <Alert variant="success">
+          <CircleCheck />
+          <AlertTitle>Todo listo</AlertTitle>
+          <AlertDescription>Pulsa "Crear estudio" para guardarlo y obtener el link para compartir.</AlertDescription>
+        </Alert>
+      )}
 
-          <VariantsCard study={study} pages={pages} onChange={(variants) => update(variants.length ? { variants } : { variants: undefined })} />
-        </div>
+      <ShowErrorsContext.Provider value={showAllErrors}>
+        <div className="grid items-start gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[17rem_minmax(0,1fr)_23rem]">
+          <div className="lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:p-1 lg:-m-1">
+            <BlockList
+              blocks={draft.blocks}
+              selection={current}
+              incomplete={incomplete}
+              onSelect={(s) => select(s)}
+              onAdd={addBlock}
+              onMove={(from, to) => setDraft({ ...draft, blocks: moveItem(draft.blocks, from, to) })}
+              onDuplicate={duplicateBlock}
+              onDelete={deleteBlock}
+            />
+          </div>
 
-        <div className="space-y-4">
-          <Card className="py-5 gap-3">
-            <CardHeader className="px-5">
-              <CardTitle className="text-base flex items-center gap-2">
-                <QrCode className="size-4" /> Link del estudio
-              </CardTitle>
-              <CardDescription>
-                {record ? 'El participante lo abre en su celular. Verá la bienvenida y luego las tareas.' : 'Guarda el estudio para obtener el link.'}
-              </CardDescription>
-            </CardHeader>
-            {participantLink && (
-              <CardContent className="px-5 space-y-3">
-                <StudyQr link={participantLink} mode={mode} />
-                <div className="flex gap-2">
-                  <Input readOnly value={participantLink} className="font-mono text-xs" onFocus={(e) => e.target.select()} />
-                  <Button variant="outline" size="icon" aria-label="Copiar link" onClick={() => void copy(participantLink, 'link')}>
-                    {copied === 'link' ? <Check /> : <Copy />}
-                  </Button>
-                </div>
-                {mode === 'static' && <p className="text-muted-foreground text-xs">En modo demo el link no corre el estudio: hace falta el servidor.</p>}
-              </CardContent>
+          <div ref={editorBox} className="min-w-0 scroll-mt-4 space-y-4" key={current}>
+            {wide && recordPanel && <div className="sticky top-6 z-10">{recordPanel}</div>}
+            {current === 'settings' && (
+              <>
+                <SettingsEditor draft={draft} onChange={update} errors={errors} protos={protos} screens={screens} saved={record !== null} />
+                {draft.blocks.length === 0 && (
+                  <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-background px-6 py-10 text-center">
+                    <h2 className="text-base font-semibold">Ahora agrega el primer bloque</h2>
+                    <p className="max-w-md text-sm text-muted-foreground">Un estudio es una lista de bloques: tareas sobre el prototipo y preguntas para el participante. Lo normal es empezar con una tarea.</p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <AddBlockMenu onAdd={addBlock}>
+                        <Button>
+                          <Plus /> Agregar bloque
+                        </Button>
+                      </AddBlockMenu>
+                      <Button variant="outline" onClick={() => setAiOpen(true)}>
+                        <Sparkles /> Armar con IA
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
-          </Card>
+            {current === 'welcome' && <WelcomeEditor draft={draft} onChange={update} errors={errors} />}
+            {current === 'thanks' && <ThanksEditor draft={draft} onChange={update} errors={errors} />}
+            {selected && isDraftTask(selected) && <TaskEditor block={selected} index={blockIndex} onChange={updateBlock} errors={errors} tools={tools} />}
+            {selected && !isDraftTask(selected) && selected.kind === 'context' && <ContextEditor block={selected as ContextBlock} index={blockIndex} onChange={updateBlock} errors={errors} />}
+            {selected && !isDraftTask(selected) && selected.kind !== 'context' && <QuestionEditor block={selected as QuestionBlock} index={blockIndex} onChange={updateBlock} errors={errors} />}
+          </div>
 
-          <Card className="py-5 gap-3">
-            <CardHeader className="px-5">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Sparkles className="size-4" /> Que lo escriba una IA
-              </CardTitle>
-              <CardDescription>
-                Copia el prompt, pégalo en Claude, ChatGPT o la IA que uses, guarda la respuesta como <code>study.json</code> e impórtalo desde Estudios.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="px-5 space-y-3">
-              <div>
-                <Label htmlFor="goal">Qué quieres averiguar (opcional)</Label>
-                <Textarea id="goal" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Si la gente encuentra el envío gratis y si el formulario asusta" />
-              </div>
-              <Button
-                variant="secondary"
-                className="w-full"
-                onClick={() => void copy(buildStudyPrompt({ prototypeId: study.prototypeId, prototypeName: proto?.name ?? study.prototypeId, pages, goal }), 'prompt')}
-              >
-                {copied === 'prompt' ? <Check /> : <Copy />} {copied === 'prompt' ? 'Copiado' : 'Copiar prompt para IA'}
-              </Button>
-              <p className="text-muted-foreground text-xs">
-                El prompt incluye las {pages.length} páginas del prototipo y el formato exacto. Taptana no llama a ningún modelo: la IA la pones tú.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </Layout>
-  );
-}
-
-function StudyQr({ link, mode }: { link: string; mode: 'http' | 'static' }) {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    void getClient().then((c) => setSrc(c.qrImageUrl(link)));
-  }, [link]);
-  if (mode === 'static' || !src) return null;
-  return (
-    <div className="flex justify-center rounded-lg bg-white p-3">
-      <img src={src} alt="QR del link del estudio" width={200} height={200} />
-    </div>
-  );
-}
-
-function TaskCard({
-  index,
-  task,
-  pages,
-  total,
-  onChange,
-  onMove,
-  onRemove,
-}: {
-  index: number;
-  task: Task;
-  pages: PrototypePage[];
-  total: number;
-  onChange: (patch: Partial<Task>) => void;
-  onMove: (dir: -1 | 1) => void;
-  onRemove: () => void;
-}) {
-  const rule = task.success;
-  const setRule = (type: SuccessRule['type']): void => {
-    if (type === 'manual') onChange({ success: { type: 'manual' } });
-    else if (type === 'reached') onChange({ success: { type: 'reached', path: rule.type === 'reached' ? rule.path : (pages[0]?.path ?? '/') } });
-    else onChange({ success: { type: 'tapped', selector: rule.type === 'tapped' ? rule.selector : '' } });
-  };
-  const kind = task.kind ?? 'task';
-
-  return (
-    <div className="rounded-lg border p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <Badge variant="secondary" className="tabular-nums">
-          {index + 1}
-        </Badge>
-        <Input value={task.title} onChange={(e) => onChange({ title: e.target.value })} placeholder="Título corto (para el panel)" className="flex-1" />
-        <NativeSelect value={kind} onChange={(e) => onChange({ kind: e.target.value as Task['kind'] })} className="w-36">
-          <option value="task">Tarea</option>
-          <option value="first-click">First click</option>
-        </NativeSelect>
-        <div className="flex">
-          <Button variant="ghost" size="icon" aria-label="Subir" disabled={index === 0} onClick={() => onMove(-1)}>
-            <ArrowUp />
-          </Button>
-          <Button variant="ghost" size="icon" aria-label="Bajar" disabled={index === total - 1} onClick={() => onMove(1)}>
-            <ArrowDown />
-          </Button>
-          <Button variant="ghost" size="icon" aria-label="Quitar" disabled={total === 1} onClick={onRemove}>
-            <Trash2 className="text-muted-foreground" />
-          </Button>
-        </div>
-      </div>
-      <div>
-        <Label>Instrucción para el participante</Label>
-        <Textarea
-          value={task.instruction}
-          onChange={(e) => onChange({ instruction: e.target.value })}
-          placeholder={kind === 'first-click' ? '¿Dónde tocarías para ver tu carrito?' : 'Quieres regalar una planta. Encuentra una grande y cómprala.'}
-        />
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <Label>Empieza en</Label>
-          <PathSelect value={task.startPath ?? ''} pages={pages} allowEmpty="Donde esté" onChange={(v) => onChange(v ? { startPath: v } : { startPath: undefined })} />
-        </div>
-        <div>
-          <Label>Se logra cuando</Label>
-          <div className={cn('grid gap-2', rule.type !== 'manual' && 'grid-cols-[auto_1fr]')}>
-            <NativeSelect value={rule.type} onChange={(e) => setRule(e.target.value as SuccessRule['type'])} className={rule.type === 'manual' ? '' : 'w-40'}>
-              <option value="reached">Llega a la página</option>
-              <option value="tapped">Toca el elemento</option>
-              <option value="manual">Lo decide el moderador</option>
-            </NativeSelect>
-            {rule.type === 'reached' && <PathSelect value={rule.path} pages={pages} onChange={(v) => onChange({ success: { type: 'reached', path: v } })} />}
-            {rule.type === 'tapped' && (
-              <Input value={rule.selector} onChange={(e) => onChange({ success: { type: 'tapped', selector: e.target.value } })} placeholder="#agregar o .cart-link" className="font-mono text-xs" />
-            )}
+          <div ref={phoneBox} className="scroll-mt-4 space-y-3 lg:col-span-2 xl:sticky xl:top-6 xl:col-span-1">
+            {!wide && recordPanel}
+            <PhoneFrame
+              ref={phone}
+              proto={proto}
+              screen={wantedScreen}
+              onMessage={onPhoneMessage}
+              highlight={mode !== null}
+              banner={
+                mode?.type === 'pick' ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-primary bg-primary/5 px-3 py-2 text-sm">
+                    <Crosshair className="size-4 shrink-0" />
+                    <span className="min-w-0 flex-1">Toca el elemento que el participante tiene que tocar.</span>
+                    <Button size="sm" variant="outline" onClick={() => setMode(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                ) : undefined
+              }
+            />
+            {!mode && proto && <p className="mx-auto max-w-[390px] text-center text-xs text-muted-foreground">Es tu prototipo de verdad: navega para revisar pantallas. Aquí no se graba nada.</p>}
           </div>
         </div>
-      </div>
-      {kind === 'task' && <ExpectedPathEditor value={task.expectedPath ?? []} pages={pages} onChange={(v) => onChange({ expectedPath: v.length ? v : undefined })} />}
-    </div>
-  );
-}
+      </ShowErrorsContext.Provider>
 
-/** Camino esperado: pantallas en orden. Sirve para distinguir éxito directo de indirecto. */
-function ExpectedPathEditor({ value, pages, onChange }: { value: string[]; pages: PrototypePage[]; onChange: (v: string[]) => void }) {
-  const [adding, setAdding] = useState('');
-  return (
-    <div className="rounded-lg bg-muted/50 p-4 space-y-2.5">
-      <div>
-        <Label className="mb-1">Camino esperado (opcional)</Label>
-        <p className="text-xs text-muted-foreground">
-          Las pantallas por las que debería pasar, en orden. Si lo dejas vacío, Taptana usa el camino más corto de quienes lo lograron.
-        </p>
-      </div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {value.map((p, i) => (
-          <span key={i} className="flex items-center gap-1.5">
-            {i > 0 && <ArrowRight className="size-3.5 text-muted-foreground" />}
-            <span className="inline-flex items-center gap-1 rounded-md border bg-background pl-2.5 pr-1 py-1 text-sm">
-              <span className="text-muted-foreground tabular-nums text-xs">{i + 1}</span> {p}
-              <button type="button" aria-label={`Quitar ${p}`} className="rounded p-0.5 hover:bg-accent" onClick={() => onChange(value.filter((_, j) => j !== i))}>
-                <X className="size-3.5" />
-              </button>
-            </span>
-          </span>
-        ))}
-        <NativeSelect
-          aria-label="Agregar pantalla al camino"
-          value={adding}
-          className="w-auto h-8"
-          onChange={(e) => {
-            if (e.target.value) onChange([...value, e.target.value]);
-            setAdding('');
-          }}
-        >
-          <option value="">+ Agregar pantalla</option>
-          {pages.map((p) => (
-            <option key={p.path} value={p.path}>
-              {p.path}
-            </option>
-          ))}
-        </NativeSelect>
-      </div>
-    </div>
-  );
-}
-
-function PathSelect({ value, pages, onChange, allowEmpty }: { value: string; pages: PrototypePage[]; onChange: (v: string) => void; allowEmpty?: string }) {
-  const known = pages.some((p) => p.path === value);
-  const [custom, setCustom] = useState(!known && value !== '');
-  if (custom) {
-    return (
-      <div className="flex gap-1">
-        <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="/pagina.html" className="font-mono text-xs" />
-        <Button variant="ghost" size="sm" onClick={() => setCustom(false)}>
-          Lista
-        </Button>
-      </div>
-    );
-  }
-  return (
-    <NativeSelect
-      value={known || value === '' ? value : '__custom'}
-      onChange={(e) => {
-        if (e.target.value === '__custom') setCustom(true);
-        else onChange(e.target.value);
-      }}
-    >
-      {allowEmpty && <option value="">{allowEmpty}</option>}
-      {pages.map((p) => (
-        <option key={p.path} value={p.path}>
-          {p.path}
-          {p.title ? ` · ${p.title}` : ''}
-        </option>
-      ))}
-      <option value="__custom">Otra ruta…</option>
-    </NativeSelect>
-  );
-}
-
-function VariantsCard({ study, pages, onChange }: { study: Study; pages: PrototypePage[]; onChange: (variants: StudyVariant[]) => void }) {
-  const variants = study.variants ?? [];
-  const set = (i: number, patch: Partial<StudyVariant>): void => onChange(variants.map((v, j) => (j === i ? { ...v, ...patch } : v)));
-  const add = (): void => {
-    const letter = String.fromCharCode(65 + variants.length);
-    onChange([...variants, { id: letter, name: `Variante ${letter}`, startPath: pages[0]?.path ?? '/' }]);
-  };
-  return (
-    <Card className="py-5 gap-4">
-      <CardHeader className="px-5 flex flex-row items-center justify-between gap-3">
-        <div>
-          <CardTitle className="text-base">Variantes A/B (opcional)</CardTitle>
-          <CardDescription>Cada participante recibe una al azar. Las tareas son las mismas; cambia la página donde empieza.</CardDescription>
-        </div>
-        <Button variant="outline" size="sm" onClick={add} disabled={variants.length >= 4}>
-          <Plus /> Variante
-        </Button>
-      </CardHeader>
-      {variants.length > 0 && (
-        <CardContent className="px-5 space-y-2">
-          {variants.map((v, i) => (
-            <div key={v.id} className="grid gap-2 sm:grid-cols-[3rem_1fr_1fr_auto] items-center">
-              <Badge variant="secondary" className="justify-center">
-                {v.id}
-              </Badge>
-              <Input value={v.name} onChange={(e) => set(i, { name: e.target.value })} placeholder="Nombre" />
-              <PathSelect value={v.startPath ?? ''} pages={pages} allowEmpty="Donde esté" onChange={(p) => set(i, p ? { startPath: p } : { startPath: undefined })} />
-              <Button variant="ghost" size="icon" aria-label="Quitar variante" onClick={() => onChange(variants.filter((_, j) => j !== i))}>
-                <Trash2 className="text-muted-foreground" />
-              </Button>
-            </div>
-          ))}
-        </CardContent>
-      )}
-    </Card>
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        link={link}
+        qr={link ? client.qrImageUrl(link) : null}
+        demo={IS_DEMO}
+        closed={draft.closed === true}
+        problem={!proto ? 'Este estudio no tiene un prototipo disponible. Elige uno en "Ajustes del estudio" y vuelve a compartir.' : undefined}
+      />
+      <TryoutDialog
+        open={tryout !== null}
+        onOpenChange={(o) => !o && setTryout(null)}
+        proto={proto}
+        study={tryout ? { ...tryout.study, ...(record ? { id: record.id, createdAt: record.createdAt, updatedAt: record.updatedAt } : {}) } : null}
+        startAt={tryout?.startAt}
+      />
+      <AiDialog open={aiOpen} onOpenChange={setAiOpen} proto={proto} screens={screens} replaces={draft.blocks.length > 0} onApply={applyImported} />
+      <ConfirmDialog
+        open={leave !== null}
+        onOpenChange={(o) => !o && setLeave(null)}
+        title="¿Salir sin guardar?"
+        description={
+          record
+            ? 'Hay cambios que no se guardaron porque al estudio le falta algo. Si sales ahora, esos cambios se pierden.'
+            : 'Todavía no creaste el estudio. Si sales ahora, se pierde lo que escribiste.'
+        }
+        confirmLabel="Salir sin guardar"
+        cancelLabel="Seguir editando"
+        destructive
+        onConfirm={() => {
+          const go = leave;
+          setLeave(null);
+          go?.();
+        }}
+      />
+    </Layout>
   );
 }

@@ -1,6 +1,7 @@
-# Publica en GitHub Pages, en cada push a main:
-#   - el panel en modo demo, con sesiones de ejemplo
+# Publica la demo en GitHub Pages, en cada push a main:
+#   - el panel en modo demo (entra por Inicio), con el estudio de ejemplo y su reporte
 #   - el prototipo de ejemplo con el recorder en modo local
+# No necesita navegador: las sesiones de ejemplo ya vienen grabadas en packages/server/seed.
 # Activar una vez en Settings → Pages → Source: GitHub Actions.
 name: pages
 

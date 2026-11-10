@@ -1,20 +1,31 @@
 /**
  * El panel nunca accede a datos directamente: siempre a través de esta interfaz.
  * Así el modo demo (JSON estáticos, GitHub Pages) y el modo real (API) son intercambiables.
+ * Cada método existe en `http.ts` y en `static.ts`.
+ *
+ * Los métodos lanzan `UserError` (mensaje en español, listo para mostrar) cuando el fallo es
+ * conocido; para cualquier otro error usa `friendlyError(e)` de `@/lib/errors`.
  */
 
-import type {
-  ManualResults,
-  Prototype,
-  ServerInfo,
-  SessionEventsResponse,
-  SessionExport,
-  SessionSummary,
-  Study,
-  StudyRecord,
-  StudyReport,
+import {
+  validateSessionExport,
+  type ExampleResponse,
+  type ManualResults,
+  type Prototype,
+  type ReportFilter,
+  type ScreenInfo,
+  type ServerInfo,
+  type SessionEventsResponse,
+  type SessionExport,
+  type SessionPatch,
+  type SessionSummary,
+  type Study,
+  type StudyRecord,
+  type StudyReport,
 } from '@taptana/shared';
+import { UserError } from '@/lib/errors';
 
+/** Página HTML de un prototipo. Queda por compatibilidad: usa `listPrototypeScreens`. */
 export interface PrototypePage {
   path: string;
   title: string;
@@ -22,51 +33,88 @@ export interface PrototypePage {
 
 export interface ApiClient {
   readonly mode: 'http' | 'static';
-  info(): Promise<ServerInfo>;
+  /** Se pueden subir prototipos desde el panel. */
+  readonly canUpload: boolean;
+  /**
+   * Si en este navegador no se puede subir ni guardar (demo sin service worker o sin
+   * IndexedDB), la explicación en español; si todo está bien, null.
+   */
+  uploadProblem(): Promise<string | null>;
 
+  info(): Promise<ServerInfo>;
+  /** Carga el ejemplo (prototipo + estudio + sesiones). Idempotente. En la demo ya viene incluido. */
+  loadExample(): Promise<ExampleResponse>;
+
+  // ── Sesiones ──
   listSessions(studyId?: string): Promise<SessionSummary[]>;
   getSessionEvents(id: string): Promise<SessionEventsResponse | null>;
-  importSession(data: SessionExport): Promise<void>;
+  /** Lanza `SessionExistsError` si la sesión ya existe y no se pidió `replace`. */
+  importSession(data: SessionExport, opts?: { replace?: boolean }): Promise<{ id: string; replaced: boolean }>;
   deleteSession(id: string): Promise<void>;
+  /** Etiqueta, notas, exclusión y marcas manuales. Solo cambia lo que viene. */
+  patchSession(id: string, patch: SessionPatch): Promise<SessionSummary>;
+  /** Atajo de `patchSession(id, { manual })`. */
   setManualResults(id: string, manual: ManualResults): Promise<SessionSummary>;
 
+  // ── Estudios ──
   listStudies(): Promise<StudyRecord[]>;
   getStudy(id: string): Promise<StudyRecord | null>;
   saveStudy(study: Study, id?: string): Promise<StudyRecord>;
   deleteStudy(id: string): Promise<void>;
-  getStudyReport(id: string): Promise<StudyReport | null>;
+  /** Copia el estudio ("Copia de …") con ids de bloque nuevos. */
+  duplicateStudy(id: string): Promise<StudyRecord>;
+  getStudyReport(id: string, filter?: ReportFilter): Promise<StudyReport | null>;
+  /** El CSV del estudio (una fila por participante) como texto, o null si el estudio no existe. */
+  exportStudyCsv(id: string): Promise<string | null>;
 
-  listPrototypePages(prototypeId: string): Promise<PrototypePage[]>;
+  // ── Prototipos ──
   listPrototypes(): Promise<Prototype[]>;
   /** Sube un .html o .zip. Con `id`, reemplaza los archivos de ese prototipo. */
   uploadPrototype(file: File, opts?: { name?: string; id?: string }): Promise<Prototype>;
+  renamePrototype(id: string, name: string): Promise<Prototype>;
+  /** "Abrir en la raíz" (solo con el servidor local; ver `canServeAtRoot`). */
+  setPrototypeRoot(id: string, root: boolean): Promise<Prototype>;
+  readonly canServeAtRoot: boolean;
   deletePrototype(id: string): Promise<void>;
-  /** Se pueden subir prototipos (solo con el servidor local). */
-  readonly canUpload: boolean;
+  /** Pantallas conocidas: archivos HTML + pantallas vistas en sesiones. */
+  listPrototypeScreens(prototypeId: string): Promise<ScreenInfo[]>;
+  /** Solo los archivos HTML (compatibilidad). */
+  listPrototypePages(prototypeId: string): Promise<PrototypePage[]>;
+
   /** URL de una imagen QR para ese texto, o null si no hay forma de generarlo. */
   qrImageUrl(text: string): string | null;
 }
 
 declare const __TAPTANA_MODE__: 'http' | 'static';
 
-let client: ApiClient | null = null;
+/** Modo del panel, conocido al compilar: no hace falta esperar al cliente para saberlo. */
+export const PANEL_MODE: 'http' | 'static' = __TAPTANA_MODE__;
+export const IS_DEMO = PANEL_MODE === 'static';
 
-export async function getClient(): Promise<ApiClient> {
-  if (client) return client;
-  if (__TAPTANA_MODE__ === 'static') {
-    const { StaticClient } = await import('./static.ts');
-    client = new StaticClient(import.meta.env.BASE_URL);
-  } else {
-    const { HttpClient } = await import('./http.ts');
-    client = new HttpClient();
+let client: Promise<ApiClient> | null = null;
+
+export function getClient(): Promise<ApiClient> {
+  if (!client) {
+    client =
+      __TAPTANA_MODE__ === 'static'
+        ? import('./static.ts').then((m): ApiClient => new m.StaticClient(import.meta.env.BASE_URL))
+        : import('./http.ts').then((m): ApiClient => new m.HttpClient());
+    client.catch(() => {
+      client = null;
+    });
   }
   return client;
 }
 
+/** Lee y valida un archivo de sesión exportado. Lanza `UserError` si no lo es. */
 export function parseSessionFile(text: string): SessionExport {
-  const data = JSON.parse(text) as Partial<SessionExport>;
-  if (data?.v !== 1 || !data.session?.id || !Array.isArray(data.events)) {
-    throw new Error('Este archivo no es una sesión de Taptana.');
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new UserError('Este archivo no es una sesión exportada de Taptana (no es un JSON válido).');
   }
-  return data as SessionExport;
+  const result = validateSessionExport(raw);
+  if (!result.ok) throw new UserError(result.error);
+  return result.value;
 }

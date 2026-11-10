@@ -1,5 +1,7 @@
 # Propuesta v0.1: estructura de carpetas y formato de eventos
 
+> **Documento histórico (v0.1).** Explica las decisiones de origen. El formato y las rutas actuales están en [plan-v1.md](plan-v1.md) y en `CLAUDE.md`.
+
 Este documento es para revisar antes de escribir código. Está en dos partes:
 
 1. Cómo se organizan las carpetas y qué hace cada pieza.

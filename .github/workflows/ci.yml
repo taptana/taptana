@@ -1,9 +1,13 @@
+# Compila y corre las pruebas unitarias en cada push y en cada pull request.
 name: ci
 
 on:
   pull_request:
   push:
-    branches-ignore: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -18,3 +22,20 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
+
+  # Pruebas de punta a punta (tests/e2e, con un navegador de verdad). Para activarlas, quita
+  # los "#" de este bloque.
+  # e2e:
+  #   runs-on: ubuntu-latest
+  #   needs: test
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: pnpm/action-setup@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 22
+  #         cache: pnpm
+  #     - run: pnpm install --frozen-lockfile
+  #     - run: pnpm build
+  #     - run: npx playwright install --with-deps chromium
+  #     - run: pnpm e2e

@@ -1,36 +1,52 @@
 import { useEffect, useRef, useState } from 'react';
-import { Upload, Trash2, RefreshCw, Copy, Check, ExternalLink, FileArchive, FolderOpen } from 'lucide-react';
-import type { Prototype, ServerInfo } from '@taptana/shared';
-import { getClient } from '@/api/client';
-import { Button } from '@/components/ui/button';
+import { Check, ChevronDown, Copy, ExternalLink, FileArchive, FlaskConical, FolderOpen, Info, Pencil, RefreshCw, Trash2, TriangleAlert, Upload } from 'lucide-react';
+import { EXAMPLE_PROTOTYPE_ID, STUDY_LIMITS, type Prototype, type ScreenInfo, type ServerInfo } from '@taptana/shared';
+import { getClient, IS_DEMO } from '@/api/client';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input, Label } from '@/components/ui/input';
-import { Layout } from '@/components/layout';
-import { cn, formatRelative } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { toast } from '@/components/ui/toast';
+import { EmptyState, ErrorState, InlineError, Layout, ListSkeleton, PageHeader } from '@/components/layout';
+import { copyText } from '@/lib/download';
+import { friendlyError } from '@/lib/errors';
+import { plural } from '@/lib/format';
 import { participantUrl } from '@/lib/links';
+import { cn, formatRelative } from '@/lib/utils';
+import { Link, useRouter } from '@/router';
+
+const ACCEPT = '.html,.htm,.zip,text/html,application/zip';
 
 export function PrototypesPage() {
   const [protos, setProtos] = useState<Prototype[] | null>(null);
   const [info, setInfo] = useState<ServerInfo | null>(null);
-  const [canUpload, setCanUpload] = useState(true);
-  const [mode, setMode] = useState<'http' | 'static'>('http');
+  const [canRoot, setCanRoot] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState('');
   const [dragging, setDragging] = useState(false);
+  const [toDelete, setToDelete] = useState<Prototype | null>(null);
+  const [toRename, setToRename] = useState<Prototype | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const { navigate } = useRouter();
 
   const load = async (): Promise<void> => {
     try {
       const client = await getClient();
-      setCanUpload(client.canUpload);
-      setMode(client.mode);
-      const [i, list] = await Promise.all([client.info(), client.listPrototypes()]);
+      setCanRoot(client.canServeAtRoot);
+      const [i, list, p] = await Promise.all([client.info(), client.listPrototypes(), client.uploadProblem()]);
       setInfo(i);
       setProtos(list);
+      setProblem(p);
+      setLoadError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setLoadError(friendlyError(e, 'No pudimos leer tus prototipos.'));
     }
   };
   useEffect(() => {
@@ -38,63 +54,92 @@ export function PrototypesPage() {
   }, []);
 
   const upload = async (file: File, id?: string): Promise<void> => {
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
       const client = await getClient();
-      await client.uploadPrototype(file, { ...(name.trim() && !id ? { name: name.trim() } : {}), ...(id ? { id } : {}) });
+      const proto = await client.uploadPrototype(file, { ...(name.trim() && !id ? { name: name.trim() } : {}), ...(id ? { id } : {}) });
       setName('');
       await load();
+      if (id) toast.success(`«${proto.name}» se actualizó. El link es el mismo.`);
+      else toast.success(`«${proto.name}» está listo.`, { action: { label: 'Crear estudio', onClick: () => navigate({ name: 'study', id: null }) }, durationMs: 8000 });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e, 'No se pudo subir el archivo. Revisa que sea un .html o un .zip e intenta de nuevo.'));
     } finally {
       setBusy(false);
     }
   };
 
   const remove = async (p: Prototype): Promise<void> => {
-    const extra = p.sessionCount ? ` Se borran también sus ${p.sessionCount} sesiones y sus estudios.` : '';
-    if (!confirm(`¿Borrar "${p.name}"?${extra} No se puede deshacer.`)) return;
     try {
       await (await getClient()).deletePrototype(p.id);
+      toast(`«${p.name}» se borró.`);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e, 'No se pudo borrar el prototipo.'));
     }
   };
 
+  const setRoot = async (p: Prototype, root: boolean): Promise<void> => {
+    try {
+      await (await getClient()).setPrototypeRoot(p.id, root);
+      await load();
+      toast(root ? `«${p.name}» ahora se abre en la raíz. Su link cambió.` : `«${p.name}» volvió a su dirección normal.`);
+    } catch (e) {
+      toast.error(friendlyError(e, 'No se pudo cambiar.'));
+    }
+  };
+
+  const hasOwn = (protos ?? []).some((p) => p.id !== EXAMPLE_PROTOTYPE_ID);
+
   return (
     <Layout>
-      <header>
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Prototipos</h1>
-        <p className="text-muted-foreground text-sm">
-          {mode === 'static'
+      <PageHeader
+        title="Prototipos"
+        description={
+          IS_DEMO
             ? 'Sube un .html o un .zip. En la demo se guarda solo en este navegador y no sale de él.'
-            : 'Sube un .html o un .zip con tu prototipo. Se guarda en esta computadora y no sale de ella.'}
-        </p>
-      </header>
+            : 'Sube un .html o un .zip con tu prototipo. Se guarda en esta computadora y no sale de ella.'
+        }
+      />
 
-      {mode === 'static' && (
-        <Card className="py-4 border-amber-500/40 bg-amber-500/5">
-          <CardContent className="px-5 text-sm space-y-1">
-            <p className="font-medium">Modo demo: todo vive en este navegador</p>
-            <p className="text-muted-foreground">
-              Puedes subir tu prototipo, armar estudios y probarlos tú mismo (o pasarle esta computadora a alguien). Las
-              sesiones aparecen solas en Sesiones. El link no funciona en otro dispositivo: para probar con celulares, corre
-              Taptana en tu computadora con <code className="text-foreground">pnpm start</code>.
+      {IS_DEMO && (
+        <Alert variant="warning">
+          <Info />
+          <AlertTitle>Demo: el prototipo que subas vive en este navegador</AlertTitle>
+          <AlertDescription>
+            <p>
+              Puedes armar un estudio y hacerlo tú mismo para ver cómo funciona. El link no abre en otro dispositivo: para probar con celulares, corre Taptana en tu
+              computadora con <code className="text-foreground">pnpm start</code>.
             </p>
-          </CardContent>
-        </Card>
+          </AlertDescription>
+        </Alert>
       )}
 
-      {canUpload ? (
+      {problem ? (
+        <Alert variant="destructive">
+          <TriangleAlert />
+          <AlertTitle>Aquí no se pueden subir prototipos</AlertTitle>
+          <AlertDescription>
+            <p>{problem}</p>
+          </AlertDescription>
+        </Alert>
+      ) : (
         <Card className="py-5 gap-4">
-          <CardContent className="px-5 space-y-3">
+          <CardContent className="px-5 space-y-4">
             <div
               role="button"
               tabIndex={0}
+              aria-label="Subir un prototipo: elige un archivo .html o .zip"
+              aria-busy={busy}
               onClick={() => !busy && fileInput.current?.click()}
-              onKeyDown={(e) => e.key === 'Enter' && fileInput.current?.click()}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && !busy) {
+                  e.preventDefault();
+                  fileInput.current?.click();
+                }
+              }}
               onDragOver={(e) => {
                 e.preventDefault();
                 setDragging(true);
@@ -107,26 +152,27 @@ export function PrototypesPage() {
                 if (f) void upload(f);
               }}
               className={cn(
-                'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 text-center cursor-pointer transition-colors',
+                'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 text-center cursor-pointer transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
                 dragging ? 'border-primary bg-accent' : 'hover:bg-accent/50',
                 busy && 'opacity-60 cursor-wait',
               )}
             >
               <Upload className="size-6 text-muted-foreground" />
               <p className="font-medium">{busy ? 'Subiendo…' : 'Arrastra aquí tu .html o .zip, o haz clic para elegirlo'}</p>
-              <p className="text-muted-foreground text-xs">
-                Un zip puede traer varias páginas, CSS, JS e imágenes. Si no hay index.html, se abre el primer HTML. Hasta 50 MB.
+              <p className="text-muted-foreground text-xs max-w-md">
+                Un zip puede traer varias páginas, estilos, scripts e imágenes. Se abre <code>index.html</code>; si no hay, el primer HTML. Hasta 50 MB.
               </p>
             </div>
             <div className="max-w-sm">
               <Label htmlFor="proto-name">Nombre (opcional)</Label>
-              <Input id="proto-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Si lo dejas vacío, se usa el nombre del archivo" />
+              <Input id="proto-name" value={name} maxLength={STUDY_LIMITS.name} onChange={(e) => setName(e.target.value)} placeholder="Si lo dejas vacío, se usa el nombre del archivo" />
             </div>
             <input
               ref={fileInput}
               type="file"
-              accept=".html,.htm,.zip,text/html,application/zip"
+              accept={ACCEPT}
               className="hidden"
+              aria-label="Archivo del prototipo"
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) void upload(f);
@@ -135,113 +181,264 @@ export function PrototypesPage() {
             />
           </CardContent>
         </Card>
-      ) : (
-        <Card className="py-4">
-          <CardContent className="px-5 text-sm text-muted-foreground">
-            En la demo no se suben archivos. Para probar tus propios prototipos, corre Taptana en tu computadora:{' '}
-            <code className="text-foreground">pnpm start</code>. Todo queda en tu máquina.
-          </CardContent>
-        </Card>
       )}
 
-      {error && (
-        <Card className="border-destructive/40 py-4">
-          <CardContent className="text-sm text-destructive">{error}</CardContent>
-        </Card>
-      )}
+      {error && <InlineError onDismiss={() => setError(null)}>{error}</InlineError>}
 
-      {protos === null || !info ? (
-        <p className="text-muted-foreground text-sm">Cargando…</p>
+      {loadError && protos === null ? (
+        <ErrorState message={loadError} onRetry={() => void load()} />
+      ) : protos === null || !info ? (
+        <ListSkeleton variant="cards" count={2} />
       ) : protos.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Todavía no hay prototipos.</p>
+        <EmptyState icon={<FileArchive className="size-6" />} title="Todavía no hay prototipos">
+          <p>Sube el tuyo arriba. Si quieres ver primero cómo se ve todo con datos, en Inicio hay un ejemplo listo.</p>
+        </EmptyState>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {protos.map((p) => (
-            <PrototypeCard key={p.id} proto={p} info={info} canUpload={canUpload} onReplace={(f) => void upload(f, p.id)} onDelete={() => void remove(p)} />
-          ))}
-        </div>
+        <>
+          {!hasOwn && !problem && <p className="text-sm text-muted-foreground">Este es el prototipo de ejemplo. Cuando subas el tuyo aparecerá aquí.</p>}
+          <div className="grid gap-4 md:grid-cols-2 items-start">
+            {protos.map((p) => (
+              <PrototypeCard
+                key={p.id}
+                proto={p}
+                info={info}
+                canRoot={canRoot}
+                canReplace={!problem}
+                busy={busy}
+                onReplace={(f) => void upload(f, p.id)}
+                onDelete={() => setToDelete(p)}
+                onRename={() => setToRename(p)}
+                onRoot={(root) => void setRoot(p, root)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        onOpenChange={(o) => !o && setToDelete(null)}
+        title={`¿Borrar «${toDelete?.name ?? ''}»?`}
+        description={
+          <p>
+            Se borran sus archivos{toDelete?.sessionCount ? `, ${toDelete.sessionCount === 1 ? 'su sesión grabada' : `sus ${toDelete.sessionCount} sesiones grabadas`}` : ''} y los estudios
+            que lo usan. No se puede deshacer.
+          </p>
+        }
+        confirmLabel="Borrar prototipo"
+        destructive
+        onConfirm={async () => {
+          if (toDelete) await remove(toDelete);
+        }}
+      />
+      {toRename && (
+        <RenameDialog
+          proto={toRename}
+          onClose={() => setToRename(null)}
+          onDone={async () => {
+            setToRename(null);
+            await load();
+          }}
+        />
       )}
     </Layout>
+  );
+}
+
+function RenameDialog({ proto, onClose, onDone }: { proto: Prototype; onClose: () => void; onDone: () => Promise<void> }) {
+  const [value, setValue] = useState(proto.name);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async (): Promise<void> => {
+    if (!value.trim()) {
+      setError('Ponle un nombre al prototipo.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await (await getClient()).renamePrototype(proto.id, value.trim());
+      await onDone();
+    } catch (e) {
+      setError(friendlyError(e, 'No se pudo cambiar el nombre.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog open onOpenChange={(o) => !o && !busy && onClose()}>
+      <DialogContent className="max-w-md">
+        <form
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Cambiar el nombre</DialogTitle>
+            <DialogDescription>Solo cambia cómo lo ves en el panel. El link sigue siendo el mismo.</DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label htmlFor="rename-proto">Nombre del prototipo</Label>
+            <Input id="rename-proto" autoFocus value={value} maxLength={STUDY_LIMITS.name} aria-invalid={error !== null} aria-describedby={error ? 'rename-error' : undefined} onChange={(e) => setValue(e.target.value)} />
+            {error && (
+              <p id="rename-error" className="text-sm text-destructive mt-1.5">
+                {error}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={busy}>
+              Guardar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function PrototypeCard({
   proto,
   info,
-  canUpload,
+  canRoot,
+  canReplace,
+  busy,
   onReplace,
   onDelete,
+  onRename,
+  onRoot,
 }: {
   proto: Prototype;
   info: ServerInfo;
-  canUpload: boolean;
+  canRoot: boolean;
+  canReplace: boolean;
+  busy: boolean;
   onReplace: (f: File) => void;
   onDelete: () => void;
+  onRename: () => void;
+  onRoot: (root: boolean) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
-  const link = participantUrl(info, proto);
-  const uploaded = proto.source === 'upload' && proto.id !== 'demo-tienda';
+  const isExample = proto.id === EXAMPLE_PROTOTYPE_ID;
+  const uploaded = proto.source === 'upload';
+  // Sesiones importadas de un prototipo que no está aquí: no hay archivos ni link.
+  const foreign = proto.source === undefined && !proto.url;
+  const link = foreign ? '' : participantUrl(info, proto);
+  const sessions = proto.sessionCount ?? 0;
 
   useEffect(() => {
+    if (!link) return;
     void getClient().then((c) => setQr(c.qrImageUrl(link)));
   }, [link]);
 
+  const copy = async (): Promise<void> => {
+    if (await copyText(link)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } else toast.error('No se pudo copiar. Selecciona el link y cópialo a mano.');
+  };
+
   return (
-    <Card className="py-5 gap-3">
+    <Card className="py-5 gap-4">
       <CardHeader className="px-5">
-        <CardTitle className="text-base flex items-center gap-2">
-          {uploaded ? <FileArchive className="size-4" /> : <FolderOpen className="size-4" />}
-          {proto.name}
+        <CardTitle className="text-base flex items-start gap-2">
+          {uploaded ? <FileArchive className="size-4 mt-0.5 shrink-0" aria-hidden /> : <FolderOpen className="size-4 mt-0.5 shrink-0" aria-hidden />}
+          <span className="min-w-0 break-words leading-snug">{proto.name}</span>
         </CardTitle>
-        <CardDescription className="flex flex-wrap gap-1.5 items-center">
-          <Badge variant="secondary">{uploaded ? 'subido' : 'carpeta local'}</Badge>
-          {proto.entryPath && <span className="font-mono text-xs">{proto.entryPath}</span>}
-          <span>· {proto.sessionCount ?? 0} sesiones</span>
-          {proto.createdAt > 0 && <span>· {formatRelative(proto.createdAt)}</span>}
+        <CardDescription className="flex flex-wrap gap-x-1.5 gap-y-1 items-center">
+          <Badge variant="secondary">{isExample ? 'Ejemplo' : foreign ? 'Importado' : uploaded ? 'Subido' : 'Carpeta local'}</Badge>
+          {proto.root && <Badge variant="outline">En la raíz</Badge>}
+          <span>{plural(sessions, 'sesión', 'sesiones', 'Sin sesiones')}</span>
+          {proto.createdAt > 0 && <span>· subido {formatRelative(proto.createdAt)}</span>}
         </CardDescription>
       </CardHeader>
-      <CardContent className="px-5 space-y-3">
-        {qr && (
-          <div className="flex justify-center rounded-lg bg-white p-3">
-            <img src={qr} alt={`QR de ${proto.name}`} width={160} height={160} />
-          </div>
+      <CardContent className="px-5 space-y-4">
+        {foreign ? (
+          <p className="text-sm text-muted-foreground">
+            Estas sesiones se importaron de otro lugar y su prototipo no está aquí. Puedes ver las grabaciones en Sesiones.
+          </p>
+        ) : (
+          <>
+            {qr && (
+              <div className="flex justify-center rounded-lg bg-white p-3">
+                <img src={qr} alt={`Código QR para abrir ${proto.name} en un celular`} width={160} height={160} />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label htmlFor={`link-${proto.id}`} className="mb-0">
+                Link del prototipo (sin estudio)
+              </Label>
+              <Input id={`link-${proto.id}`} readOnly value={link} className="font-mono text-xs" onFocus={(e) => e.target.select()} />
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button variant="outline" size="sm" onClick={() => void copy()}>
+                  {copied ? <Check /> : <Copy />} {copied ? 'Copiado' : 'Copiar link'}
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <a href={link} target="_blank" rel="noreferrer">
+                    <ExternalLink /> Abrir
+                  </a>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link to={{ name: 'study', id: null }}>
+                    <FlaskConical /> Crear estudio
+                  </Link>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Quien abra este link usa el prototipo libremente y queda grabado. Para pedir tareas y consentimiento, crea un estudio.</p>
+            </div>
+
+            {uploaded && canRoot && (
+              <div className={cn('rounded-lg border p-3 space-y-1.5', proto.absoluteUrls && !proto.root && 'border-amber-500/50 bg-amber-500/5')}>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor={`root-${proto.id}`} className="mb-0">
+                    Abrir en la raíz
+                  </Label>
+                  <Switch id={`root-${proto.id}`} checked={proto.root === true} onCheckedChange={onRoot} />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {proto.absoluteUrls && !proto.root
+                    ? 'Recomendado: este prototipo usa rutas que empiezan con «/» (por ejemplo /css/app.css). Si se ve sin estilos o sus páginas no cargan, actívalo.'
+                    : 'Sirve el prototipo en la dirección principal en vez de una subcarpeta. Úsalo si se ve sin estilos o si es una app con rutas propias. Solo un prototipo a la vez.'}
+                </p>
+              </div>
+            )}
+            {uploaded && !canRoot && proto.absoluteUrls && (
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Este prototipo usa rutas que empiezan con «/». En la demo puede verse sin estilos; en tu computadora se arregla con «Abrir en la raíz».
+              </p>
+            )}
+
+            <Screens prototypeId={proto.id} />
+          </>
         )}
-        <div className="flex gap-2">
-          <Input readOnly value={link} className="font-mono text-xs" onFocus={(e) => e.target.select()} />
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Copiar link"
-            onClick={() => {
-              void navigator.clipboard.writeText(link).then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              });
-            }}
-          >
-            {copied ? <Check /> : <Copy />}
-          </Button>
-          <Button variant="outline" size="icon" aria-label="Abrir" asChild>
-            <a href={link} target="_blank" rel="noreferrer">
-              <ExternalLink />
-            </a>
-          </Button>
-        </div>
-        {uploaded && canUpload && (
-          <div className="flex justify-between gap-2">
-            <Button variant="outline" size="sm" onClick={() => replaceInput.current?.click()}>
-              <RefreshCw /> Subir nueva versión
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onDelete}>
+
+        {(uploaded || foreign) && !isExample && (
+          <div className="flex flex-wrap gap-2 border-t pt-4">
+            {uploaded && canReplace && (
+              <Button variant="outline" size="sm" disabled={busy} onClick={() => replaceInput.current?.click()} title="Mantiene el mismo link, sus estudios y sesiones">
+                <RefreshCw /> Subir nueva versión
+              </Button>
+            )}
+            {uploaded && (
+              <Button variant="outline" size="sm" onClick={onRename}>
+                <Pencil /> Cambiar nombre
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive ml-auto" onClick={onDelete}>
               <Trash2 /> Borrar
             </Button>
             <input
               ref={replaceInput}
               type="file"
-              accept=".html,.htm,.zip,text/html,application/zip"
+              accept={ACCEPT}
               className="hidden"
+              aria-label={`Nueva versión de ${proto.name}`}
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) onReplace(f);
@@ -250,8 +447,75 @@ function PrototypeCard({
             />
           </div>
         )}
-        {uploaded && <p className="text-muted-foreground text-xs">Subir una nueva versión mantiene el mismo link, sus estudios y sesiones.</p>}
       </CardContent>
     </Card>
+  );
+}
+
+/** Pantallas que Taptana conoce de un prototipo. Se cargan al desplegar. */
+function Screens({ prototypeId }: { prototypeId: string }) {
+  const [open, setOpen] = useState(false);
+  const [screens, setScreens] = useState<ScreenInfo[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || screens !== null) return;
+    let cancelled = false;
+    setError(null);
+    getClient()
+      .then((c) => c.listPrototypeScreens(prototypeId))
+      .then((list) => !cancelled && setScreens(list))
+      .catch((e) => !cancelled && setError(friendlyError(e, 'No se pudieron leer las pantallas.')));
+    return () => {
+      cancelled = true;
+    };
+  }, [open, screens, prototypeId]);
+
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={`screens-${prototypeId}`}
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-2 rounded-md py-1 text-sm font-medium cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
+        <span>Pantallas detectadas{screens ? ` (${screens.length})` : ''}</span>
+        <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden />
+      </button>
+      {open && (
+        <div id={`screens-${prototypeId}`} className="pt-2">
+          {error ? (
+            <p className="text-sm text-destructive">{error}</p>
+          ) : screens === null ? (
+            <div className="space-y-1.5">
+              <Skeleton className="h-5 w-2/3" />
+              <Skeleton className="h-5 w-1/2" />
+            </div>
+          ) : screens.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Todavía no conocemos ninguna pantalla. Aparecen al subir archivos HTML o cuando alguien recorre el prototipo.</p>
+          ) : (
+            <>
+              <ul className="space-y-1 text-sm max-h-56 overflow-y-auto">
+                {screens.map((s) => (
+                  <li key={s.id} className="flex items-baseline gap-2 min-w-0">
+                    <span className="truncate">{s.title || s.label}</span>
+                    <span className="font-mono text-xs text-muted-foreground truncate">{s.id}</span>
+                    {s.source === 'seen' && (
+                      <Badge variant="outline" className="ml-auto text-muted-foreground" title="No es un archivo: alguien llegó a esta pantalla en una sesión">
+                        vista en sesiones
+                      </Badge>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground pt-2">
+                Son las pantallas que puedes elegir al armar una tarea. Las de apps de una sola página aparecen después de que alguien las recorre.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

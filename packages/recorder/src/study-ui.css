@@ -33,13 +33,14 @@
 .t *::after {
   box-sizing: border-box;
 }
-.t p,
-.t h2 {
+/* :where() deja estas reglas base sin peso: cualquier clase de más abajo las gana. */
+:where(.t) p,
+:where(.t) h2 {
   margin: 0;
 }
-.t button,
-.t input,
-.t textarea {
+:where(.t) button,
+:where(.t) input,
+:where(.t) textarea {
   font: inherit;
   color: inherit;
   margin: 0;
@@ -47,6 +48,10 @@
 .t :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+/* La hoja recibe el foco al abrirse (para el teclado y los lectores), pero no se le dibuja borde. */
+.t .sheet:focus-visible {
+  outline: none;
 }
 
 /* ── Hojas ─────────────────────────────────────────────────────────── */
@@ -373,7 +378,7 @@
   animation: tt-nudge 0.4s;
 }
 .consent span {
-  max-height: 126px;
+  max-height: max(84px, 30vh);
   overflow-y: auto;
   overscroll-behavior: contain;
   font-size: 14px;
