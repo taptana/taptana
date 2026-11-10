@@ -21,6 +21,7 @@ import {
   SESSION_LIMITS,
   STUDY_PARAM,
   isContextBlock,
+  isQuestionBlock,
   isTaskBlock,
   normalizeStudy,
   sameScreen,
@@ -132,6 +133,8 @@ export class StudyController {
     preloaded?: StudyRecord,
   ) {
     this.study = preloaded ?? null;
+    // Se registra antes que el envío final de la grabación: la respuesta alcanza a salir.
+    window.addEventListener('pagehide', () => this.keepDraft());
   }
 
   get studyId(): string {
@@ -332,7 +335,34 @@ export class StudyController {
       this.save();
     }
     if (isContextBlock(block)) this.ui.context({ step, title: block.title, text: block.text }, () => this.advance());
-    else this.ui.question({ step, block }, (value) => this.answer(block, value));
+    else {
+      const draft = state.draft && state.draft.blockId === block.id ? state.draft.value : null;
+      this.ui.question(
+        { step, block, initial: draft },
+        (value) => this.answer(block, value),
+        (value) => {
+          // Lo elegido se guarda al momento: sobrevive a una recarga y a cerrar la página.
+          state.draft = { blockId: block.id, value };
+          this.save();
+        },
+      );
+    }
+  }
+
+  /**
+   * La página se va (recarga, cierre, otra dirección) con una pregunta a medio responder: lo
+   * que ya estaba elegido se guarda como respuesta, para no perder un "Sí" sin "Continuar". Si
+   * el participante vuelve, la pregunta sigue ahí con su elección y lo que confirme la reemplaza.
+   */
+  private keepDraft(): void {
+    const state = this.state;
+    const block = this.study?.blocks[state.index];
+    const draft = state.draft;
+    if (state.status !== 'active' || !block || !isQuestionBlock(block) || !draft || draft.blockId !== block.id) return;
+    const value = typeof draft.value === 'string' ? draft.value.trim() : draft.value;
+    if (value === null || value === '' || (Array.isArray(value) && value.length === 0)) return;
+    const now = Date.now();
+    this.host.emit({ kind: 'taptana', type: 'answer', t: now, blockId: block.id, value, durationMs: Math.max(0, now - (state.shownAt ?? now)) });
   }
 
   private answer(block: QuestionBlock, value: AnswerValue): void {

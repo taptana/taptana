@@ -3,7 +3,7 @@
  * entre páginas del prototipo, y se borra al cerrar la pestaña.
  */
 
-import { PREVIEW_WINDOW, STUDY_PARAM, normalizeStudy, type StudyRecord } from '@taptana/shared';
+import { PREVIEW_WINDOW, STUDY_PARAM, normalizeStudy, type AnswerValue, type StudyRecord } from '@taptana/shared';
 import { queryParam } from './config.js';
 import { resetSession, storageGet, storageRemove, storageSet } from './session.js';
 
@@ -38,6 +38,8 @@ export interface StudyState {
   closeAt?: number;
   /** Pregunta: cuándo se mostró (para medir cuánto tardó en responder). */
   shownAt?: number;
+  /** Pregunta: lo que tiene elegido o escrito y aún no confirma con "Continuar". */
+  draft?: { blockId: string; value: AnswerValue };
   /** Regla `visible`: ya se vio la pantalla sin cumplirla, así que si aparece es por la tarea. */
   armed?: boolean;
   /** Ya se llevó al participante a la pantalla de inicio de este bloque (para no hacerlo en bucle). */
@@ -61,6 +63,7 @@ export function resetBlock(state: StudyState, index: number): void {
   delete state.tapAt;
   delete state.closeAt;
   delete state.shownAt;
+  delete state.draft;
   delete state.armed;
 }
 

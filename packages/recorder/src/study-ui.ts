@@ -16,6 +16,64 @@ const ARM_MS = 300;
 const SHIELD_MS = 350;
 const HINT_MS = 4500;
 const DRAG_PX = 8;
+/** Franja de arriba donde suele estar el encabezado o el título del prototipo. */
+const TOP_BAND_PX = 72;
+/** Un encabezado más alto que esto no es una barra: la píldora no se manda tan abajo. */
+const TOP_BAND_MAX_PX = 132;
+const PILL_GAP_PX = 8;
+/** Cuánto hay que desplazar una hoja para dar por vista la pista de "desliza". */
+const SCROLL_SEEN_PX = 24;
+
+/**
+ * ¿Dónde termina lo que el prototipo tiene arriba (barra fija o pegajosa, <header>, o el primer
+ * título dentro de la franja superior)? Devuelve su borde inferior en píxeles del viewport, o
+ * `null` si arriba no hay nada que tapar. La píldora de la tarea se pone justo debajo.
+ */
+export function topBandBottom(doc: Document = document): number | null {
+  const W = window.innerWidth;
+  const ours = (el: Element): boolean => el.closest('[data-taptana-ui]') !== null;
+  const box = (el: Element): DOMRect | null => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 ? r : null;
+  };
+  let bottom: number | null = null;
+  const take = (value: number): void => {
+    if (value > 0 && value <= TOP_BAND_MAX_PX && (bottom === null || value > bottom)) bottom = value;
+  };
+  // 1. Una barra fija o pegajosa arriba: se mira qué hay en tres puntos de la primera fila.
+  for (const x of [W * 0.15, W * 0.5, W * 0.85]) {
+    let el: Element | null = null;
+    try {
+      el = doc.elementsFromPoint(x, 10).find((e) => !ours(e)) ?? null;
+    } catch {
+      el = null;
+    }
+    for (let depth = 0; el && el !== doc.body && el !== doc.documentElement && depth < 12; el = el.parentElement, depth++) {
+      const position = getComputedStyle(el).position;
+      if (position !== 'fixed' && position !== 'sticky') continue;
+      const r = box(el);
+      if (r && r.top <= 4 && r.width >= W * 0.5) take(r.bottom);
+      break;
+    }
+  }
+  if (bottom !== null) return Math.round(bottom);
+  // 2. Un <header> (o role="banner") pegado arriba.
+  for (const el of Array.from(doc.querySelectorAll('header, [role="banner"]')).slice(0, 8)) {
+    if (ours(el)) continue;
+    const r = box(el);
+    if (r && r.top >= -4 && r.top <= 8 && r.width >= W * 0.5) take(r.bottom);
+  }
+  if (bottom !== null) return Math.round(bottom);
+  // 3. El primer título dentro de la franja de arriba.
+  for (const el of Array.from(doc.querySelectorAll('h1, h2, h3, [role="heading"]')).slice(0, 40)) {
+    if (ours(el)) continue;
+    const r = box(el);
+    if (!r || r.bottom <= 0 || r.top >= TOP_BAND_PX) continue;
+    take(r.bottom);
+    break;
+  }
+  return bottom === null ? null : Math.round(bottom);
+}
 
 export interface Step {
   /** Número del bloque, empezando en 1. */
@@ -233,8 +291,17 @@ export class StudyUi {
     });
   }
 
-  /** Una pregunta con su control. `onAnswer(null)` = la saltó. */
-  question(view: { step: Step; block: QuestionBlock }, onAnswer: (value: AnswerValue) => void): void {
+  /**
+   * Una pregunta con su control. `onAnswer(null)` = la saltó. "Continuar" solo se activa con
+   * algo respondido; en una pregunta opcional, la única forma de saltarla es "Saltar".
+   * `initial`: lo que ya había elegido (si recargó la página). `onChange` avisa cada cambio,
+   * para que lo elegido no se pierda si el participante sale de la pregunta de otra forma.
+   */
+  question(
+    view: { step: Step; block: QuestionBlock; initial?: AnswerValue },
+    onAnswer: (value: AnswerValue) => void,
+    onChange?: (value: AnswerValue) => void,
+  ): void {
     const b = view.block;
     let value: AnswerValue = null;
     let control = '';
@@ -265,13 +332,23 @@ export class StudyUi {
       (b.description ? `<p class="text">${esc(b.description)}</p>` : '') +
       control;
     const foot =
-      `<button type="button" class="btn primary" data-act="go"${b.required ? ' aria-disabled="true"' : ''}>Continuar</button>` +
+      '<button type="button" class="btn primary" data-act="go" aria-disabled="true">Continuar</button>' +
       (b.required ? '' : '<button type="button" class="btn plain" data-act="skip">Saltar</button>');
     const sheet = this.sheet(body, foot);
     const go = this.button(sheet, 'go');
-    const refresh = (): void => {
-      if (b.required) go.setAttribute('aria-disabled', String(isEmptyAnswer(value)));
+    const refresh = (silent = false): void => {
+      const empty = isEmptyAnswer(value);
+      const was = go.getAttribute('aria-disabled') === 'true';
+      go.setAttribute('aria-disabled', String(empty));
+      // Al activarse, "Continuar" late una vez: se nota que ya se puede seguir.
+      if (was && !empty && !silent) {
+        go.classList.remove('lit');
+        void go.offsetWidth;
+        go.classList.add('lit');
+      }
+      if (!silent) onChange?.(value);
     };
+    const initial = view.initial ?? null;
 
     if (b.kind === 'scale' || b.kind === 'yesno') {
       const group = sheet.querySelector('[role="radiogroup"]') as HTMLElement;
@@ -286,6 +363,16 @@ export class StudyUi {
         refresh();
       };
       for (const item of items) item.addEventListener('click', () => pick(item));
+      const wanted = typeof initial === 'boolean' ? (initial ? 'yes' : 'no') : typeof initial === 'number' ? String(initial) : null;
+      const chosen = wanted === null ? undefined : items.find((item) => item.dataset['v'] === wanted);
+      if (chosen) {
+        for (const item of items) {
+          item.setAttribute('aria-checked', String(item === chosen));
+          item.tabIndex = item === chosen ? 0 : -1;
+        }
+        value = initial;
+        refresh(true);
+      }
       group.addEventListener('keydown', (e) => {
         const at = items.indexOf(this.focused() as HTMLElement);
         const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
@@ -297,7 +384,7 @@ export class StudyUi {
       });
     } else if (b.kind === 'choice') {
       const inputs = Array.from(sheet.querySelectorAll<HTMLInputElement>('.opts input'));
-      const read = (): void => {
+      const read = (silent = false): void => {
         const chosen: string[] = [];
         inputs.forEach((input, i) => {
           input.closest('.opt')?.classList.toggle('on', input.checked);
@@ -305,11 +392,23 @@ export class StudyUi {
           if (input.checked && option !== undefined) chosen.push(option);
         });
         value = b.multiple ? chosen : (chosen[0] ?? null);
-        refresh();
+        refresh(silent);
       };
-      for (const input of inputs) input.addEventListener('change', read);
+      for (const input of inputs) input.addEventListener('change', () => read());
+      const before = Array.isArray(initial) ? initial : typeof initial === 'string' ? [initial] : [];
+      if (before.length > 0) {
+        inputs.forEach((input, i) => {
+          input.checked = before.includes(b.options[i] as string);
+        });
+        read(true);
+      }
     } else {
       const area = sheet.querySelector('#area') as HTMLTextAreaElement;
+      if (typeof initial === 'string' && initial) {
+        area.value = initial;
+        value = initial;
+        refresh(true);
+      }
       area.addEventListener('input', () => {
         value = area.value;
         refresh();
@@ -317,18 +416,21 @@ export class StudyUi {
     }
 
     this.act(sheet, go, () => {
-      if (b.required && isEmptyAnswer(value)) {
+      if (isEmptyAnswer(value)) {
+        // Sin respuesta, "Continuar" no avanza: se señala el control (y "Saltar", si la hay).
         const target = sheet.querySelector<HTMLElement>('.scale, .yn, .opts, .area');
         if (target) this.nudge(target);
         return false;
       }
-      onAnswer(isEmptyAnswer(value) ? null : typeof value === 'string' ? value.trim() : value);
+      onAnswer(typeof value === 'string' ? value.trim() : value);
       return true;
     });
     const skip = sheet.querySelector<HTMLElement>('[data-act="skip"]');
     if (skip) {
       this.act(sheet, skip, () => {
-        onAnswer(null);
+        // Un "Sí" o un número ya elegido no se pierde aunque salga con "Saltar".
+        const picked = (b.kind === 'yesno' || b.kind === 'scale') && !isEmptyAnswer(value);
+        onAnswer(picked ? value : null);
         return true;
       });
     }
@@ -350,7 +452,12 @@ export class StudyUi {
 
   // ── Píldora y avisos ────────────────────────────────────────────────
 
-  /** El botón pequeño de la tarea: arriba al centro, se puede arrastrar. */
+  /**
+   * El botón pequeño de la tarea. Si el participante no lo ha movido, va justo DEBAJO de lo que
+   * el prototipo tiene arriba (barra fija, encabezado o título), para no taparlo; si arriba no
+   * hay nada, queda chico en la esquina superior derecha. Se puede arrastrar y recuerda dónde
+   * lo dejaron.
+   */
   pill(view: { position: [number, number] | undefined; hint: boolean }, handlers: { onOpen(): void; onMove(position: [number, number]): void }): void {
     this.mount();
     this.hidePill();
@@ -360,8 +467,31 @@ export class StudyUi {
     const pill = this.pillSlot.querySelector('.pill') as HTMLElement;
     let position = view.position;
 
+    /** Posición por defecto: debajo del encabezado del prototipo, o chica en la esquina. */
+    const dock = (): void => {
+      if (position || !pill.isConnected) return;
+      const hint = this.pillSlot.querySelector<HTMLElement>('.hint');
+      const band = topBandBottom();
+      if (band === null) {
+        pill.classList.add('corner');
+        pill.style.removeProperty('top');
+        hint?.classList.add('corner');
+        hint?.style.removeProperty('top');
+        return;
+      }
+      pill.classList.remove('corner');
+      hint?.classList.remove('corner');
+      const top = Math.max(band, this.tryout ? 20 : 0) + PILL_GAP_PX;
+      pill.style.top = `${top}px`;
+      if (hint) hint.style.top = `${top + 46}px`;
+    };
+    dock();
+    // La página puede terminar de dibujarse un momento después (o cambiar de pantalla).
+    const redock = window.setTimeout(dock, 400);
+
     const place = (): void => {
       if (!position) return;
+      pill.classList.remove('corner');
       const r = pill.getBoundingClientRect();
       const W = window.innerWidth;
       const H = window.innerHeight;
@@ -416,9 +546,15 @@ export class StudyUi {
       handlers.onOpen();
     });
 
-    const onResize = (): void => place();
+    const onResize = (): void => {
+      place();
+      dock();
+    };
     window.addEventListener('resize', onResize);
-    this.pillCleanup = () => window.removeEventListener('resize', onResize);
+    this.pillCleanup = () => {
+      window.removeEventListener('resize', onResize);
+      clearTimeout(redock);
+    };
     if (this.pillSlot.querySelector('.hint')) this.hintTimer = window.setTimeout(() => this.hideHint(), HINT_MS);
   }
 
@@ -481,9 +617,11 @@ export class StudyUi {
     this.shieldTimer = undefined;
     this.sheetSlot.innerHTML =
       '<div class="scrim"></div><div class="dock"><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="tt" tabindex="-1">' +
-      `<div class="body">${body}</div>${foot ? `<div class="foot ${opts.footClass ?? ''}">${foot}</div>` : ''}</section></div>`;
+      `<div class="body">${body}</div><div class="more" hidden aria-hidden="true"><span>Desliza para ver más ↓</span></div>` +
+      `${foot ? `<div class="foot ${opts.footClass ?? ''}">${foot}</div>` : ''}</section></div>`;
     const sheet = this.sheetSlot.querySelector('.sheet') as HTMLElement;
     const scrim = this.sheetSlot.querySelector('.scrim') as HTMLElement;
+    this.scrollCue(sheet);
     window.setTimeout(() => {
       sheet.dataset['ready'] = '1';
     }, ARM_MS);
@@ -524,6 +662,32 @@ export class StudyUi {
       /* sin foco no pasa nada */
     }
     return sheet;
+  }
+
+  /**
+   * Pista de "desliza": si el contenido de la hoja no cabe (pantallas chicas, celular en
+   * horizontal), un degradado con la palabra avisa que hay más abajo. Se va al deslizar.
+   * Desliza el cuerpo (vertical) o la hoja entera (horizontal, ver el CSS): se miran los dos.
+   */
+  private scrollCue(sheet: HTMLElement): void {
+    const body = sheet.querySelector('.body') as HTMLElement;
+    const more = sheet.querySelector('.more') as HTMLElement;
+    let seen = false;
+    const update = (): void => {
+      if (!sheet.isConnected) return;
+      const overflow = Math.max(body.scrollHeight - body.clientHeight, sheet.scrollHeight - sheet.clientHeight);
+      if (Math.max(body.scrollTop, sheet.scrollTop) > SCROLL_SEEN_PX) seen = true;
+      more.hidden = seen || overflow <= 12;
+    };
+    body.addEventListener('scroll', update, { passive: true });
+    sheet.addEventListener('scroll', update, { passive: true });
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(update);
+      ro.observe(sheet);
+      ro.observe(body);
+    }
+    update();
+    window.setTimeout(update, 350);
   }
 
   /**
