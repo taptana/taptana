@@ -110,3 +110,16 @@ export function panelPlaceholderPage(): string {
 <p class="muted">Mientras tanto la API funciona: <a href="${API_PREFIX}/sessions">${API_PREFIX}/sessions</a></p>`,
   );
 }
+
+/** 502: el sitio de un prototipo por URL no respondió (apagado, sin red, o tardó demasiado). */
+export function upstreamDownPage(opts: { url: string; timeout?: boolean }): string {
+  return page(
+    'Prototipo no disponible',
+    `<h1>No pudimos abrir este prototipo</h1>
+<p>Taptana intentó abrirlo en <code>${escapeHtml(opts.url)}</code> y ${opts.timeout ? 'tardó demasiado en responder' : 'no respondió'}.</p>
+<p class="muted">Si eres participante, espera un momento y vuelve a cargar la página.</p>
+<div class="aside">
+<p><strong>¿Organizas la prueba?</strong> Revisa que el sitio esté encendido y abre esa dirección en esta computadora. Si es un servidor de desarrollo (por ejemplo <code>npm run dev</code>), tiene que seguir corriendo durante toda la prueba.</p>
+</div>`,
+  );
+}

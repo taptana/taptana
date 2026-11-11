@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, Ellipsis, ExternalLink, FileArchive, FlaskConical, FolderOpen, Info, Pencil, RefreshCw, Trash2, TriangleAlert, Upload } from 'lucide-react';
-import { EXAMPLE_PROTOTYPE_ID, STUDY_LIMITS, type Prototype, type ScreenInfo, type ServerInfo } from '@taptana/shared';
+import { Check, ChevronDown, CircleAlert, CircleCheck, Copy, Ellipsis, ExternalLink, FileArchive, FlaskConical, FolderOpen, Globe, Info, Link2, LoaderCircle, Pencil, Plus, RefreshCw, Trash2, TriangleAlert, Upload } from 'lucide-react';
+import { EXAMPLE_PROTOTYPE_ID, STUDY_LIMITS, normalizePrototypeUrl, type Prototype, type PrototypeUrlCheck, type PrototypeUrlIssue, type ScreenInfo, type ServerInfo } from '@taptana/shared';
 import { getClient, IS_DEMO } from '@/api/client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { ConfirmDialog, Dialog, DialogContent, DialogDescription, DialogFooter, 
 import { Input, Label } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/toast';
 import { EmptyState, ErrorState, InlineError, Layout, ListSkeleton, Notice, PageHeader, Section } from '@/components/layout';
 import { copyText } from '@/lib/download';
@@ -34,6 +35,9 @@ export function PrototypesPage() {
   const [dragging, setDragging] = useState(false);
   const [toDelete, setToDelete] = useState<Prototype | null>(null);
   const [toRename, setToRename] = useState<Prototype | null>(null);
+  const [toMove, setToMove] = useState<Prototype | null>(null);
+  const [mode, setMode] = useState<'file' | 'url'>('file');
+  const [canUrl, setCanUrl] = useState(true);
   const fileInput = useRef<HTMLInputElement>(null);
   const { navigate } = useRouter();
 
@@ -41,6 +45,7 @@ export function PrototypesPage() {
     try {
       const client = await getClient();
       setCanRoot(client.canServeAtRoot);
+      setCanUrl(client.canAddByUrl);
       const [i, list, p] = await Promise.all([client.info(), client.listPrototypes(), client.uploadProblem()]);
       setInfo(i);
       setProtos(list);
@@ -108,7 +113,7 @@ export function PrototypesPage() {
         description={
           IS_DEMO
             ? 'Sube un .html o un .zip. En la demo se guarda solo en este navegador y no sale de él.'
-            : 'Sube un .html o un .zip con tu prototipo. Se guarda en esta computadora y no sale de ella.'
+            : 'Sube un .html o un .zip con tu prototipo, o agrega la dirección de un sitio publicado. Lo que grabes se guarda en esta computadora y no sale de ella.'
         }
       />
 
@@ -121,73 +126,94 @@ export function PrototypesPage() {
         </Notice>
       )}
 
-      {problem ? (
-        <Alert variant="destructive">
-          <TriangleAlert />
-          <AlertTitle>Aquí no se pueden subir prototipos</AlertTitle>
-          <AlertDescription>
-            <p>{problem}</p>
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <Section title="Subir un prototipo">
-          <div className="space-y-5">
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label="Subir un prototipo: elige un archivo .html o .zip"
-              aria-busy={busy}
-              onClick={() => !busy && fileInput.current?.click()}
-              onKeyDown={(e) => {
-                if ((e.key === 'Enter' || e.key === ' ') && !busy) {
-                  e.preventDefault();
-                  fileInput.current?.click();
-                }
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragging(false);
-                const f = e.dataTransfer.files[0];
-                if (f) void upload(f);
-              }}
-              className={cn(
-                'flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-background px-6 py-12 sm:py-14 text-center cursor-pointer transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                dragging ? 'border-primary bg-accent' : 'hover:border-foreground/30',
-                busy && 'opacity-60 cursor-wait',
-              )}
-            >
-              <span className="grid size-12 place-items-center rounded-full bg-muted text-muted-foreground">
-                <Upload className="size-5" />
-              </span>
-              <p className="font-medium">{busy ? 'Subiendo…' : 'Arrastra aquí tu .html o .zip, o haz clic para elegirlo'}</p>
-              <p className="text-muted-foreground text-sm leading-relaxed max-w-md">
-                Un zip puede traer varias páginas, estilos, scripts e imágenes. Se abre <code>index.html</code>; si no hay, el primer HTML. Hasta 50 MB.
-              </p>
-            </div>
-            <div className="max-w-sm space-y-2">
-              <Label htmlFor="proto-name">Nombre (opcional)</Label>
-              <Input id="proto-name" value={name} maxLength={STUDY_LIMITS.name} onChange={(e) => setName(e.target.value)} placeholder="Si lo dejas vacío, se usa el nombre del archivo" />
-            </div>
-            <input
-              ref={fileInput}
-              type="file"
-              accept={ACCEPT}
-              className="hidden"
-              aria-label="Archivo del prototipo"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void upload(f);
-                e.target.value = '';
+      <Section title="Agregar un prototipo">
+        <Tabs value={mode} onValueChange={(v) => setMode(v === 'url' ? 'url' : 'file')} className="gap-6">
+          <TabsList aria-label="Cómo agregar el prototipo" className="[&_svg]:size-4">
+            <TabsTrigger value="file">
+              <Upload /> Subir archivo
+            </TabsTrigger>
+            <TabsTrigger value="url">
+              <Globe /> Agregar por URL
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="file">
+            {problem ? (
+              <Alert variant="destructive">
+                <TriangleAlert />
+                <AlertTitle>Aquí no se pueden subir prototipos</AlertTitle>
+                <AlertDescription>
+                  <p>{problem}</p>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="space-y-5">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Subir un prototipo: elige un archivo .html o .zip"
+                  aria-busy={busy}
+                  onClick={() => !busy && fileInput.current?.click()}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !busy) {
+                      e.preventDefault();
+                      fileInput.current?.click();
+                    }
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragging(true);
+                  }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragging(false);
+                    const f = e.dataTransfer.files[0];
+                    if (f) void upload(f);
+                  }}
+                  className={cn(
+                    'flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-background px-6 py-12 sm:py-14 text-center cursor-pointer transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                    dragging ? 'border-primary bg-accent' : 'hover:border-foreground/30',
+                    busy && 'opacity-60 cursor-wait',
+                  )}
+                >
+                  <span className="grid size-12 place-items-center rounded-full bg-muted text-muted-foreground">
+                    <Upload className="size-5" />
+                  </span>
+                  <p className="font-medium">{busy ? 'Subiendo…' : 'Arrastra aquí tu .html o .zip, o haz clic para elegirlo'}</p>
+                  <p className="text-muted-foreground text-sm leading-relaxed max-w-md">
+                    Un zip puede traer varias páginas, estilos, scripts e imágenes. Se abre <code>index.html</code>; si no hay, el primer HTML. Hasta 50 MB.
+                  </p>
+                </div>
+                <div className="max-w-sm space-y-2">
+                  <Label htmlFor="proto-name">Nombre (opcional)</Label>
+                  <Input id="proto-name" value={name} maxLength={STUDY_LIMITS.name} onChange={(e) => setName(e.target.value)} placeholder="Si lo dejas vacío, se usa el nombre del archivo" />
+                </div>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept={ACCEPT}
+                  className="hidden"
+                  aria-label="Archivo del prototipo"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void upload(f);
+                    e.target.value = '';
+                  }}
+                />
+              </div>
+            )}
+          </TabsContent>
+          <TabsContent value="url">
+            <UrlForm
+              canAdd={canUrl}
+              onAdded={async (proto) => {
+                await load();
+                toast.success(`«${proto.name}» está listo.`, { action: { label: 'Crear estudio', onClick: () => navigate({ name: 'study', id: null }) }, durationMs: 8000 });
               }}
             />
-          </div>
-        </Section>
-      )}
+          </TabsContent>
+        </Tabs>
+      </Section>
 
       {error && <InlineError onDismiss={() => setError(null)}>{error}</InlineError>}
 
@@ -213,6 +239,7 @@ export function PrototypesPage() {
                 onReplace={(f) => void upload(f, p.id)}
                 onDelete={() => setToDelete(p)}
                 onRename={() => setToRename(p)}
+                onMove={() => setToMove(p)}
                 onRoot={(root) => void setRoot(p, root)}
               />
             ))}
@@ -226,7 +253,7 @@ export function PrototypesPage() {
         title={`¿Borrar «${toDelete?.name ?? ''}»?`}
         description={
           <p>
-            Se borran sus archivos{toDelete?.sessionCount ? `, ${toDelete.sessionCount === 1 ? 'su sesión grabada' : `sus ${toDelete.sessionCount} sesiones grabadas`}` : ''} y los estudios
+            Se borran {toDelete?.source === 'url' ? 'su dirección' : 'sus archivos'}{toDelete?.sessionCount ? `, ${toDelete.sessionCount === 1 ? 'su sesión grabada' : `sus ${toDelete.sessionCount} sesiones grabadas`}` : ''} y los estudios
             que lo usan. No se puede deshacer.
           </p>
         }
@@ -236,6 +263,17 @@ export function PrototypesPage() {
           if (toDelete) await remove(toDelete);
         }}
       />
+      {toMove && (
+        <ChangeUrlDialog
+          proto={toMove}
+          onClose={() => setToMove(null)}
+          onDone={async (p) => {
+            setToMove(null);
+            await load();
+            toast.success(`«${p.name}» ahora muestra ${p.sourceUrl ?? 'la nueva dirección'}. El link es el mismo.`);
+          }}
+        />
+      )}
       {toRename && (
         <RenameDialog
           proto={toRename}
@@ -315,6 +353,7 @@ function PrototypeRow({
   onReplace,
   onDelete,
   onRename,
+  onMove,
   onRoot,
 }: {
   proto: Prototype;
@@ -325,6 +364,7 @@ function PrototypeRow({
   onReplace: (f: File) => void;
   onDelete: () => void;
   onRename: () => void;
+  onMove: () => void;
   onRoot: (root: boolean) => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -332,7 +372,9 @@ function PrototypeRow({
   const [open, setOpen] = useState(false);
   const replaceInput = useRef<HTMLInputElement>(null);
   const isExample = proto.id === EXAMPLE_PROTOTYPE_ID;
-  const uploaded = proto.source === 'upload';
+  const byUrl = proto.source === 'url';
+  /** Subido o por URL: vive en /p/<id>/, se renombra, se borra y se puede abrir en la raíz. */
+  const uploaded = proto.source === 'upload' || byUrl;
   // Sesiones importadas de un prototipo que no está aquí: no hay archivos ni link.
   const foreign = proto.source === undefined && !proto.url;
   const link = foreign ? '' : participantUrl(info, proto);
@@ -355,16 +397,17 @@ function PrototypeRow({
     <li className="rounded-2xl border border-border/70 bg-card">
       <div className="flex min-h-16 flex-wrap items-center gap-x-4 gap-y-3 px-(--card-pad) py-4">
         <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground" aria-hidden>
-          {uploaded ? <FileArchive className="size-5" /> : <FolderOpen className="size-5" />}
+          {byUrl ? <Globe className="size-5" /> : uploaded ? <FileArchive className="size-5" /> : <FolderOpen className="size-5" />}
         </span>
         <div className="min-w-0 flex-1 basis-48">
           <h3 className="font-semibold leading-snug break-words">{proto.name}</h3>
           <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-            <Badge variant="secondary">{isExample ? 'Ejemplo' : foreign ? 'Importado' : uploaded ? 'Subido' : 'Carpeta local'}</Badge>
+            <Badge variant="secondary">{isExample ? 'Ejemplo' : foreign ? 'Importado' : byUrl ? 'Por URL' : uploaded ? 'Subido' : 'Carpeta local'}</Badge>
             {proto.root && <Badge variant="outline">En la raíz</Badge>}
             <span>{plural(sessions, 'sesión', 'sesiones', 'Sin sesiones')}</span>
-            {proto.createdAt > 0 && <span>· subido {formatRelative(proto.createdAt)}</span>}
+            {proto.createdAt > 0 && <span>· {byUrl ? 'agregado' : 'subido'} {formatRelative(proto.createdAt)}</span>}
           </p>
+          {byUrl && proto.sourceUrl && <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={proto.sourceUrl}>{proto.sourceUrl}</p>}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {!foreign && (
@@ -396,9 +439,14 @@ function PrototypeRow({
                   </DropdownMenuItem>
                 </>
               )}
-              {uploaded && canReplace && !isExample && (
+              {uploaded && !byUrl && canReplace && !isExample && (
                 <DropdownMenuItem disabled={busy} onSelect={() => replaceInput.current?.click()} title="Mantiene el mismo link, sus estudios y sesiones">
                   <RefreshCw /> Subir nueva versión
+                </DropdownMenuItem>
+              )}
+              {byUrl && (
+                <DropdownMenuItem onSelect={onMove} title="Mantiene el mismo link, sus estudios y sesiones">
+                  <Link2 /> Cambiar dirección
                 </DropdownMenuItem>
               )}
               {uploaded && !isExample && (
@@ -438,6 +486,19 @@ function PrototypeRow({
           </p>
         ) : (
           <>
+            {byUrl && proto.sourceUrl && (
+              <div className="space-y-1.5 rounded-xl bg-muted/50 p-4 text-sm">
+                <p className="font-medium">Siempre muestra lo que está publicado ahora</p>
+                <p className="text-muted-foreground leading-relaxed">
+                  Taptana abre{' '}
+                  <a href={proto.sourceUrl} target="_blank" rel="noreferrer" className="break-all text-foreground underline underline-offset-4">
+                    {proto.sourceUrl}
+                  </a>{' '}
+                  cada vez que alguien entra y le agrega la grabación, sin tocar tu sitio. Si lo cambias, los participantes ven el cambio al momento. Tiene que estar encendido
+                  durante la prueba.
+                </p>
+              </div>
+            )}
             <div className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
             <div className="space-y-2">
               <Label htmlFor={`link-${proto.id}`}>Link del prototipo (sin estudio)</Label>
@@ -480,7 +541,7 @@ function PrototypeRow({
                 </p>
               </div>
             )}
-            {uploaded && !canRoot && proto.absoluteUrls && (
+            {uploaded && !byUrl && !canRoot && proto.absoluteUrls && (
               <p className="text-xs text-amber-700 dark:text-amber-400">
                 Este prototipo usa rutas que empiezan con «/». En la demo puede verse sin estilos; en tu computadora se arregla con «Abrir en la raíz».
               </p>
@@ -560,5 +621,238 @@ function Screens({ prototypeId }: { prototypeId: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+const LEVEL_TITLE: Record<PrototypeUrlCheck['level'], string> = {
+  ok: 'Todo bien: se puede usar',
+  warning: 'Se puede usar, pero revisa esto',
+  error: 'Así no se puede usar',
+};
+
+function IssueIcon({ level }: { level: PrototypeUrlIssue['level'] | PrototypeUrlCheck['level'] }) {
+  if (level === 'error') return <CircleAlert className="size-4 shrink-0 text-destructive" aria-hidden />;
+  if (level === 'warning') return <TriangleAlert className="size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />;
+  if (level === 'ok') return <CircleCheck className="size-4 shrink-0 text-primary" aria-hidden />;
+  return <Info className="size-4 shrink-0 text-muted-foreground" aria-hidden />;
+}
+
+/** Agregar por URL: escribir la dirección → «Revisar» → veredicto con nombre sugerido → «Agregar». */
+function UrlForm({ canAdd, onAdded }: { canAdd: boolean; onAdded: (proto: Prototype) => Promise<void> }) {
+  const [url, setUrl] = useState('');
+  const [name, setName] = useState('');
+  const [check, setCheck] = useState<PrototypeUrlCheck | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const review = async (value: string): Promise<void> => {
+    const normalized = normalizePrototypeUrl(value);
+    setCheck(null);
+    if (!normalized.ok) {
+      setError(normalized.error);
+      return;
+    }
+    setError(null);
+    setChecking(true);
+    try {
+      const result = await (await getClient()).checkPrototypeUrl(normalized.url);
+      setCheck(result);
+      setName(result.title ?? '');
+    } catch (e) {
+      setError(friendlyError(e, 'No pudimos revisar esa dirección. Intenta de nuevo.'));
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const add = async (): Promise<void> => {
+    if (!check || adding) return;
+    setAdding(true);
+    setError(null);
+    try {
+      const proto = await (await getClient()).addPrototypeUrl(check.url, name.trim() ? { name: name.trim() } : {});
+      setUrl('');
+      setName('');
+      setCheck(null);
+      await onAdded(proto);
+    } catch (e) {
+      setError(friendlyError(e, 'No se pudo agregar el prototipo.'));
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  if (!canAdd) {
+    return (
+      <Notice tone="neutral" icon={<Globe />} title="Agregar por URL necesita Taptana en tu computadora">
+        <p>
+          Es el servidor de Taptana el que abre tu sitio y le agrega la grabación, y en esta demo no hay servidor. Corre Taptana con{' '}
+          <code className="text-foreground">pnpm start</code> y desde ahí podrás pegar la dirección de tu sitio de Lovable, v0, Bolt, Vercel o de tu servidor de desarrollo.
+        </p>
+      </Notice>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <form
+        className="space-y-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void review(url);
+        }}
+      >
+        <Label htmlFor="proto-url">Dirección de tu prototipo</Label>
+        <div className="flex flex-wrap gap-3">
+          <Input
+            id="proto-url"
+            type="text"
+            inputMode="url"
+            autoComplete="url"
+            spellCheck={false}
+            className="min-w-0 flex-1 basis-72"
+            value={url}
+            placeholder="https://mi-app.vercel.app"
+            aria-invalid={error !== null && check === null}
+            aria-describedby="proto-url-help"
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setCheck(null);
+              setError(null);
+            }}
+          />
+          <Button type="submit" disabled={checking || !url.trim()}>
+            {checking ? <LoaderCircle className="animate-spin" /> : null} {checking ? 'Revisando…' : 'Revisar'}
+          </Button>
+        </div>
+        <p id="proto-url-help" className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+          Para sitios hechos con Lovable, v0, Bolt, Vercel, Netlify o Figma Sites, o tu servidor de desarrollo (por ejemplo <code>http://localhost:5173</code>). Taptana lo muestra a
+          través de sí mismo y lo graba igual que un archivo subido, sin tocar tu sitio.
+        </p>
+      </form>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {check && (
+        <div role="status" aria-live="polite" className="space-y-4 rounded-2xl border border-border/70 bg-background p-(--card-pad)">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5">
+              <IssueIcon level={check.level} />
+            </span>
+            <div className="min-w-0">
+              <p className="font-medium leading-snug">{LEVEL_TITLE[check.level]}</p>
+              <p className="break-all font-mono text-xs text-muted-foreground">{check.url}</p>
+            </div>
+          </div>
+          {check.issues.length > 0 && (
+            <ul className="space-y-2 text-sm" aria-label="Lo que encontramos">
+              {check.issues.map((issue) => (
+                <li key={issue.code} className="flex items-start gap-2.5 leading-relaxed">
+                  <span className="mt-1">
+                    <IssueIcon level={issue.level} />
+                  </span>
+                  <span>{issue.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {check.suggestedUrl && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="max-w-full"
+              onClick={() => {
+                const next = check.suggestedUrl ?? '';
+                setUrl(next);
+                void review(next);
+              }}
+            >
+              <span className="truncate">Usar {check.suggestedUrl}</span>
+            </Button>
+          )}
+          {check.level !== 'error' && (
+            <form
+              className="flex flex-wrap items-end gap-3 border-t border-border/70 pt-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void add();
+              }}
+            >
+              <div className="min-w-0 flex-1 basis-60 space-y-2">
+                <Label htmlFor="proto-url-name">Nombre</Label>
+                <Input id="proto-url-name" value={name} maxLength={STUDY_LIMITS.name} onChange={(e) => setName(e.target.value)} placeholder={new URL(check.url).host} />
+              </div>
+              <Button type="submit" disabled={adding}>
+                {adding ? <LoaderCircle className="animate-spin" /> : <Plus />} Agregar
+              </Button>
+            </form>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChangeUrlDialog({ proto, onClose, onDone }: { proto: Prototype; onClose: () => void; onDone: (p: Prototype) => Promise<void> }) {
+  const [value, setValue] = useState(proto.sourceUrl ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async (): Promise<void> => {
+    const normalized = normalizePrototypeUrl(value);
+    if (!normalized.ok) {
+      setError(normalized.error);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await onDone(await (await getClient()).setPrototypeUrl(proto.id, normalized.url));
+    } catch (e) {
+      setError(friendlyError(e, 'No se pudo cambiar la dirección.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const sessions = proto.sessionCount ?? 0;
+  return (
+    <Dialog open onOpenChange={(o) => !o && !busy && onClose()}>
+      <DialogContent className="max-w-lg">
+        <form
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Cambiar la dirección</DialogTitle>
+            <DialogDescription>El link para los participantes, los estudios y las sesiones siguen igual. Antes de guardar, revisamos que la nueva dirección funcione.</DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label htmlFor="move-proto">Nueva dirección</Label>
+            <Input id="move-proto" autoFocus inputMode="url" spellCheck={false} value={value} aria-invalid={error !== null} aria-describedby={error ? 'move-error' : undefined} onChange={(e) => setValue(e.target.value)} />
+            {error && (
+              <p id="move-error" className="text-sm text-destructive mt-1.5">
+                {error}
+              </p>
+            )}
+          </div>
+          {sessions > 0 && (
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              Ya tiene {plural(sessions, 'sesión grabada', 'sesiones grabadas')}: si el sitio nuevo es distinto, los resultados nuevos no serán comparables con los anteriores.
+            </p>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? 'Revisando…' : 'Guardar'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

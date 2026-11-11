@@ -634,3 +634,19 @@ test('opens a v0.1 database: migrates columns, keys and indexes, and keeps the d
   assert.equal(again.listSessions().length, 1);
   again.close();
 });
+
+test('a prototype by URL keeps its address, also when renamed, and can be at the root', () => {
+  const store = new SqliteStore(':memory:');
+  store.savePrototype({ id: 'pr_url', name: 'Por URL', createdAt: 1, source: 'url', sourceUrl: 'http://localhost:5173/', entryPath: '/' });
+  const saved = store.getPrototype('pr_url');
+  assert.equal(saved?.source, 'url');
+  assert.equal(saved?.sourceUrl, 'http://localhost:5173/');
+  store.savePrototype({ ...saved!, name: 'Otro nombre' });
+  assert.equal(store.getPrototype('pr_url')?.sourceUrl, 'http://localhost:5173/');
+  store.setRootPrototype('pr_url');
+  assert.equal(store.getRootPrototype()?.id, 'pr_url');
+  // Un subido nunca trae sourceUrl.
+  store.savePrototype({ id: 'pr_up', name: 'Subido', createdAt: 2, source: 'upload', sourceUrl: 'http://x/' });
+  assert.equal(store.getPrototype('pr_up')?.sourceUrl, undefined);
+  store.close();
+});

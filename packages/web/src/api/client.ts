@@ -11,6 +11,7 @@ import {
   validateSessionExport,
   type ExampleResponse,
   type Prototype,
+  type PrototypeUrlCheck,
   type ReportFilter,
   type ScreenInfo,
   type ServerInfo,
@@ -78,6 +79,17 @@ export interface ApiClient {
   /** Sube un .html o .zip. Con `id`, reemplaza los archivos de ese prototipo. */
   uploadPrototype(file: File, opts?: { name?: string; id?: string }): Promise<Prototype>;
   renamePrototype(id: string, name: string): Promise<Prototype>;
+  /**
+   * Prototipos por URL: Taptana sirve el sitio a través de sí mismo. Solo con el servidor
+   * (en la demo no hay servidor que lo haga; ver `canAddByUrl`).
+   */
+  readonly canAddByUrl: boolean;
+  /** Revisa la URL sin guardar nada: veredicto y avisos en español. */
+  checkPrototypeUrl(url: string): Promise<PrototypeUrlCheck>;
+  /** Agrega el prototipo. Si la URL no se puede usar, lanza `UserError` con el motivo. */
+  addPrototypeUrl(url: string, opts?: { name?: string }): Promise<Prototype>;
+  /** Cambia la dirección de un prototipo por URL (mismo id, estudios y sesiones). */
+  setPrototypeUrl(id: string, url: string): Promise<Prototype>;
   /** "Abrir en la raíz" (solo con el servidor local; ver `canServeAtRoot`). */
   setPrototypeRoot(id: string, root: boolean): Promise<Prototype>;
   readonly canServeAtRoot: boolean;

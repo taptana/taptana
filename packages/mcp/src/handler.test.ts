@@ -150,6 +150,13 @@ function fakeApi(opts: { sessions?: number; locked?: boolean } = {}) {
       assert.ok(body instanceof FormData);
       return reply(201, { id: 'pr_nuevo', name: body.get('name'), source: 'upload', url: '/p/pr_nuevo/', createdAt: 9 });
     }
+    if (method === 'POST' && route === '/prototypes/url') {
+      const { url } = body as { url: string };
+      if (url.includes('privado')) {
+        return reply(400, { error: 'El sitio no deja entrar sin iniciar sesión (respondió 401).', check: { url, level: 'error', issues: [{ level: 'error', code: 'login', message: 'El sitio no deja entrar sin iniciar sesión (respondió 401).' }] } });
+      }
+      return reply(201, { id: 'pr_url', name: 'Mi app', source: 'url', sourceUrl: url, url: '/p/pr_url/', createdAt: 9, check: { url, level: 'ok', issues: [{ level: 'info', code: 'empty-without-js', message: 'La página se arma con JavaScript.' }] } });
+    }
     return reply(404, { error: 'No existe esta ruta de la API.' });
   };
   return { request, calls, studies };
@@ -228,7 +235,7 @@ test('tools/list declares every tool with schema and annotations, and no delete 
   const { tools } = (await rpc(handler, 'tools/list')).result as { tools: Array<{ name: string; description: string; inputSchema: { type: string }; annotations: Record<string, unknown> }> };
   assert.deepEqual(
     tools.map((t) => t.name),
-    ['get_info', 'get_study_format', 'list_prototypes', 'list_screens', 'get_screen_html', 'list_studies', 'get_study', 'validate_study', 'create_study', 'update_study', 'duplicate_study', 'get_report', 'upload_prototype'],
+    ['get_info', 'get_study_format', 'list_prototypes', 'list_screens', 'get_screen_html', 'list_studies', 'get_study', 'validate_study', 'create_study', 'update_study', 'duplicate_study', 'get_report', 'upload_prototype', 'add_prototype_url'],
   );
   for (const t of tools) {
     assert.equal(t.inputSchema.type, 'object');
@@ -427,6 +434,20 @@ test('upload_prototype sends the HTML as a file', async () => {
   assert.equal((await tool(handler, 'upload_prototype', { name: 'x', html: ' ' })).isError, true);
 });
 
+test('add_prototype_url posts the address and explains why one cannot be used', async () => {
+  const { handler, calls } = setup();
+  const res = await tool(handler, 'add_prototype_url', { url: 'http://localhost:5173', name: 'Mi app' });
+  assert.equal(res.isError, false);
+  assert.equal(res.data['id'], 'pr_url');
+  assert.equal(res.data['sourceUrl'], 'http://localhost:5173');
+  assert.deepEqual(res.data['notes'], ['La página se arma con JavaScript.']);
+  assert.deepEqual(calls.find((c) => c.method === 'POST')?.body, { url: 'http://localhost:5173', name: 'Mi app' });
+  const bad = await tool(handler, 'add_prototype_url', { url: 'https://privado.dev' });
+  assert.equal(bad.isError, true);
+  assert.match(bad.text, /iniciar sesión/);
+  assert.equal((await tool(handler, 'add_prototype_url', {})).isError, true);
+});
+
 test('a locked Taptana explains how to pass the key; an unreachable one says to start it', async () => {
   const locked = setup({ locked: true });
   const res = await tool(locked.handler, 'list_prototypes');
@@ -464,6 +485,7 @@ test('every tool answers (no protocol error) with a fake API', async () => {
     duplicate_study: { studyId: 'st_1' },
     get_report: { studyId: 'st_1' },
     upload_prototype: { name: 'n', html: '<p>x</p>' },
+    add_prototype_url: { url: 'https://mi-app.vercel.app' },
     get_screen_html: { prototypeId: 'pr_tienda', screen: '/index.html' },
   };
   for (const t of TOOLS) {

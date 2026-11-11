@@ -28,7 +28,9 @@ en tu navegador, con el mismo ejemplo.
 ## Cómo funciona una prueba
 
 **1. Sube tu prototipo.** Un `.html` o un `.zip`, tal como lo hiciste (con IA, a mano, como
-sea). No hay que cambiarle nada.
+sea). No hay que cambiarle nada. ¿Tu prototipo ya tiene dirección (Lovable, v0, Bolt, Vercel o
+tu servidor de desarrollo en `http://localhost:5173`)? Agrégalo **por URL**: Taptana lo muestra a
+través de sí mismo y lo graba igual.
 
 ![Inicio: los cuatro pasos de tu primera prueba](docs/img/inicio.png)
 

@@ -23,7 +23,7 @@ export function promptMessages(name: string, args: Record<string, unknown>) {
 
 Sigue estos pasos con las herramientas de Taptana:
 1. get_study_format: lee la guía completa del formato antes de escribir nada.
-2. list_prototypes: si hay más de uno y no está claro cuál, pregúntame.
+2. list_prototypes: si hay más de uno y no está claro cuál, pregúntame. Si no hay ninguno y te doy una dirección (un sitio publicado o http://localhost:…), agrégalo con add_prototype_url.
 3. list_screens con ese prototipo. Usa solo esas pantallas; no inventes ninguna.
 4. get_screen_html con las pantallas que vas a usar, para ver sus textos, links, botones y selectores reales. Escribe reglas "tapped" o "visible" solo con selectores y textos que aparezcan ahí.
 5. Escribe un estudio corto (de 5 a 9 bloques) que responda a lo que quiero averiguar${goal ? '' : ' (si no lo dije, el flujo principal del prototipo)'}. Instrucciones en palabras del participante, de tú, sin nombrar botones.

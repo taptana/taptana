@@ -38,8 +38,13 @@ export interface Prototype {
   id: string;
   name: string;
   createdAt: number;
-  /** 'folder': la carpeta de `taptana dev`. 'upload': subido desde el panel. */
-  source?: 'folder' | 'upload';
+  /**
+   * 'folder': la carpeta de `taptana dev`. 'upload': subido desde el panel. 'url': un sitio
+   * publicado (o un servidor de desarrollo) que Taptana sirve a través de sí mismo en /p/<id>/.
+   */
+  source?: 'folder' | 'upload' | 'url';
+  /** Solo con `source: 'url'`: la dirección del sitio ("https://mi-app.vercel.app/"). */
+  sourceUrl?: string;
   /** Página de entrada, relativa al prototipo ("/index.html"). */
   entryPath?: string;
   /** Ruta donde se sirve ("/" o "/p/pr_abc/"). La pone el servidor al listar. */

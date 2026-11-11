@@ -70,6 +70,7 @@ interface PrototypeRow {
   entry_path: string | null;
   root: number | null;
   absolute_urls: number | null;
+  source_url: string | null;
   session_count: number;
 }
 
@@ -110,7 +111,8 @@ function createId(prefix: string, length = 8): string {
 function rowToPrototype(row: PrototypeRow): Prototype {
   const p: Prototype = { id: row.id, name: row.name, createdAt: row.created_at, sessionCount: Number(row.session_count) };
   // 'import' (sin archivos) queda sin `source`: no es ni la carpeta local ni un archivo subido.
-  if (row.source === 'upload' || row.source === 'folder') p.source = row.source;
+  if (row.source === 'upload' || row.source === 'folder' || row.source === 'url') p.source = row.source;
+  if (row.source === 'url' && row.source_url) p.sourceUrl = row.source_url;
   if (row.entry_path) p.entryPath = row.entry_path;
   if (row.root === 1) p.root = true;
   if (row.absolute_urls === 1) p.absoluteUrls = true;
@@ -270,10 +272,10 @@ export class SqliteStore implements Store {
     const existing = this.getPrototype(p.id);
     const absoluteUrls = p.absoluteUrls ?? existing?.absoluteUrls ?? false;
     this.q(
-      `INSERT INTO prototypes (id, name, created_at, source, entry_path, absolute_urls) VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO prototypes (id, name, created_at, source, entry_path, absolute_urls, source_url) VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET name = excluded.name, source = excluded.source,
-         entry_path = excluded.entry_path, absolute_urls = excluded.absolute_urls`,
-    ).run(p.id, p.name, p.createdAt, p.source ?? 'import', p.entryPath ?? null, absoluteUrls ? 1 : 0);
+         entry_path = excluded.entry_path, absolute_urls = excluded.absolute_urls, source_url = excluded.source_url`,
+    ).run(p.id, p.name, p.createdAt, p.source ?? 'import', p.entryPath ?? null, absoluteUrls ? 1 : 0, p.source === 'url' ? (p.sourceUrl ?? null) : null);
     return this.getPrototype(p.id)!;
   }
 
@@ -292,7 +294,7 @@ export class SqliteStore implements Store {
   }
 
   getRootPrototype(): Prototype | null {
-    const row = this.q(`${PROTOTYPE_SELECT} WHERE p.root = 1 AND p.source = 'upload' LIMIT 1`).get() as unknown as PrototypeRow | undefined;
+    const row = this.q(`${PROTOTYPE_SELECT} WHERE p.root = 1 AND p.source IN ('upload', 'url') LIMIT 1`).get() as unknown as PrototypeRow | undefined;
     return row ? rowToPrototype(row) : null;
   }
 

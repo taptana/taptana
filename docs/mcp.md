@@ -169,4 +169,6 @@ un Taptana corriendo; variables `TAPTANA_URL` y `TAPTANA_KEY`) y `POST /mcp` en 
 
 Herramientas: `get_info`, `get_study_format`, `list_prototypes`, `list_screens`,
 `get_screen_html` (usa `GET /api/v1/prototypes/:id/source?path=`), `list_studies`, `get_study`, `validate_study`, `create_study`, `update_study`,
-`duplicate_study`, `get_report`, `upload_prototype`. Prompt: `armar_estudio`.
+`duplicate_study`, `get_report`, `upload_prototype`, `add_prototype_url` (agrega un sitio por su
+dirección, después de revisarlo; con un prototipo por URL, `get_screen_html` pide el HTML al
+sitio en ese momento). Prompt: `armar_estudio`.

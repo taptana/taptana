@@ -27,6 +27,56 @@ servirlo.
   internet.
 - Mientras editas, también puedes servir una carpeta directamente: `pnpm start ./mi-prototipo`.
 
+## Agregar por URL
+
+Si tu prototipo ya vive en una dirección (lo publicaste con Lovable, v0, Bolt, Vercel, Netlify o
+Figma Sites, o lo tienes corriendo en tu laptop con `npm run dev`), no hace falta exportarlo:
+en **Prototipos → Agregar por URL** pegas la dirección, tocas **Revisar** y, si está bien,
+**Agregar**.
+
+Taptana no copia tu sitio ni lo modifica. Cada vez que un participante abre el link
+(`/p/<id>/`), Taptana pide esa página a tu sitio en ese momento, le agrega la grabación y se la
+entrega al celular. Para el participante y para el reporte es igual que un prototipo subido:
+misma Wi-Fi, mismas grabaciones, toques, pantallas, mapas de calor y embudos.
+
+**Qué revisa antes de agregarlo:** que responda, que sea una página web, que no pida iniciar
+sesión y que no te mande a otro sitio (si redirige, te ofrece la dirección final). También te
+avisa si la página se arma con JavaScript (está bien, solo es informativo), si parece una app
+con rutas propias (conviene «Abrir en la raíz») o si usa cookies que solo funcionan con https.
+El título de la página se sugiere como nombre.
+
+**Lo que conviene saber:**
+
+- **Muestra siempre lo publicado ahora.** Si cambias el sitio a mitad de un estudio, los
+  participantes nuevos ven el cambio. Para probar otra versión, publícala en otra dirección y
+  agrégala como otro prototipo. La dirección se puede cambiar después (menú ⋯ → «Cambiar
+  dirección») sin perder el link, los estudios ni las sesiones.
+- **Tiene que estar encendido** durante la prueba. Si no responde, el participante ve una página
+  amable que dice que no se pudo abrir.
+- **Servidor de desarrollo en tu laptop** (`http://localhost:5173`, `:3000`…): funciona, y los
+  celulares no necesitan llegar a él (llegan a Taptana, que sí llega). La recarga en caliente
+  no pasa por Taptana: si cambias el código, recarga la página. Ojo: cualquiera en la Wi-Fi con
+  el link puede pedir, a través de Taptana, cualquier dirección de ese servidor (como si lo
+  corrieras con `--host`).
+- **Apps con rutas propias** (React Router, Vue Router, Next.js): si al navegar vuelven siempre
+  al inicio o dicen «página no encontrada», activa **Abrir en la raíz** (ver abajo). Dentro de
+  `/p/<id>/` funcionan mejor los sitios de varias páginas.
+
+**Lo que no funciona:**
+
+- **Sitios con inicio de sesión** (la página pide cuenta, o el sitio está protegido con
+  contraseña o con «Vercel Authentication»). Publícalo como público.
+- **Sitios que solo funcionan en su propio dominio**: inicio de sesión con Google u otro
+  proveedor (OAuth), APIs de otro dominio que solo aceptan peticiones desde el dominio original
+  (CORS estricto), pagos reales.
+- **WebSockets** (chat en vivo, datos en tiempo real, recarga en caliente).
+- **Service workers** del sitio: Taptana no deja que se instalen, para que ninguna página quede
+  sin grabación. Un sitio que dependa de su service worker para funcionar sin conexión no lo
+  hará.
+- **Cookies `Secure`, `__Host-` o `__Secure-`**: Taptana va por http en tu red, así que el
+  navegador no las guarda. Las cookies simples (un carrito, una preferencia) sí funcionan.
+- Una ruta del sitio que empiece con `/api/v1/` o `/__taptana/` es de Taptana y no llega al sitio.
+
 ## Direcciones que empiezan con `/`
 
 Un prototipo subido vive en una dirección como `/p/pr_abc123/`. Si tu HTML pide
@@ -95,6 +145,8 @@ navega en el teléfono de la derecha y fíjate en "Pantalla:" arriba del teléfo
   que vio un participante; los toques de otros pueden caer sobre algo un poco distinto.
 - **Pantallas muy parecidas sin marcador** (dos pasos de un formulario con el mismo título)
   pueden contarse como una sola. Usa `data-screen`.
+- **Prototipos por URL**: ver «Agregar por URL» arriba (inicio de sesión, WebSockets, cookies
+  `Secure`).
 - **Service workers o lógica que dependa del dominio** (inicio de sesión con Google, pagos
   reales) no van a funcionar dentro de Taptana. Simúlalos.
 - **Gestos**: se registran toques, deslizamientos y scroll. Pellizcar para ampliar no.

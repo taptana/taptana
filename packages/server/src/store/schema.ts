@@ -14,10 +14,11 @@ CREATE TABLE IF NOT EXISTS prototypes (
   id            TEXT PRIMARY KEY,
   name          TEXT NOT NULL,
   created_at    INTEGER NOT NULL,
-  source        TEXT NOT NULL DEFAULT 'folder',  -- 'folder' | 'upload' | 'import' (sin archivos)
+  source        TEXT NOT NULL DEFAULT 'folder',  -- 'folder' | 'upload' | 'url' | 'import' (sin archivos)
   entry_path    TEXT,
   root          INTEGER NOT NULL DEFAULT 0,      -- 1: servido también en "/" (uno a la vez)
-  absolute_urls INTEGER NOT NULL DEFAULT 0       -- 1: su HTML de entrada usa rutas absolutas
+  absolute_urls INTEGER NOT NULL DEFAULT 0,      -- 1: su HTML de entrada usa rutas absolutas
+  source_url    TEXT                             -- solo 'url': el sitio que Taptana sirve en /p/<id>/
 );
 
 CREATE TABLE IF NOT EXISTS studies (
@@ -118,4 +119,5 @@ export const COLUMNS: Array<[string, string, string]> = [
   ['prototypes', 'entry_path', 'TEXT'],
   ['prototypes', 'root', 'INTEGER NOT NULL DEFAULT 0'],
   ['prototypes', 'absolute_urls', 'INTEGER NOT NULL DEFAULT 0'],
+  ['prototypes', 'source_url', 'TEXT'],
 ];

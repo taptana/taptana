@@ -5,6 +5,7 @@ import {
   type PrototypeListResponse,
   type PrototypePagesResponse,
   type PrototypeScreensResponse,
+  type PrototypeUrlCheck,
   type ReportFilter,
   type ScreenInfo,
   type ServerInfo,
@@ -171,6 +172,20 @@ export class HttpClient implements ApiClient {
 
   renamePrototype(prototypeId: string, name: string): Promise<Prototype> {
     return request<Prototype>(`/prototypes/${id(prototypeId)}`, json('PATCH', { name }));
+  }
+
+  readonly canAddByUrl = true;
+
+  checkPrototypeUrl(url: string): Promise<PrototypeUrlCheck> {
+    return request<PrototypeUrlCheck>('/prototypes/url/check', json('POST', { url }));
+  }
+
+  addPrototypeUrl(url: string, opts: { name?: string } = {}): Promise<Prototype> {
+    return request<Prototype>('/prototypes/url', json('POST', { url, ...(opts.name && { name: opts.name }) }));
+  }
+
+  setPrototypeUrl(prototypeId: string, url: string): Promise<Prototype> {
+    return request<Prototype>(`/prototypes/${id(prototypeId)}`, json('PATCH', { url }));
   }
 
   setPrototypeRoot(prototypeId: string, root: boolean): Promise<Prototype> {

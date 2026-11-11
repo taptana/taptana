@@ -41,6 +41,7 @@ import {
   type ExampleResponse,
   type ManualResults,
   type Prototype,
+  type PrototypeUrlCheck,
   type ReportFilter,
   type ReportSession,
   type ScreenInfo,
@@ -58,6 +59,10 @@ import type { ApiClient, ManualMarks, PrototypePage } from './client.ts';
 import { SessionExistsError, UserError } from '@/lib/errors';
 import { idbAvailable, idbBatch, idbRequest, openDb } from '@/lib/idb';
 import { htmlTitle, unpack } from '@/lib/unzip';
+
+/** En la demo no hay un servidor que pueda abrir otro sitio y servirlo con el recorder. */
+export const NEEDS_SERVER_FOR_URL =
+  'Agregar por URL necesita Taptana instalado en tu computadora: es el servidor el que abre tu sitio y le agrega la grabación. En esta demo puedes subir un .html o un .zip.';
 
 const PANEL_DB = 'taptana-panel';
 const SESSIONS = 'sessions';
@@ -576,6 +581,20 @@ export class StaticClient implements ApiClient {
     const next = { ...proto, name: clean };
     await write(PROTOTYPES, (s) => s.put(next));
     return { ...next, url: `${this.base}local/${id}/` };
+  }
+
+  readonly canAddByUrl = false;
+
+  async checkPrototypeUrl(): Promise<PrototypeUrlCheck> {
+    throw new UserError(NEEDS_SERVER_FOR_URL, 400);
+  }
+
+  async addPrototypeUrl(): Promise<Prototype> {
+    throw new UserError(NEEDS_SERVER_FOR_URL, 400);
+  }
+
+  async setPrototypeUrl(): Promise<Prototype> {
+    throw new UserError(NEEDS_SERVER_FOR_URL, 400);
   }
 
   async setPrototypeRoot(): Promise<Prototype> {

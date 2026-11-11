@@ -6,7 +6,7 @@
  * el borrador es válido. Mientras haya cambios sin guardar, salir pide confirmación.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, BarChart3, CircleAlert, CircleCheck, Copy, Crosshair, Download, Ellipsis, FileArchive, LayoutList, ListChecks, LoaderCircle, PencilRuler, Play, Plus, Share2, Smartphone, Sparkles, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BarChart3, CircleAlert, CircleCheck, Copy, Crosshair, Download, Ellipsis, FileArchive, Globe, LayoutList, ListChecks, LoaderCircle, PencilRuler, Play, Plus, Share2, Smartphone, Sparkles, TriangleAlert } from 'lucide-react';
 import {
   STUDY_LIMITS,
   sameScreen,
@@ -498,7 +498,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
   };
 
   // Una app con rutas propias (History API) servida en una subcarpeta suele volver siempre al inicio.
-  const needsRoot = Boolean(proto?.absoluteUrls && !proto.root && proto.source === 'upload' && proto.url && proto.url !== '/');
+  const needsRoot = Boolean(proto?.absoluteUrls && !proto.root && (proto.source === 'upload' || proto.source === 'url') && proto.url && proto.url !== '/');
   const openAtRoot = async (): Promise<void> => {
     if (!proto) return;
     setBusy(true);
@@ -652,6 +652,15 @@ export function StudyEditorPage({ id }: { id: string | null }) {
           }
         >
           <p>Cambiar las tareas afecta los resultados que ya tienes. Si quieres probar otra versión, mejor duplica el estudio y edita la copia.</p>
+        </Notice>
+      )}
+
+      {record && sessionCount > 0 && proto?.source === 'url' && (
+        <Notice tone="warning" icon={<Globe />} title="Este prototipo se ve en vivo desde su URL">
+          <p>
+            Los participantes ven lo que está publicado en {proto.sourceUrl} en el momento en que abren el link. Si cambias el sitio, cambia lo que ven y los resultados
+            nuevos dejan de ser comparables con las sesiones que ya tienes. Para probar otra versión, publícala en otra dirección y agrégala como otro prototipo.
+          </p>
         </Notice>
       )}
 
@@ -908,7 +917,7 @@ function SetupSteps({
       {step === 0 &&
         (protos.length === 0 ? (
           <div className="space-y-4 rounded-2xl border border-dashed bg-background p-(--card-pad)">
-            <p className="text-muted-foreground">Todavía no hay prototipos. Sube tu archivo .html o .zip y vuelve aquí.</p>
+            <p className="text-muted-foreground">Todavía no hay prototipos. Sube tu archivo .html o .zip, o agrega tu sitio por URL, y vuelve aquí.</p>
             <Button asChild>
               <Link to={{ name: 'prototypes' }}>
                 <FileArchive /> Ir a Prototipos
@@ -930,7 +939,7 @@ function SetupSteps({
                   <input type="radio" name="setup-proto" className="size-4 shrink-0 accent-[var(--primary)]" checked={checked} onChange={() => onPrototype(p.id)} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{p.name}</span>
-                    <span className="block truncate text-sm text-muted-foreground">{p.url}</span>
+                    <span className="block truncate text-sm text-muted-foreground">{p.source === 'url' && p.sourceUrl ? p.sourceUrl : p.url}</span>
                   </span>
                 </label>
               );

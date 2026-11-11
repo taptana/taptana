@@ -85,6 +85,8 @@ Reglas duras:
    `data-endpoint`, `data-prototype`, `data-transport`, `data-base`, `data-export`. Nunca asume
    que el servidor es el mismo origen.
 3. **Los datos pertenecen a un prototipo.** Tabla `prototypes`; cada sesión y estudio apunta a uno.
+   `source`: `folder`, `upload`, `url` (con `sourceUrl`: un sitio que Taptana sirve a través de sí
+   mismo, `server/src/proxy.ts`) o `import` (sin archivos).
 4. **Base de datos detrás de una interfaz** (`Store`). SQLite hoy.
 5. **Configuración por variables de entorno y flags**: `TAPTANA_PORT`, `TAPTANA_HOST`,
    `TAPTANA_DATA_DIR`, `TAPTANA_PANEL=open`, `TAPTANA_PUBLIC_URL`. Flags: `--port`, `--host`,
@@ -173,7 +175,7 @@ La sesión vive en `sessionStorage` (una pestaña). Cada carga de página es un 
 
 - **Rutas de página**: `/panel` (el panel; `/sessions` redirige), `/p/<id>/` (prototipos
   subidos, con respaldo de app de una página y redirección por `Referer` para rutas
-  absolutas), `/` (la carpeta servida, el prototipo marcado "Abrir en la raíz" o una página
+  absolutas, 307 para cualquier método; y prototipos por URL, ver abajo), `/` (la carpeta servida, el prototipo marcado "Abrir en la raíz" o una página
   amable), `/__taptana/recorder.js`.
 - **MCP** (`routes/mcp.ts`): `POST /mcp`, sin estado (respuesta JSON; 202 para
   notificaciones; `GET` → 405). Pasa por `guard.mcp`, que además acepta
@@ -181,7 +183,18 @@ La sesión vive en `sessionStorage` (una pestaña). Cada carga de página es un 
 - **API** (`routes/api.ts`): `/info`, `/events`, `/sessions` (lista, detalle, eventos,
   export, import con 409 salvo `?replace=1`, PATCH con `manual`/`label`/`notes`/`excluded`),
   `/studies` (CRUD, `/report?variant=&device=`, `/export.csv`, `/duplicate`), `/prototypes`
-  (subir, nueva versión, PATCH `name`/`root`, `/screens`, `/source?path=` con el HTML en disco), `/example`, `/qr.svg`.
+  (subir, `url`, `url/check`, nueva versión, PATCH `name`/`root`/`url`, `/screens`, `/source?path=` con el HTML en disco), `/example`, `/qr.svg`.
+- **Prototipos por URL** (`proxy.ts`): `/p/<id>/<ruta>` se pide con `fetch` al origen de
+  `sourceUrl` (nunca a otro host; se permiten localhost y la red local), sin seguir
+  redirecciones, sin caché. En el HTML: recorder inyectado, rutas `/…` y del mismo origen bajo
+  `/p/<id>/`, sin CSP. Se quitan CSP, X-Frame-Options, HSTS, `Service-Worker-Allowed`; `Location`
+  y `Set-Cookie` se reescriben; la cookie de la llave del panel nunca sale. El script de un
+  service worker (`Service-Worker: script`) recibe 404. Sin WebSockets. Lo que el JS pide con
+  ruta absoluta vuelve por el Referer (por eso solo `/api/v1/` y `/__taptana/` están
+  reservados en la raíz). `POST /prototypes/url` (`{ url, name? }`, revisa antes y responde
+  400 con `check` si no sirve), `POST /prototypes/url/check` (solo el veredicto,
+  `PrototypeUrlCheck`), PATCH `url`. `/screens` = la página de inicio + las vistas en sesiones;
+  `/source` pide el HTML en vivo. Se pueden abrir en la raíz como los subidos.
 - **Guardia del panel**: pasa la conexión local, la que trae la llave (`?key=` → cookie) o
   todo si el modo es abierto. Bloquea peticiones entre sitios. La llave está en
   `<dataDir>/panel.key` y la terminal imprime el link. En Docker no hay conexión "local": el
@@ -265,4 +278,8 @@ del ejemplo.
   un dominio aparte (`docs/servidor-hospedado.md`).
 - El mapa de calor usa como fondo lo que vio un participante; en pantallas que cambian mucho
   según el estado, los toques de otros pueden no caer sobre lo mismo.
+- Prototipos por URL: no pasan inicios de sesión, OAuth, APIs con CORS estricto, WebSockets
+  (ni la recarga en caliente de un servidor de desarrollo), service workers ni cookies `Secure`
+  sobre http. Dentro de `/p/<id>/`, una app con router de History puede necesitar «Abrir en la
+  raíz» (y un módulo referido desde el HTML y desde JS puede cargarse dos veces).
 - Sin HTTPS propio, sin cuentas. Una sola red Wi-Fi salvo que se despliegue en un servidor.

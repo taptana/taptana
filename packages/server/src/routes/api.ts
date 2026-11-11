@@ -38,6 +38,7 @@ import {
   type PrototypeListResponse,
   type PrototypePagesResponse,
   type PrototypeScreensResponse,
+  type PrototypeUrlCheck,
   type ReportFilter,
   type ServerInfo,
   type SessionExport,
@@ -49,6 +50,7 @@ import { isLoopback } from '../network.js';
 import type { PanelGuard } from '../panel-guard.js';
 import { PANEL_KEY_PARAM } from '../panel-guard.js';
 import { listPrototypePages } from '../prototype-pages.js';
+import { checkPrototypeUrl, upstreamUrl, UPSTREAM_TIMEOUT_MS } from '../proxy.js';
 import { resolveFile } from '../static.js';
 import type { ListSessionsFilter, Store } from '../store/store.js';
 import { extractUpload, MAX_UPLOAD_BYTES, prototypeDir as uploadedDir, removePrototypeFiles, UploadError } from '../uploads.js';
@@ -104,6 +106,8 @@ export interface ApiOptions {
   /** De dónde sale el ejemplo. Por defecto, del paquete. */
   exampleDir?: string;
   seedDir?: string;
+  /** Para pruebas: con qué se abren los prototipos por URL. Por defecto, el fetch de Node. */
+  fetch?: (input: URL | string, init?: RequestInit) => Promise<Response>;
 }
 
 function limit(maxSize: number, message: string): MiddlewareHandler {
@@ -136,7 +140,7 @@ function hostNameOf(host: string): string {
   return colon === -1 ? host : host.slice(0, colon);
 }
 
-export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl, exampleDir, seedDir }: ApiOptions): Hono {
+export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl, exampleDir, seedDir, fetch: fetchImpl }: ApiOptions): Hono {
   const api = new Hono();
 
   // ── Quién entra ──────────────────────────────────────────────────────
@@ -385,7 +389,7 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
     delete out.root;
     if (isLocalFolder(p)) {
       out.url = '/';
-    } else if (p.source === 'upload') {
+    } else if (p.source === 'upload' || p.source === 'url') {
       const root = p.root === true && !prototypeDir;
       if (root) out.root = true;
       out.url = root ? '/' : `${UPLOADED_PATH}/${p.id}/`;
@@ -407,7 +411,7 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
     const prototypes = store
       .listPrototypes()
       // La carpeta local (si hay), los subidos y los que llegaron con una sesión importada.
-      .filter((p) => isLocalFolder(p) || p.source === 'upload' || (p.source === undefined && p.id !== LOCAL_PROTOTYPE_ID) || (p.source === undefined && !prototypeDir))
+      .filter((p) => isLocalFolder(p) || p.source === 'upload' || p.source === 'url' || (p.source === undefined && p.id !== LOCAL_PROTOTYPE_ID) || (p.source === undefined && !prototypeDir))
       .map(present);
     return c.json<PrototypeListResponse>({ prototypes });
   });
@@ -443,6 +447,57 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
 
   api.post('/prototypes', uploadLimit, (c) => upload(c, null));
 
+  // ── Prototipos por URL ──
+  /** Taptana se ve por https (un túnel o un proxy): entonces las cookies `Secure` sí funcionan. */
+  const servedSecure = (c: Context): boolean =>
+    new URL(c.req.url).protocol === 'https:' || c.req.header('x-forwarded-proto')?.split(',')[0]?.trim() === 'https' || (publicUrl ?? '').startsWith('https:');
+  const check = (c: Context, url: string): Promise<PrototypeUrlCheck> => checkPrototypeUrl(url, { secure: servedSecure(c), ...(fetchImpl && { fetch: fetchImpl }) });
+  const urlLimit = limit(PATCH_MAX_BYTES, 'El cambio es demasiado grande.');
+
+  const readUrlBody = async (c: Context): Promise<{ ok: true; url: string; name?: string } | { ok: false; response: Response }> => {
+    const body = await readJson(c);
+    if (!body.ok) return { ok: false, response: c.json<ApiError>({ error: INVALID_JSON }, 400) };
+    const value = (typeof body.value === 'object' && body.value !== null ? body.value : {}) as { url?: unknown; name?: unknown };
+    if (typeof value.url !== 'string') return { ok: false, response: c.json<ApiError>({ error: 'Falta la dirección del prototipo ("url").' }, 400) };
+    if (value.name !== undefined && typeof value.name !== 'string') return { ok: false, response: c.json<ApiError>({ error: '"name" tiene que ser un texto.' }, 400) };
+    const name = typeof value.name === 'string' ? value.name.trim().slice(0, STUDY_LIMITS.name) : '';
+    return { ok: true, url: value.url, ...(name && { name }) };
+  };
+
+  /** Revisa una URL sin guardar nada: el veredicto con avisos en español (ver checkPrototypeUrl). */
+  api.post('/prototypes/url/check', urlLimit, async (c) => {
+    const body = await readUrlBody(c);
+    if (!body.ok) return body.response;
+    c.header('cache-control', 'no-store');
+    return c.json<PrototypeUrlCheck>(await check(c, body.url));
+  });
+
+  /** Agrega un prototipo por URL: { url, name? }. Si la revisión dice que no se puede, 400 con la revisión (`check`). */
+  api.post('/prototypes/url', urlLimit, async (c) => {
+    const body = await readUrlBody(c);
+    if (!body.ok) return body.response;
+    const verdict = await check(c, body.url);
+    if (verdict.level === 'error') return c.json({ error: verdict.issues.find((i) => i.level === 'error')?.message ?? 'No se puede usar esa dirección.', check: verdict }, 400);
+    const start = new URL(verdict.url);
+    const name = body.name || verdict.title?.slice(0, STUDY_LIMITS.name) || start.host;
+    const saved = store.savePrototype({
+      id: newPrototypeId(),
+      name,
+      createdAt: Date.now(),
+      source: 'url',
+      sourceUrl: verdict.url,
+      entryPath: start.pathname,
+      absoluteUrls: verdict.absoluteUrls === true,
+    });
+    // Una app con rutas propias (React Router y parecidos) solo navega bien en la raíz: si la raíz
+    // está libre se la damos de una vez, para que el caso más común funcione sin tocar nada.
+    if (saved.absoluteUrls && !prototypeDir && !store.getRootPrototype()) {
+      store.setRootPrototype(saved.id);
+      return c.json({ ...present(store.getPrototype(saved.id) ?? saved), check: verdict }, 201);
+    }
+    return c.json({ ...present(saved), check: verdict }, 201);
+  });
+
   api.put('/prototypes/:id', uploadLimit, (c) => {
     const existing = store.getPrototype(c.req.param('id'));
     if (!existing || existing.source !== 'upload' || !UPLOADED_ID.test(existing.id)) return c.json<ApiError>({ error: NO_PROTOTYPE }, 404);
@@ -455,8 +510,8 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
     if (!existing) return c.json<ApiError>({ error: NO_PROTOTYPE }, 404);
     const body = await readJson(c);
     if (!body.ok) return c.json<ApiError>({ error: INVALID_JSON }, 400);
-    const patch = (typeof body.value === 'object' && body.value !== null ? body.value : {}) as { name?: unknown; root?: unknown };
-    if (patch.name === undefined && patch.root === undefined) return c.json<ApiError>({ error: 'Indica qué cambiar: "name" o "root".' }, 400);
+    const patch = (typeof body.value === 'object' && body.value !== null ? body.value : {}) as { name?: unknown; root?: unknown; url?: unknown };
+    if (patch.name === undefined && patch.root === undefined && patch.url === undefined) return c.json<ApiError>({ error: 'Indica qué cambiar: "name", "root" o "url".' }, 400);
 
     let name: string | undefined;
     if (patch.name !== undefined) {
@@ -466,16 +521,27 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
     }
     if (patch.root !== undefined) {
       if (typeof patch.root !== 'boolean') return c.json<ApiError>({ error: '"root" tiene que ser true o false.' }, 400);
-      if (existing.source !== 'upload') return c.json<ApiError>({ error: 'Solo un prototipo subido se puede abrir en la raíz.' }, 400);
+      if (existing.source !== 'upload' && existing.source !== 'url') return c.json<ApiError>({ error: 'Solo un prototipo subido o por URL se puede abrir en la raíz.' }, 400);
       if (patch.root && prototypeDir) {
         return c.json<ApiError>({ error: 'La raíz ya la ocupa la carpeta que estás sirviendo. Arranca Taptana sin carpeta para abrir en la raíz un prototipo subido.' }, 400);
       }
     }
 
-    if (name !== undefined) store.savePrototype({ ...existing, name });
+    // Cambiar la URL: se revisa como al agregarla. Los estudios y sesiones siguen con el prototipo.
+    let moved: Partial<Prototype> | undefined;
+    let verdict: PrototypeUrlCheck | undefined;
+    if (patch.url !== undefined) {
+      if (existing.source !== 'url') return c.json<ApiError>({ error: 'Solo se le cambia la dirección a un prototipo agregado por URL.' }, 400);
+      if (typeof patch.url !== 'string') return c.json<ApiError>({ error: '"url" tiene que ser un texto.' }, 400);
+      verdict = await check(c, patch.url);
+      if (verdict.level === 'error') return c.json({ error: verdict.issues.find((i) => i.level === 'error')?.message ?? 'No se puede usar esa dirección.', check: verdict }, 400);
+      moved = { sourceUrl: verdict.url, entryPath: new URL(verdict.url).pathname, absoluteUrls: verdict.absoluteUrls === true };
+    }
+
+    if (name !== undefined || moved) store.savePrototype({ ...existing, ...(name !== undefined && { name }), ...moved });
     if (patch.root === true) store.setRootPrototype(existing.id);
     else if (patch.root === false && existing.root) store.setRootPrototype(null);
-    return c.json(present(store.getPrototype(existing.id)!));
+    return c.json({ ...present(store.getPrototype(existing.id)!), ...(verdict && { check: verdict }) });
   });
 
   api.delete('/prototypes/:id', async (c) => {
@@ -491,6 +557,10 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
   });
 
   const htmlFiles = async (id: string): Promise<Array<{ path: string; title: string }>> => {
+    // Un prototipo por URL no tiene archivos: su pantalla conocida es la de inicio; las demás
+    // aparecen cuando alguien las recorre (con el título que vio el participante).
+    const proto = store.getPrototype(id);
+    if (proto?.source === 'url') return [{ path: proto.entryPath ?? '/', title: '' }];
     const dir = dirFor(id);
     return dir ? listPrototypePages(dir) : [];
   };
@@ -508,7 +578,9 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
    */
   api.get('/prototypes/:id/source', async (c) => {
     const id = c.req.param('id');
-    if (!store.getPrototype(id) && !(id === LOCAL_PROTOTYPE_ID && prototypeDir)) return c.json<ApiError>({ error: NO_PROTOTYPE }, 404);
+    const proto = store.getPrototype(id);
+    if (!proto && !(id === LOCAL_PROTOTYPE_ID && prototypeDir)) return c.json<ApiError>({ error: NO_PROTOTYPE }, 404);
+    if (proto?.source === 'url' && proto.sourceUrl) return liveSource(c, proto.sourceUrl);
     const dir = dirFor(id);
     if (!dir) return c.json<ApiError>({ error: 'Este prototipo no tiene archivos en Taptana (llegó con una sesión importada): no hay HTML que mostrar.' }, 404);
     const path = screenParts(c.req.query('path') || '/').path;
@@ -518,6 +590,38 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
     c.header('cache-control', 'no-store');
     return c.json({ path, size: file.size, html: await fs.readFile(file.absolute, 'utf8') });
   });
+
+  /** El HTML de una pantalla de un prototipo por URL, pedido al sitio en este momento (sin seguir redirecciones a otros sitios). */
+  const liveSource = async (c: Context, sourceUrl: string): Promise<Response> => {
+    // "/" y "/carpeta/" se guardan como "…/index.html" (ScreenId); al sitio se le pide la carpeta.
+    const path = screenParts(c.req.query('path') || '/').path.replace(/\/index\.html$/, '/');
+    const doFetch = fetchImpl ?? fetch;
+    let target = upstreamUrl(sourceUrl, path);
+    try {
+      for (let hop = 0; hop < 5; hop++) {
+        const res = await doFetch(target, { headers: { accept: 'text/html' }, redirect: 'manual', signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+        const location = res.headers.get('location');
+        if (res.status >= 300 && res.status < 400 && location) {
+          await res.body?.cancel().catch(() => undefined);
+          const next = new URL(location, target);
+          if (next.origin !== target.origin) return c.json<ApiError>({ error: `«${path}» redirige a otro sitio (${next.host}).` }, 404);
+          target = next;
+          continue;
+        }
+        if (!res.ok || !/text\/html/i.test(res.headers.get('content-type') ?? '')) {
+          await res.body?.cancel().catch(() => undefined);
+          return c.json<ApiError>({ error: `El sitio no tiene una página HTML en «${path}» (respondió ${res.status}).` }, 404);
+        }
+        const html = await res.text();
+        if (html.length > SOURCE_MAX_BYTES) return c.json<ApiError>({ error: 'Esa página pesa más de 5 MB: es demasiado para mostrarla.' }, 413);
+        c.header('cache-control', 'no-store');
+        return c.json({ path, size: Buffer.byteLength(html), html, url: target.toString() });
+      }
+      return c.json<ApiError>({ error: `«${path}» redirige demasiadas veces.` }, 404);
+    } catch {
+      return c.json<ApiError>({ error: `No pudimos abrir ${new URL(sourceUrl).origin}: revisa que el sitio esté encendido.` }, 502);
+    }
+  };
 
   /** Alias anterior a v1: solo los archivos HTML. */
   api.get('/prototypes/:id/pages', async (c) => {

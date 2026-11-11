@@ -103,6 +103,52 @@ export interface PrototypeScreensResponse {
   screens: ScreenInfo[];
 }
 
+/** Qué tan grave es lo que encontró la revisión de una URL. */
+export type PrototypeUrlLevel = 'ok' | 'warning' | 'error';
+
+/** Una observación sobre una URL de prototipo, en español, lista para mostrar. */
+export interface PrototypeUrlIssue {
+  level: 'error' | 'warning' | 'info';
+  code:
+    | 'invalid'
+    | 'unreachable'
+    | 'timeout'
+    | 'http-error'
+    | 'not-html'
+    | 'login'
+    | 'other-host'
+    | 'empty-without-js'
+    | 'history-router'
+    | 'secure-cookies'
+    | 'too-many-redirects';
+  message: string;
+}
+
+/**
+ * POST /api/v1/prototypes/url/check (y la respuesta 400 de POST /prototypes/url): lo que
+ * Taptana vio al abrir la URL. `level: 'error'` significa que no se puede agregar.
+ */
+export interface PrototypeUrlCheck {
+  /** La URL normalizada (con https:// si faltaba, sin #fragmento). */
+  url: string;
+  level: PrototypeUrlLevel;
+  issues: PrototypeUrlIssue[];
+  /** Código HTTP de la última respuesta, si hubo. */
+  status?: number;
+  /** El <title> de la página: buen nombre para el prototipo. */
+  title?: string;
+  /** Si redirige a otro sitio: la dirección final, para usarla en su lugar. */
+  suggestedUrl?: string;
+  /** Navega con la History API: conviene "Abrir en la raíz". */
+  absoluteUrls?: boolean;
+}
+
+/** POST /api/v1/prototypes/url */
+export interface PrototypeUrlRequest {
+  url: string;
+  name?: string;
+}
+
 /** GET /api/v1/info: lo que el panel necesita saber del servidor. */
 export interface ServerInfo {
   version: string;

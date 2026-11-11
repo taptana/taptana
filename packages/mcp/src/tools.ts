@@ -13,6 +13,7 @@ import {
   taskBlocks,
   validateStudy,
   type Prototype,
+  type PrototypeUrlCheck,
   type ScreenInfo,
   type ServerInfo,
   type SessionSummary,
@@ -240,7 +241,7 @@ export const TOOLS: ToolDefinition[] = [
     name: 'list_prototypes',
     title: 'Prototipos',
     description:
-      'Los prototipos cargados en Taptana, con su id y nombre. El id es el prototypeId del estudio. Después llama a list_screens con el id elegido. Si no hay ninguno, el diseñador puede subir uno en el panel (Prototipos) o puedes usar upload_prototype.',
+      'Los prototipos cargados en Taptana, con su id y nombre. El id es el prototypeId del estudio. Después llama a list_screens con el id elegido. Si no hay ninguno, el diseñador puede subir uno en el panel (Prototipos) o puedes usar upload_prototype (un HTML) o add_prototype_url (un sitio publicado o un servidor de desarrollo).',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
     run: async (_args, ctx) => {
@@ -248,7 +249,7 @@ export const TOOLS: ToolDefinition[] = [
       if (list.length === 0) return text('Todavía no hay prototipos. El diseñador puede subir un .html o .zip en el panel (Prototipos), o cargar el ejemplo con «Ver un ejemplo» en Inicio.');
       return answer(
         `Hay ${list.length === 1 ? '1 prototipo' : `${list.length} prototipos`}. Usa su id como prototypeId y pide sus pantallas con list_screens.`,
-        list.map((p) => ({ id: p.id, name: p.name, ...(p.url && { url: p.url }) })),
+        list.map((p) => ({ id: p.id, name: p.name, ...(p.url && { url: p.url }), ...(p.sourceUrl && { sourceUrl: p.sourceUrl }) })),
       );
     },
   },
@@ -300,7 +301,8 @@ export const TOOLS: ToolDefinition[] = [
       if (res.status !== 200) return fail(`${apiError(res, 'No pude leer el HTML')} Revisa el id con list_prototypes y la pantalla con list_screens.`);
       const { path, html } = res.data as { path: string; html: string };
       const clean = cleanHtml(html);
-      const notes = [`Archivo ${path} del prototipo ${id}.`];
+      const live = (res.data as { url?: string }).url;
+      const notes = [live ? `Página ${path} del prototipo ${id}, pedida ahora a ${live}.` : `Archivo ${path} del prototipo ${id}.`];
       if (path !== screen) notes.push(`La pantalla «${screen}» vive en este archivo.`);
       if (clean.truncated) notes.push(`truncado: la página es larga y aquí va solo el principio (${clean.html.length} de ${clean.originalChars} caracteres).`);
       if (clean.scriptsEmptied > 0) {
@@ -513,6 +515,45 @@ export const TOOLS: ToolDefinition[] = [
         name: proto.name,
         panel: `${l.panel}/prototypes`,
         ...(proto.url && l.info.participantUrl && { open: new URL(proto.url, l.info.participantUrl).toString() }),
+      });
+    },
+  },
+  {
+    name: 'add_prototype_url',
+    title: 'Agregar un prototipo por URL',
+    description:
+      'Agrega como prototipo un sitio que ya tiene dirección: publicado (Vercel, Lovable, v0, Bolt, Netlify…) o un servidor de desarrollo en la computadora del diseñador (por ejemplo http://localhost:5173). Taptana lo sirve a través de sí mismo con el recorder, sin tocar el sitio. Antes de agregarlo lo revisa: si no se puede usar (pide iniciar sesión, no responde, no es HTML, redirige a otro sitio) devuelve el motivo y no lo agrega. Después: list_screens con el id que devuelve.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'La dirección del prototipo, como se ve en el navegador. Si falta https:// se agrega.' },
+        name: { type: 'string', description: 'Opcional: nombre del prototipo. Si no viene, se usa el título de la página.' },
+      },
+      required: ['url'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    run: async (args, ctx) => {
+      const url = stringArg(args, 'url', true);
+      const name = stringArg(args, 'name');
+      const res = await call(ctx, 'POST', '/prototypes/url', { url, ...(name && { name }) });
+      const verdict = (res.data as { check?: PrototypeUrlCheck } | undefined)?.check;
+      const notes = (verdict?.issues ?? []).map((i) => i.message);
+      if (res.status !== 201) {
+        return failWith(apiError(res, 'No se pudo agregar el prototipo'), {
+          ...(verdict?.suggestedUrl && { suggestedUrl: verdict.suggestedUrl }),
+          ...(notes.length > 0 && { issues: notes }),
+        });
+      }
+      const proto = res.data as Prototype;
+      const l = await links(ctx);
+      return answer(`Agregué «${proto.name}» (${proto.id}), que muestra lo que está publicado en ${proto.sourceUrl}. Ahora pide sus pantallas con list_screens: al principio solo se conoce la de inicio; las demás aparecen cuando alguien recorre el sitio.`, {
+        id: proto.id,
+        name: proto.name,
+        sourceUrl: proto.sourceUrl,
+        panel: `${l.panel}/prototypes`,
+        ...(proto.url && l.info.participantUrl && { open: new URL(proto.url, l.info.participantUrl).toString() }),
+        ...(notes.length > 0 && { notes }),
       });
     },
   },

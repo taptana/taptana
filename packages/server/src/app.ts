@@ -6,7 +6,8 @@
  *   /mcp                     el MCP para herramientas de IA (POST), detrás de la guardia
  *   /panel, /panel/...       el panel compilado (packages/web), detrás de la guardia
  *   /sessions...             la dirección antigua del panel: redirige a /panel
- *   /p/<id>/...              prototipos subidos, con el recorder inyectado en cada HTML
+ *   /p/<id>/...              prototipos subidos, con el recorder inyectado en cada HTML, y
+ *                            prototipos por URL (proxy.ts: el sitio pasa a través de Taptana)
  *   /*                       lo que esté montado en la raíz: la carpeta de `taptana dev <carpeta>`
  *                            o el prototipo subido marcado "abrir en la raíz"
  *
@@ -26,9 +27,11 @@ import {
   STUDY_PARAM,
   UPLOADED_PATH,
   type ApiError,
+  type Prototype,
   type ServerInfo,
 } from '@taptana/shared';
 import { injectRecorder } from './inject.js';
+import { proxyRequest, type ProxyTarget } from './proxy.js';
 import { lostPage, notFoundPage, panelPlaceholderPage } from './pages.js';
 import { createPanelGuard, loadPanelKey } from './panel-guard.js';
 import { apiRoutes, UPLOADED_ID } from './routes/api.js';
@@ -61,6 +64,8 @@ export interface AppOptions {
   /** De dónde sale el ejemplo (`POST /api/v1/example`). Por defecto, del paquete. */
   exampleDir?: string;
   seedDir?: string;
+  /** Con qué se abren los prototipos por URL. Por defecto, el fetch de Node. Para pruebas. */
+  fetch?: (input: URL | string, init?: RequestInit) => Promise<Response>;
 }
 
 const PANEL_PROTOTYPE_ID = 'taptana-panel';
@@ -79,6 +84,7 @@ const wantsHtml = (c: Context): boolean => (c.req.header('accept') ?? '').includ
 /** "/css/app.css" tiene extensión; "/checkout" y "/producto/42" no (son rutas de una app). */
 const hasExtension = (path: string): boolean => /\.[A-Za-z0-9]{1,8}$/.test(path.split('/').pop() ?? '');
 const searchOf = (c: Context): string => new URL(c.req.url).search;
+const isRead = (c: Context): boolean => c.req.method === 'GET' || c.req.method === 'HEAD';
 
 export function createApp(opts: AppOptions): Hono {
   const publicDir = opts.publicDir ?? join(PACKAGE_ROOT, 'public');
@@ -132,6 +138,7 @@ export function createApp(opts: AppOptions): Hono {
       ...(opts.publicUrl && { publicUrl: opts.publicUrl }),
       ...(opts.exampleDir && { exampleDir: opts.exampleDir }),
       ...(opts.seedDir && { seedDir: opts.seedDir }),
+      ...(opts.fetch && { fetch: opts.fetch }),
     }),
   );
 
@@ -197,7 +204,45 @@ export function createApp(opts: AppOptions): Hono {
     if (opts.prototypeDir) return { dir: opts.prototypeDir, prototypeId: opts.prototypeId, entry: '/', base: '' };
     if (!dataDir) return null;
     const proto = store.getRootPrototype();
-    return proto && UPLOADED_ID.test(proto.id) ? { ...uploadedMount(proto.id, proto.entryPath), base: '' } : null;
+    return proto && proto.source === 'upload' && UPLOADED_ID.test(proto.id) ? { ...uploadedMount(proto.id, proto.entryPath), base: '' } : null;
+  };
+
+  // ── Prototipos por URL (proxy.ts) ──────────────────────────────────
+  const urlTarget = (proto: Prototype, base: string): ProxyTarget | null =>
+    proto.source === 'url' && proto.sourceUrl ? { prototypeId: proto.id, sourceUrl: proto.sourceUrl, base } : null;
+
+  /** El prototipo por URL marcado "abrir en la raíz", si hay uno (y no hay carpeta local). */
+  const rootProxy = (): ProxyTarget | null => {
+    if (opts.prototypeDir || !dataDir) return null;
+    const proto = store.getRootPrototype();
+    return proto ? urlTarget(proto, '') : null;
+  };
+
+  /** ¿Se sirve en /p/<id>/? Los subidos y los por URL. */
+  const servedUnderP = (id: string): boolean => {
+    if (!dataDir || !UPLOADED_ID.test(id)) return false;
+    const source = store.getPrototype(id)?.source;
+    return source === 'upload' || source === 'url';
+  };
+
+  const proxyTo = (c: Context, target: ProxyTarget, rel: string): Promise<Response> | Response => {
+    // La entrada no es "/": se va a la ruta de inicio del sitio, con la query del link (?study=…).
+    const start = new URL(target.sourceUrl);
+    if (rel === '/' && isRead(c) && (start.pathname !== '/' || start.search)) {
+      const to = new URL(`${target.base}${start.pathname}${start.search}`, 'http://x');
+      new URL(c.req.url).searchParams.forEach((value, key) => to.searchParams.set(key, value));
+      return c.redirect(`${to.pathname}${to.search}`, 302);
+    }
+    const url = new URL(c.req.url);
+    const forwardedProto = c.req.header('x-forwarded-proto')?.split(',')[0]?.trim();
+    const publicHost = c.req.header('x-forwarded-host')?.split(',')[0]?.trim() || url.host;
+    return proxyRequest(c.req.raw, target, {
+      rel,
+      search: url.search,
+      publicHost,
+      secure: url.protocol === 'https:' || forwardedProto === 'https' || (opts.publicUrl ?? '').startsWith('https:'),
+      ...(opts.fetch && { fetch: opts.fetch }),
+    });
   };
 
   // Un formulario del prototipo con method="post" no tiene servidor que lo reciba: se trata
@@ -207,15 +252,18 @@ export function createApp(opts: AppOptions): Hono {
   // ── Prototipos subidos: /p/<id>/... ─────────────────────────────────
   if (dataDir) {
     app.get(`${UPLOADED_PATH}/:id`, (c) => c.redirect(`${UPLOADED_PATH}/${c.req.param('id')}/${searchOf(c)}`, 301));
-    app.get(`${UPLOADED_PATH}/:id/*`, async (c) => {
+    app.all(`${UPLOADED_PATH}/:id/*`, async (c) => {
       const id = c.req.param('id');
       const proto = UPLOADED_ID.test(id) ? store.getPrototype(id) : null;
+      const base = `${UPLOADED_PATH}/${id}`;
+      const rel = c.req.path.slice(base.length) || '/';
+      const target = proto ? urlTarget(proto, base) : null;
+      if (target) return proxyTo(c, target, rel);
       if (!proto || proto.source !== 'upload') return notFound(c, 'No existe este prototipo');
-      const mount = uploadedMount(id, proto.entryPath);
-      const rel = c.req.path.slice(mount.base.length) || '/';
-      return (await serveFrom(c, mount, rel, true)) ?? notFound(c);
+      if (c.req.method === 'POST') return formPost(c);
+      if (!isRead(c)) return notFound(c);
+      return (await serveFrom(c, uploadedMount(id, proto.entryPath), rel, true)) ?? notFound(c);
     });
-    app.post(`${UPLOADED_PATH}/:id/*`, formPost);
   }
 
   // ── Panel ──────────────────────────────────────────────────────────
@@ -266,45 +314,51 @@ export function createApp(opts: AppOptions): Hono {
 
   // ── La raíz ────────────────────────────────────────────────────────
   /** Direcciones nuestras: si ninguna ruta de arriba las atendió, no existen (no son del prototipo). */
-  const isReserved = (path: string): boolean => path.startsWith('/api/') || path.startsWith('/__taptana/');
+  // "/api/…" fuera de /api/v1 no es nuestro: puede ser la API de un prototipo por URL (`fetch('/api/x')`).
+  const isReserved = (path: string): boolean => path === API_PREFIX || path.startsWith(`${API_PREFIX}/`) || path.startsWith('/__taptana/');
 
-  app.get('/*', async (c) => {
+  app.all('/*', async (c) => {
     const path = c.req.path;
     if (isReserved(path)) return c.notFound();
+    const read = isRead(c);
     const mount = rootMount();
+    const proxied = mount ? null : rootProxy();
 
     // Un link de estudio que apunta a la raíz pero cuyo prototipo vive en /p/<id>/ (o no hay
     // nada en la raíz): se manda al participante a su prototipo, con el link intacto.
-    const studyId = path === '/' ? c.req.query(STUDY_PARAM) : undefined;
+    const studyId = read && path === '/' ? c.req.query(STUDY_PARAM) : undefined;
     if (studyId) {
       const study = store.getStudy(studyId);
-      if (study && study.prototypeId !== mount?.prototypeId && dataDir && UPLOADED_ID.test(study.prototypeId)) {
-        if (store.getPrototype(study.prototypeId)?.source === 'upload') {
-          return c.redirect(`${UPLOADED_PATH}/${study.prototypeId}/${searchOf(c)}`, 302);
-        }
+      if (study && study.prototypeId !== (mount ?? proxied)?.prototypeId && servedUnderP(study.prototypeId)) {
+        return c.redirect(`${UPLOADED_PATH}/${study.prototypeId}/${searchOf(c)}`, 302);
       }
     }
 
-    if (mount) {
+    if (mount && read) {
       const direct = await serveFrom(c, mount, path, false);
       if (direct) return direct;
     }
 
-    // Rutas absolutas de un prototipo subido ("/css/app.css", "/checkout/"): se salen de
-    // /p/<id>/, pero la página que las pide dice de dónde viene.
+    // Rutas absolutas de un prototipo de /p/<id>/ ("/css/app.css", "/checkout/", o un
+    // `fetch('/api/x')` de un prototipo por URL): se salen de /p/<id>/, pero la página que las
+    // pide dice de dónde viene. 307 conserva el método y el cuerpo (un POST sigue siendo POST).
     const referer = c.req.header('referer');
     if (referer && dataDir) {
       const from = /^\/p\/(pr_[A-Za-z0-9]+)\//.exec(pathOf(referer));
-      if (from && store.getPrototype(from[1] as string)?.source === 'upload') {
+      if (from && servedUnderP(from[1] as string)) {
         return c.redirect(`${UPLOADED_PATH}/${from[1]}${path}${searchOf(c)}`, 307);
       }
     }
 
+    if (proxied) return proxyTo(c, proxied, path);
+
     if (mount) {
+      if (!read) return c.req.method === 'POST' ? formPost(c) : c.notFound();
       const fallback = await serveFrom(c, mount, path, true);
       if (fallback) return fallback;
       return notFound(c);
     }
+    if (!read) return c.notFound();
 
     // Nada en la raíz: casi seguro un participante con el link incompleto. El panel solo se
     // le ofrece a quien está en la computadora de Taptana.
@@ -315,7 +369,6 @@ export function createApp(opts: AppOptions): Hono {
     }
     return notFound(c);
   });
-  app.post('/*', (c) => (!isReserved(c.req.path) && rootMount() ? formPost(c) : c.notFound()));
 
   return app;
 }

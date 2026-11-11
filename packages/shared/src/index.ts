@@ -36,7 +36,12 @@ export type {
   SessionPatch,
   ExampleResponse,
   ApiError,
+  PrototypeUrlCheck,
+  PrototypeUrlIssue,
+  PrototypeUrlLevel,
+  PrototypeUrlRequest,
 } from './api.js';
+export { normalizePrototypeUrl, isPrivateHost } from './prototype-url.js';
 export {
   API_PREFIX,
   RECORDER_PATH,
