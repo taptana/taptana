@@ -3,18 +3,10 @@
  * foto de la pantalla, cómo se lee el puntaje y cómo se explica el embudo. Con pruebas.
  */
 
-import { similarWidth, type HeatPoint, type ParticipantReport, type SuccessRule, type TaskOutcomeCounts, type TaskReport } from '@taptana/shared';
+import { similarWidth, type HeatPoint, type ParticipantReport, type SuccessRule, type TaskReport } from '@taptana/shared';
 
-export type ScoreTone = 'good' | 'ok' | 'warn' | 'bad' | 'none';
-
-/** Cómo se lee un puntaje de usabilidad (0 a 100). */
-export function scoreBand(score: number | null | undefined): { tone: ScoreTone; label: string } {
-  if (score === null || score === undefined || Number.isNaN(score)) return { tone: 'none', label: 'Sin datos todavía' };
-  if (score >= 80) return { tone: 'good', label: 'Muy bien' };
-  if (score >= 60) return { tone: 'ok', label: 'Bien, con detalles por pulir' };
-  if (score >= 40) return { tone: 'warn', label: 'Necesita trabajo' };
-  return { tone: 'bad', label: 'Con problemas serios' };
-}
+// Viven en `shared` para que el reporte y la presentación digan lo mismo.
+export { OUTCOME_ORDER, scoreBand, type ScoreTone } from '@taptana/shared';
 
 export interface PlacedPoint {
   /** Posición sobre la foto, en píxeles CSS de la pantalla de muestra. */
@@ -137,8 +129,6 @@ export function ruleSelector(rule: SuccessRule | undefined): string {
   if (rule?.type === 'visible' && !rule.text) return rule.selector ?? '';
   return '';
 }
-
-export const OUTCOME_ORDER: ReadonlyArray<keyof TaskOutcomeCounts> = ['direct', 'indirect', 'review', 'reported', 'failed', 'incomplete'];
 
 /** ¿Dos caminos (listas de pantallas) son el mismo? */
 export function samePages(a: readonly string[], b: readonly string[]): boolean {

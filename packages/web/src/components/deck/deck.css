@@ -1,0 +1,90 @@
+/*
+ * Presentación: textos editables en la diapositiva y la versión para PDF (una diapositiva por
+ * hoja, sin el panel). La hoja tiene nombre (`page: deck`) para no cambiar la impresión del reporte.
+ */
+
+.tt-editable {
+  cursor: text;
+  border-radius: 6px;
+  outline: none;
+  transition: box-shadow 120ms;
+}
+.tt-editable:hover {
+  box-shadow: 0 0 0 2px rgb(24 24 27 / 0.12);
+}
+.tt-editable:focus {
+  box-shadow: 0 0 0 3px rgb(24 24 27 / 0.35);
+  -webkit-line-clamp: unset !important;
+  overflow: visible !important;
+  background: rgb(255 255 255 / 0.9);
+}
+
+/* El mapa dentro de la diapositiva: sin barra de desplazamiento, se ve el inicio de la pantalla. */
+.tt-deck-map .tt-map-scroll {
+  overflow: hidden !important;
+}
+
+.tt-present-controls {
+  opacity: 0.15;
+  transition: opacity 200ms;
+}
+.tt-present-controls:hover,
+.tt-present-controls:focus-within {
+  opacity: 1;
+}
+
+/* Fuera de pantalla mientras se prepara: así las fotos de los mapas se arman con su tamaño real. */
+.tt-deck-print {
+  position: fixed;
+  left: -20000px;
+  top: 0;
+  width: 1280px;
+}
+
+@page deck {
+  size: 1280px 720px;
+  margin: 0;
+}
+
+@media print {
+  body:has(.tt-deck-print) .tt-deck-screen,
+  body:has(.tt-deck-print) aside,
+  body:has(.tt-deck-print) [data-sonner-toaster],
+  body:has(.tt-deck-print) [role='status'] {
+    display: none !important;
+  }
+  body:has(.tt-deck-print) #contenido > div {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  body:has(.tt-deck-print) .min-h-dvh {
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+  body:has(.tt-deck-print) #contenido .tt-deck-print {
+    position: static;
+    left: auto;
+    width: auto;
+    margin: 0 !important;
+  }
+  /* El reporte recorta los mapas a 95 mm al imprimir; en la diapositiva manda su hueco. */
+  .tt-deck-print .tt-deck-map .tt-map-scroll {
+    max-height: 612px !important;
+  }
+  .tt-deck-page {
+    page: deck;
+    width: 1280px;
+    height: 720px;
+    overflow: hidden;
+    break-after: page;
+    break-inside: avoid;
+  }
+  .tt-deck-page:last-child {
+    break-after: auto;
+  }
+  .tt-deck-print * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

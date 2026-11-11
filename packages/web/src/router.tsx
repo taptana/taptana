@@ -8,6 +8,7 @@
  *   studies/new                constructor (nuevo)
  *   studies/:id                constructor (editar)
  *   studies/:id/report         resultados
+ *   studies/:id/presentation   presentación ([?variant=<id>][&device=touch|desktop])
  *   recordings[?study=<id>]    sesiones
  *   recordings/:id[?t=<ms>]    reproductor (t: instante desde el inicio de la sesión)
  *
@@ -24,6 +25,7 @@ export type Route =
   | { name: 'studies' }
   | { name: 'study'; id: string | null }
   | { name: 'report'; id: string }
+  | { name: 'presentation'; id: string; variant?: string; device?: 'touch' | 'desktop' }
   | { name: 'recordings'; study?: string }
   | { name: 'player'; id: string; t?: number }
   | { name: 'notfound' };
@@ -49,6 +51,14 @@ export function parseRoute(pathname: string, search = ''): { route: Route; redir
     if (second === undefined) return ok({ name: 'studies' });
     if (third === undefined) return ok({ name: 'study', id: second === 'new' ? null : second });
     if (third === 'report' && rest.length === 0) return ok({ name: 'report', id: second });
+    if (third === 'presentation' && rest.length === 0) {
+      const route: Extract<Route, { name: 'presentation' }> = { name: 'presentation', id: second };
+      const variant = query.get('variant');
+      const device = query.get('device');
+      if (variant) route.variant = variant;
+      if (device === 'touch' || device === 'desktop') route.device = device;
+      return ok(route);
+    }
     return ok({ name: 'notfound' });
   }
   if (first === 'recordings' || first === 'sessions') {
@@ -78,6 +88,13 @@ export function href(route: Route): string {
       return `${BASE}/studies/${route.id === null ? 'new' : encodeURIComponent(route.id)}`;
     case 'report':
       return `${BASE}/studies/${encodeURIComponent(route.id)}/report`;
+    case 'presentation': {
+      const q = new URLSearchParams();
+      if (route.variant) q.set('variant', route.variant);
+      if (route.device) q.set('device', route.device);
+      const search = q.toString();
+      return `${BASE}/studies/${encodeURIComponent(route.id)}/presentation${search ? `?${search}` : ''}`;
+    }
     case 'recordings':
       return `${BASE}/recordings${route.study ? `?study=${encodeURIComponent(route.study)}` : ''}`;
     case 'player':

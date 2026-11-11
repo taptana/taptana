@@ -12,6 +12,7 @@ import { StudiesPage } from '@/pages/Studies';
 // Lo pesado (rrweb, constructor, reporte) se baja solo cuando se abre esa pantalla.
 const PlayerPage = lazy(() => import('@/pages/Player').then((m) => ({ default: m.PlayerPage })));
 const ReportPage = lazy(() => import('@/pages/Report').then((m) => ({ default: m.ReportPage })));
+const PresentationPage = lazy(() => import('@/pages/Presentation').then((m) => ({ default: m.PresentationPage })));
 const StudyEditorPage = lazy(() => import('@/pages/StudyEditor').then((m) => ({ default: m.StudyEditorPage })));
 
 /** Si una pantalla falla al dibujarse, se explica en vez de dejar la página en blanco. */
@@ -55,6 +56,8 @@ function Routes() {
       return <StudyEditorPage key={route.id ?? 'new'} id={route.id} />;
     case 'report':
       return <ReportPage key={route.id} id={route.id} />;
+    case 'presentation':
+      return <PresentationPage key={`${route.id}:${route.variant ?? ''}:${route.device ?? ''}`} id={route.id} filter={{ ...(route.variant ? { variantId: route.variant } : {}), ...(route.device ? { device: route.device } : {}) }} />;
     case 'recordings':
       return <SessionsPage {...(route.study ? { study: route.study } : {})} />;
     case 'player':
@@ -72,7 +75,7 @@ function RoutesWithBoundary() {
     <ErrorBoundary key={key}>
       <Suspense
         fallback={
-          <Layout wide={route.name === 'player' || route.name === 'report' || route.name === 'study'}>
+          <Layout wide={route.name === 'player' || route.name === 'report' || route.name === 'presentation' || route.name === 'study'}>
             <PageSkeleton />
           </Layout>
         }

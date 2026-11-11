@@ -159,6 +159,8 @@ export type {
   TaskReport,
   QuestionReport,
   Insight,
+  InsightTopic,
+  ScoreTone,
   ReportFilter,
   VariantReport,
   StudyReport,
@@ -167,7 +169,11 @@ export type {
   ParticipantTask,
   ParticipantAnswer,
 } from './report.js';
-export { NOT_STARTED_LABEL, OUTCOME_LABELS, REPORT_DEFINITIONS, SIMILAR_WIDTH_RATIO, similarWidth, computeStudyReport, studyCsv, shortSessionId } from './report.js';
+export { NOT_STARTED_LABEL, OUTCOME_LABELS, OUTCOME_ORDER, REPORT_DEFINITIONS, scoreBand, taskOutcomeLabel, SIMILAR_WIDTH_RATIO, similarWidth, computeStudyReport, studyCsv, shortSessionId } from './report.js';
+
+export { smallSampleText } from './insights.js';
+export type { Deck, DeckBar, DeckEdits, DeckItem, DeckMetric, DeckOptions, DeckOutcome, Slide, SlideEdit, SlideKind } from './deck.js';
+export { applyDeckEdits, buildDeck, deckFileName, visibleSlides } from './deck.js';
 
 export type { RecorderMessage, PanelMessage } from './preview.js';
 export {

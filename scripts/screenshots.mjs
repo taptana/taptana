@@ -70,6 +70,12 @@ try {
   await page.waitForTimeout(300);
   await shot('mapa-de-calor');
 
+  // 4b. La presentación que se arma con el reporte
+  await page.goto(`${panel}/studies/${studyId}/presentation`);
+  await page.locator('[data-testid="deck-slide"]').waitFor({ timeout: 15000 });
+  await page.waitForTimeout(800);
+  await shot('presentacion');
+
   // 5. Reproductor de una sesión
   await page.goto(`${panel}/recordings/s_demo_estudio_2`);
   await page.locator('.rr-player, .replayer-wrapper').first().waitFor({ timeout: 20000 });

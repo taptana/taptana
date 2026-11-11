@@ -9,7 +9,7 @@ import { Link, useRouter, type Route, type RouteName } from '@/router';
 const NAV: Array<{ to: Route; label: string; hint: string; icon: typeof FileArchive; match: (r: RouteName) => boolean }> = [
   { to: { name: 'home' }, label: 'Inicio', hint: 'Empieza aquí', icon: House, match: (r) => r === 'home' },
   { to: { name: 'prototypes' }, label: 'Prototipos', hint: 'Sube tu HTML', icon: FileArchive, match: (r) => r === 'prototypes' },
-  { to: { name: 'studies' }, label: 'Estudios', hint: 'Tareas', icon: FlaskConical, match: (r) => r === 'studies' || r === 'study' || r === 'report' },
+  { to: { name: 'studies' }, label: 'Estudios', hint: 'Tareas', icon: FlaskConical, match: (r) => r === 'studies' || r === 'study' || r === 'report' || r === 'presentation' },
   { to: { name: 'recordings' }, label: 'Sesiones', hint: 'Paso a paso', icon: PlayCircle, match: (r) => r === 'recordings' || r === 'player' },
 ];
 

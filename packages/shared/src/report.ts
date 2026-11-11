@@ -215,8 +215,26 @@ export interface QuestionReport {
   texts?: Array<{ sessionId: string; text: string; who?: string }>;
 }
 
+/** De qué regla salió una frase de `insights` (para derivar "Qué arreglar primero"). */
+export type InsightTopic =
+  | 'lowest-success'
+  | 'funnel-drop'
+  | 'misclicks'
+  | 'slow'
+  | 'review'
+  | 'scale-low'
+  | 'scale-high'
+  | 'detour'
+  | 'completion'
+  | 'small-sample'
+  | 'solid'
+  | 'score'
+  | 'basic';
+
 export interface Insight {
   level: 'good' | 'warn' | 'bad';
+  /** La regla que la generó. */
+  topic?: InsightTopic;
   /** Una frase en español, lista para mostrar. */
   text: string;
   blockId?: string;
@@ -416,6 +434,27 @@ export const OUTCOME_LABELS: Record<keyof TaskOutcomeCounts, string> = {
   incomplete: 'Sin terminar',
   review: 'Por revisar',
 };
+
+/** El orden en que se muestran los resultados de una tarea (barras, leyendas, presentación). */
+export const OUTCOME_ORDER: ReadonlyArray<keyof TaskOutcomeCounts> = ['direct', 'indirect', 'review', 'reported', 'failed', 'incomplete'];
+
+/** Cómo se llama un resultado; en primer clic solo hay acierto o fallo. */
+export function taskOutcomeLabel(key: keyof TaskOutcomeCounts, firstClick: boolean): string {
+  if (firstClick && (key === 'direct' || key === 'indirect')) return 'Acertó';
+  if (firstClick && key === 'failed') return 'Tocó en otro lado';
+  return OUTCOME_LABELS[key];
+}
+
+export type ScoreTone = 'good' | 'ok' | 'warn' | 'bad' | 'none';
+
+/** Cómo se lee un puntaje de usabilidad (0 a 100). El reporte y la presentación dicen lo mismo. */
+export function scoreBand(score: number | null | undefined): { tone: ScoreTone; label: string } {
+  if (score === null || score === undefined || Number.isNaN(score)) return { tone: 'none', label: 'Sin datos todavía' };
+  if (score >= 80) return { tone: 'good', label: 'Muy bien' };
+  if (score >= 60) return { tone: 'ok', label: 'Bien, con detalles por pulir' };
+  if (score >= 40) return { tone: 'warn', label: 'Necesita trabajo' };
+  return { tone: 'bad', label: 'Con problemas serios' };
+}
 
 /** Una tarea que el participante no llegó a empezar (en el CSV y en la lista de participantes). */
 export const NOT_STARTED_LABEL = 'No empezó';

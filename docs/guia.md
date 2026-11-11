@@ -152,6 +152,27 @@ Antes de sacar conclusiones:
 En el menú **Exportar**: **Exportar CSV** baja una fila por participante para tu hoja de
 cálculo, e **Imprimir / PDF** arma el reporte completo (todas las pestañas) para compartir.
 
+### La presentación para tu equipo
+
+Cuando quieras contar los resultados, toca **Crear presentación** (al final del Resumen, o en
+**Exportar**). Taptana arma solo las diapositivas a partir del reporte, una idea por
+diapositiva: portada, cómo le fue al prototipo, lo más importante, una por cada tarea (con su
+mapa de calor si hubo toques sin efecto), una por pregunta (las respuestas abiertas van como
+citas firmadas «P1», «P2»…, nunca con nombres), **Qué arreglar primero** y **Cómo se midió**.
+Si tenías un filtro puesto (variante o dispositivo), la presentación lo respeta y lo dice en la
+portada.
+
+- **Ajusta antes de compartir.** Toca un título o una frase para cambiarla, y esconde las
+  diapositivas que no quieras mostrar. Los cambios quedan guardados en ese navegador;
+  **Restablecer** vuelve a la versión original.
+- **Presentar** la abre a pantalla completa: flechas o espacio para avanzar, Esc para salir.
+- **Descargar → PowerPoint (.pptx)** baja un archivo que se abre en PowerPoint, Keynote o
+  Google Slides, con textos y gráficos editables. El mapa de calor no viaja como imagen: en su
+  lugar va un recuadro con el nombre de la pantalla, junto a los números y lo más tocado sin
+  efecto.
+- **Descargar → PDF** abre el diálogo de impresión con una diapositiva por hoja: elige
+  «Guardar como PDF». Ahí sí van los mapas de calor.
+
 ### Qué significa cada número
 
 - **Participantes**: sesiones del estudio que aceptaron grabar y no están excluidas. Cada

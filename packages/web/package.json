@@ -25,6 +25,7 @@
     "clsx": "^2.1.1",
     "fflate": "^0.8.3",
     "lucide-react": "^1.70.0",
+    "pptxgenjs": "^3.12.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "rrweb-player": "^2.2.1",

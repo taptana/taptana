@@ -8,7 +8,7 @@
  * por gravedad hasta completar seis.
  */
 
-import type { Insight, StudyReport, TaskReport } from './report.js';
+import type { Insight, InsightTopic, StudyReport, TaskReport } from './report.js';
 import { screenName as nameOf } from './screen.js';
 import { questionBlocks, taskBlocks, type StudyRecord } from './study.js';
 
@@ -48,13 +48,18 @@ function middle(values: number[]): number {
 const wins = (t: TaskReport): number => t.outcomes.direct + t.outcomes.indirect;
 
 
+/** El aviso de muestra chica (menos de 5 personas). Lo usan las frases y la presentación. */
+export function smallSampleText(n: number): string {
+  return `Con pocas personas (${n}) los porcentajes cambian mucho; con 5 o más ya aparecen los problemas principales.`;
+}
+
 export function buildInsights(report: Omit<StudyReport, 'insights'>, study: StudyRecord): Insight[] {
   const n = report.participants;
   if (n === 0) return [];
 
   const found: Candidate[] = [];
-  const add = (level: Insight['level'], weight: number, text: string, extra: { blockId?: string; screen?: string; must?: boolean } = {}): void => {
-    found.push({ level, weight, text, ...extra });
+  const add = (topic: InsightTopic, level: Insight['level'], weight: number, text: string, extra: { blockId?: string; screen?: string; must?: boolean } = {}): void => {
+    found.push({ level, topic, weight, text, ...extra });
   };
   /** El mismo nombre de pantalla que usa el reporte (uno por pantalla). */
   const screenName = (path: string): string => nameOf(path, report.screenNames);
@@ -89,7 +94,7 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
       else text = `${who} ${form(ok, 'logró', 'lograron')} ${title} (${pct(lowest.successRate)}).`;
       if (ok > 0 && rest.length) text += ` Del resto: ${list(rest)}.`;
     }
-    add(lowest.successRate < 0.5 ? 'bad' : 'warn', 100 - lowest.successRate * 50, text, { blockId: lowest.taskId, must: true });
+    add('lowest-success', lowest.successRate < 0.5 ? 'bad' : 'warn', 100 - lowest.successRate * 50, text, { blockId: lowest.taskId, must: true });
   }
 
   // 2. El paso del embudo con mayor caída.
@@ -111,6 +116,7 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
     const a = drop.task.funnel[drop.i]?.path ?? '';
     const b = drop.task.funnel[drop.i + 1]?.path ?? '';
     add(
+      'funnel-drop',
       drop.ratio >= 0.5 && drop.lost >= 2 ? 'bad' : 'warn',
       40 + drop.ratio * 40,
       `En ${quote(drop.task.title)}, ${drop.lost} de ${people(drop.from)} que ${form(drop.from, 'llegó', 'llegaron')} a ${quote(screenName(a))} no ${form(drop.lost, 'siguió', 'siguieron')} a ${quote(screenName(b))}: es el paso con mayor caída.`,
@@ -131,6 +137,7 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
     const top = screen.topMisclicks[0];
     const most = top ? `; lo más tocado fue ${quote(top.label)} (${top.count} ${form(top.count, 'vez', 'veces')})` : '';
     add(
+      'misclicks',
       screen.misclicks >= 5 && share >= 0.4 ? 'bad' : 'warn',
       30 + Math.min(30, screen.misclicks * 3),
       `En la pantalla ${quote(screenName(screen.path))} hubo ${screen.misclicks} toques sin efecto${most}. Revisa si parece tocable sin serlo.`,
@@ -147,6 +154,7 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
     const others = middle(timed.slice(1).map((t) => t.medianTimeMs));
     if (slow.medianTimeMs >= 20_000 && slow.medianTimeMs >= 1.5 * others) {
       add(
+        'slow',
         'warn',
         45,
         `${quote(slow.title)} es la tarea más lenta: ${duration(slow.medianTimeMs)} de mediana entre quienes la lograron, frente a ${duration(others)} de ${form(timed.length - 1, 'la otra', 'las demás')}.`,
@@ -154,7 +162,7 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
       );
     }
   } else if (slow && slow.medianTimeMs >= 120_000) {
-    add('warn', 35, `Quienes lograron ${quote(slow.title)} tardaron ${duration(slow.medianTimeMs)} de mediana.`, { blockId: slow.taskId, must: true });
+    add('slow', 'warn', 35, `Quienes lograron ${quote(slow.title)} tardaron ${duration(slow.medianTimeMs)} de mediana.`, { blockId: slow.taskId, must: true });
   }
 
   // 5. Resultados por revisar.
@@ -165,6 +173,7 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
     const where =
       waiting.length === 1 && first ? `${quote(first.title)}, una tarea que decides tú` : `${waiting.length} tareas que decides tú`;
     add(
+      'review',
       'warn',
       90,
       `Hay ${pending} ${form(pending, 'resultado', 'resultados')} por revisar en ${where}. Hasta que ${form(pending, 'lo', 'los')} marques no ${form(pending, 'cuenta', 'cuentan')} en el éxito ni en el puntaje.`,
@@ -190,6 +199,7 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
   const bestScale = scales[scales.length - 1];
   if (worstScale && worstScale.norm < 0.6) {
     add(
+      'scale-low',
       worstScale.norm < 0.4 ? 'bad' : 'warn',
       45 - worstScale.norm * 30,
       `${scaleText(worstScale.q)}${scales.length > 1 ? ': es la pregunta con la nota más baja' : ''}.`,
@@ -197,7 +207,7 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
     );
   }
   if (bestScale && bestScale.norm >= 0.8) {
-    add('good', 50, `${scaleText(bestScale.q)}.`, { blockId: bestScale.q.blockId });
+    add('scale-high', 'good', 50, `${scaleText(bestScale.q)}.`, { blockId: bestScale.q.blockId });
   }
 
   // 7. Éxito con rodeos: lo logran, pero no por donde se esperaba.
@@ -207,6 +217,7 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
   if (detour) {
     const k = detour.outcomes.indirect;
     add(
+      'detour',
       'warn',
       30,
       `En ${quote(detour.title)}, ${k} de ${people(wins(detour))} que lo lograron ${form(k, 'dio', 'dieron')} un rodeo: no ${form(k, 'siguió', 'siguieron')} el camino ${detour.expectedPathInferred ? 'más corto' : 'esperado'}.`,
@@ -220,18 +231,18 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
     let text: string;
     if (report.completed > 0) text = `Solo ${report.completed} de ${people(n)} ${form(report.completed, 'llegó', 'llegaron')} al final del estudio.`;
     else text = n === 1 ? 'La única persona que participó no llegó al final del estudio.' : `Ninguna de las ${n} personas llegó al final del estudio.`;
-    add('warn', 55, text);
+    add('completion', 'warn', 55, text);
   }
 
   // 9. Muestra chica.
   if (n < 5) {
-    add('warn', 5, `Con pocas personas (${n}) los porcentajes cambian mucho; con 5 o más ya aparecen los problemas principales.`);
+    add('small-sample', 'warn', 5, smallSampleText(n));
   }
 
   // 10. Lo que salió bien.
   const solid = settled.filter((t) => t.successRate >= 0.8 && t.decided >= 2);
   if (decided.length >= 2 && solid.length === decided.length) {
-    add('good', 80, `Las ${decided.length} tareas tienen ${pct(0.8)} de éxito o más.`);
+    add('solid', 'good', 80, `Las ${decided.length} tareas tienen ${pct(0.8)} de éxito o más.`);
   } else {
     const best = [...solid].sort((a, b) => b.successRate - a.successRate || b.directRate - a.directRate)[0];
     if (best) {
@@ -241,12 +252,12 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
       const direct =
         best.kind === 'task' && !best.expectedPathInferred && best.outcomes.direct === ok ? ', todas por el camino esperado' : '';
       const rate = ok === best.decided ? '' : ` (${pct(best.successRate)})`;
-      add('good', 60, `${who} ${verb} ${quote(best.title)}${rate}${direct}.`, { blockId: best.taskId });
+      add('solid', 'good', 60, `${who} ${verb} ${quote(best.title)}${rate}${direct}.`, { blockId: best.taskId });
     }
   }
   // Con menos de 3 personas, un puntaje alto todavía no dice que "el flujo se entiende".
   if (report.score !== null && report.score >= 80 && n >= 3) {
-    add('good', 70, `Puntaje de usabilidad: ${report.score} de 100. El flujo se entiende bien.`);
+    add('score', 'good', 70, `Puntaje de usabilidad: ${report.score} de 100. El flujo se entiende bien.`);
   }
 
   // De más a menos grave. Primero se sientan las que nunca se quedan fuera (menor éxito, más
@@ -266,6 +277,7 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
     const all = report.completed === n;
     picked.push({
       level: 'good',
+      topic: 'basic',
       weight: 0,
       text: all
         ? `${n === 1 ? 'La única persona que participó llegó' : `Las ${n} personas llegaron`} al final del estudio.`
@@ -276,6 +288,7 @@ export function buildInsights(report: Omit<StudyReport, 'insights'>, study: Stud
     const time = report.medianDurationMs === null ? '' : ` La sesión duró ${duration(report.medianDurationMs)} de mediana.`;
     picked.push({
       level: 'good',
+      topic: 'basic',
       weight: 0,
       text: `${n === 1 ? 'Participó 1 persona' : `Participaron ${n} personas`}.${time}`,
     });

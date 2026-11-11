@@ -51,7 +51,8 @@ misma red Wi-Fi que tu computadora. Ve una bienvenida, acepta que se grabe y sig
 
 **4. Lee los resultados.** Por cada tarea: cuántos la lograron (directo o dando vueltas), en
 cuánto tiempo, en qué paso se cayeron y dónde tocaron sin que pasara nada. Un resumen te dice
-qué arreglar primero. Se exporta a CSV y se imprime a PDF.
+qué arreglar primero. Se exporta a CSV y se imprime a PDF, y con un clic se arma una
+**presentación** con los hallazgos para presentarla o bajarla en PowerPoint o PDF.
 
 ![Una tarea del reporte: puntaje, éxito directo e indirecto, tiempo, misclicks y embudo](docs/img/reporte-tarea.png)
 

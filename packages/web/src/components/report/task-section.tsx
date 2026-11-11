@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, PlayCircle } from 'lucide-react';
-import { OUTCOME_LABELS, tapMatches, taskBlocks, type ScreenReport, type SuccessRule, type TaskBlock, type TaskOutcomeCounts, type TaskReport, type TaskReportRow } from '@taptana/shared';
+import { tapMatches, taskOutcomeLabel, taskBlocks, type ScreenReport, type SuccessRule, type TaskBlock, type TaskOutcomeCounts, type TaskReport, type TaskReportRow } from '@taptana/shared';
 import { getClient } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,11 +47,7 @@ export const OUTCOME_HELP: Record<OutcomeKey, string> = {
 };
 
 /** En primer clic solo hay acierto o fallo. */
-export function outcomeLabel(key: OutcomeKey, firstClick: boolean): string {
-  if (firstClick && (key === 'direct' || key === 'indirect')) return 'Acertó';
-  if (firstClick && key === 'failed') return 'Tocó en otro lado';
-  return OUTCOME_LABELS[key];
-}
+export const outcomeLabel = taskOutcomeLabel;
 
 function OutcomeBar({ task }: { task: TaskReport }) {
   const firstClick = task.kind === 'first-click';

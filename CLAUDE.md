@@ -53,6 +53,7 @@ qué resuelven para la prueba de usabilidad.
 | Reproducción | rrweb-player 2.x | Reproductor listo con línea de tiempo |
 | Panel | React + Vite + Tailwind v4 + shadcn en `packages/web` | Se compila a estáticos que Hono sirve |
 | Zip | `fflate` | JavaScript puro |
+| Presentación (.pptx) | `pptxgenjs` en `packages/web` | JavaScript puro (MIT), se carga solo al descargar |
 | Red | Escucha en `0.0.0.0`, puerto 4321 (o el siguiente libre) | Accesible desde el celular en la misma Wi-Fi |
 | Pruebas con navegador | Playwright (devDependency de la raíz) | Solo para e2e, semillas y capturas; nunca en producción |
 
@@ -104,7 +105,7 @@ Reglas duras:
 taptana/
 ├── packages/
 │   ├── shared/      Contrato: study.ts, validate.ts, events.ts, screen.ts, results.ts,
-│   │                report.ts, insights.ts, preview.ts, api.ts (sin dependencias)
+│   │                report.ts, insights.ts, deck.ts, preview.ts, api.ts (sin dependencias)
 │   ├── recorder/    Script que corre en el celular: rrweb, gestos, pantallas (screens.ts),
 │   │                flujo del participante (study.ts, study-ui.ts), privacidad, cola de envío
 │   ├── mcp/         MCP para herramientas de IA: núcleo JSON-RPC, herramientas, stdio
@@ -202,7 +203,12 @@ La sesión vive en `sessionStorage` (una pestaña). Cada carga de página es un 
 
 - Rutas (bajo `/panel` en local, la base del sitio en la demo): Inicio, `prototypes`,
   `studies`, `studies/new`, `studies/:id` (constructor a tres columnas), `studies/:id/report`,
-  `recordings`, `recordings/:id?t=<ms>`.
+  `studies/:id/presentation?variant=&device=`, `recordings`, `recordings/:id?t=<ms>`.
+- **Presentación**: `buildDeck` (`shared/deck.ts`) arma las diapositivas como datos desde el
+  reporte y sus frases, sin nombres ni ids de sesión. `components/deck/layout.ts` las convierte
+  en figuras (texto ya ajustado a su caja); las dibujan la vista en pantalla (y su PDF con
+  `window.print`) y `pptx.ts` con `pptxgenjs`, cargado con `import()` solo al descargar. Las
+  ediciones (textos, escondidas) viven en `localStorage` por estudio, no en el servidor.
 - **Nunca accede a datos directamente**: siempre por `api/client.ts`, con `http.ts` (API real)
   y `static.ts` (demo). Cada método existe en los dos.
 - Componentes de shadcn copiados a `src/components/ui/`, no instalados. Sin `window.confirm`.

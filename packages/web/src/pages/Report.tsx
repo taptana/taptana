@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ChevronDown, ClipboardCheck, Copy, Download, Pencil, Printer, Users } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ClipboardCheck, Copy, Download, Pencil, Presentation, Printer, Users } from 'lucide-react';
 import {
   BLOCK_KIND_LABELS,
   blockTitle,
@@ -37,7 +37,7 @@ import { participantUrl } from '@/lib/links';
 import { screenNamer } from '@/lib/screens';
 import { fileSlug, sessionName } from '@/lib/sessions';
 import { cn } from '@/lib/utils';
-import { Link } from '@/router';
+import { Link, type Route } from '@/router';
 import '@/report.css';
 
 export { StudyTabs };
@@ -253,6 +253,9 @@ export function ReportPage({ id }: { id: string }) {
   const tasks = taskBlocks(study);
   const variantName = filter.variantId ? (study.variants?.find((v) => v.id === filter.variantId)?.name ?? filter.variantId) : null;
 
+  /** La presentación, con el mismo filtro que se está viendo. */
+  const presentation: Route = { name: 'presentation', id, ...(filter.variantId ? { variant: filter.variantId } : {}), ...(filter.device ? { device: filter.device } : {}) };
+
   const exportCsv = async (): Promise<void> => {
     try {
       const client = await getClient();
@@ -333,6 +336,12 @@ export function ReportPage({ id }: { id: string }) {
             <Printer />
             Imprimir / PDF
           </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to={presentation}>
+              <Presentation />
+              Crear presentación
+            </Link>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -391,6 +400,20 @@ export function ReportPage({ id }: { id: string }) {
       )}
       <InsightsCard insights={report.insights} onJump={jump} />
       <VariantsCard report={report} />
+      <section aria-labelledby="titulo-presentacion" className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6" data-print="hide">
+        <div className="space-y-1">
+          <h2 id="titulo-presentacion" className="text-base font-semibold">
+            Presentación lista para compartir
+          </h2>
+          <p className="text-sm text-muted-foreground">Las diapositivas con lo más importante, armadas solas con estos resultados. Preséntalas o descárgalas en PowerPoint o PDF.</p>
+        </div>
+        <Button asChild className="shrink-0">
+          <Link to={presentation}>
+            <Presentation />
+            Crear presentación
+          </Link>
+        </Button>
+      </section>
     </>
   );
 
