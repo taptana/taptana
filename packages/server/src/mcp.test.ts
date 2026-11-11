@@ -85,3 +85,21 @@ test('/mcp rejects requests from other websites, even with the key', async () =>
   const site = await app.request('/mcp', post(rpc('tools/list'), { 'sec-fetch-site': 'cross-site' }));
   assert.equal(site.status, 403);
 });
+
+test('GET /prototypes/:id/source: the file as it is on disk, behind the guard', async () => {
+  const { app } = makeApp();
+  assert.equal((await app.request('/api/v1/example', { method: 'POST' })).status, 200);
+  const res = await app.request(`/api/v1/prototypes/${EXAMPLE_PROTOTYPE_ID}/source?path=${encodeURIComponent('/producto.html')}`);
+  assert.equal(res.status, 200);
+  const body = (await res.json()) as { path: string; html: string };
+  assert.equal(body.path, '/producto.html');
+  assert.match(body.html, /<html/i);
+  assert.doesNotMatch(body.html, /__taptana\/recorder\.js/);
+  // Un ScreenId de app de una página apunta a su archivo.
+  const spa = await app.request(`/api/v1/prototypes/${EXAMPLE_PROTOTYPE_ID}/source?path=${encodeURIComponent('/index.html#/carrito')}`);
+  assert.equal(((await spa.json()) as { path: string }).path, '/index.html');
+  assert.equal((await app.request(`/api/v1/prototypes/${EXAMPLE_PROTOTYPE_ID}/source?path=/nada.html`)).status, 404);
+  assert.equal((await app.request(`/api/v1/prototypes/${EXAMPLE_PROTOTYPE_ID}/source?path=${encodeURIComponent('/../../etc/passwd')}`)).status, 404);
+  assert.equal((await app.request('/api/v1/prototypes/pr_noExiste/source?path=/index.html')).status, 404);
+  assert.equal((await app.request(`/api/v1/prototypes/${EXAMPLE_PROTOTYPE_ID}/source?path=/producto.html`, { headers: { [REMOTE]: LAN } })).status, 401);
+});

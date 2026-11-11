@@ -14,6 +14,7 @@ import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { randomBytes } from 'node:crypto';
+import { promises as fs } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
 import {
@@ -24,6 +25,7 @@ import {
   STUDY_LIMITS,
   UPLOADED_PATH,
   computeStudyReport,
+  screenParts,
   studyCsv,
   validateEventBatch,
   validateSessionExport,
@@ -47,6 +49,7 @@ import { isLoopback } from '../network.js';
 import type { PanelGuard } from '../panel-guard.js';
 import { PANEL_KEY_PARAM } from '../panel-guard.js';
 import { listPrototypePages } from '../prototype-pages.js';
+import { resolveFile } from '../static.js';
 import type { ListSessionsFilter, Store } from '../store/store.js';
 import { extractUpload, MAX_UPLOAD_BYTES, prototypeDir as uploadedDir, removePrototypeFiles, UploadError } from '../uploads.js';
 import { VERSION } from '../version.js';
@@ -67,6 +70,8 @@ const MB = 1024 * KB;
 const STUDY_MAX_BYTES = 1 * MB;
 /** Cambios de una sesión o de un prototipo: unas notas y poco más. */
 const PATCH_MAX_BYTES = 64 * KB;
+/** Una página HTML para mostrarle a una IA. */
+const SOURCE_MAX_BYTES = 5 * MB;
 /** Una sesión exportada trae toda su grabación; las largas pesan decenas de MB. */
 const IMPORT_MAX_BYTES = 64 * MB;
 
@@ -494,6 +499,24 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
   api.get('/prototypes/:id/screens', async (c) => {
     const id = c.req.param('id');
     return c.json<PrototypeScreensResponse>({ screens: store.listScreens(id, await htmlFiles(id)) });
+  });
+
+  /**
+   * El HTML de una pantalla tal como está en el disco (sin el recorder, que se agrega al
+   * servirlo), para que una IA vea textos y selectores reales (`get_screen_html` del MCP).
+   * `?path=` es un ScreenId o una ruta: "/producto.html", "/index.html#/carrito".
+   */
+  api.get('/prototypes/:id/source', async (c) => {
+    const id = c.req.param('id');
+    if (!store.getPrototype(id) && !(id === LOCAL_PROTOTYPE_ID && prototypeDir)) return c.json<ApiError>({ error: NO_PROTOTYPE }, 404);
+    const dir = dirFor(id);
+    if (!dir) return c.json<ApiError>({ error: 'Este prototipo no tiene archivos en Taptana (llegó con una sesión importada): no hay HTML que mostrar.' }, 404);
+    const path = screenParts(c.req.query('path') || '/').path;
+    const file = await resolveFile(dir, path);
+    if (!file || !file.isHtml || file.needsSlash) return c.json<ApiError>({ error: `No hay un archivo HTML en «${path}» dentro de este prototipo.` }, 404);
+    if (file.size > SOURCE_MAX_BYTES) return c.json<ApiError>({ error: 'Esa página pesa más de 5 MB: es demasiado para mostrarla.' }, 413);
+    c.header('cache-control', 'no-store');
+    return c.json({ path, size: file.size, html: await fs.readFile(file.absolute, 'utf8') });
   });
 
   /** Alias anterior a v1: solo los archivos HTML. */

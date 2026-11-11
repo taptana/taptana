@@ -39,3 +39,13 @@ test('summarizeReport caps open answers and handles an empty report', () => {
   assert.equal(out.questions[0]?.moreAnswers, 5);
   assert.equal('variants' in out, false);
 });
+
+test('howToRead explains score and expectedPathInferred with the panel wording', async () => {
+  const { REPORT_DEFINITIONS } = await import('@taptana/shared');
+  const { HOW_TO_READ } = await import('./summary.js');
+  const panel = REPORT_DEFINITIONS.map((d) => d.text).join(' ');
+  const inferred = HOW_TO_READ.expectedPathInferred.replace(/^true cuando el diseñador no escribió el camino esperado\. /, '');
+  assert.ok(inferred.length > 20 && panel.includes(inferred), inferred);
+  assert.ok(panel.includes(HOW_TO_READ.score.split('Puntaje de una tarea: ')[1]?.split(' Puntaje del estudio: ')[0] ?? 'x'));
+  assert.match(HOW_TO_READ.score, /promedio del puntaje de las tareas/);
+});

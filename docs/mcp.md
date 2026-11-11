@@ -123,6 +123,8 @@ ajusta lo que haga falta antes de compartirlo. La IA propone; tú decides.
 ## Qué puede ver tu IA
 
 - Los nombres de tus prototipos y sus pantallas.
+- El HTML de cada pantalla (sin el código JavaScript, los estilos ni las imágenes incrustadas),
+  para usar los textos, links y botones reales al escribir las tareas y saber qué tocar.
 - Tus estudios completos (bloques, textos, ajustes).
 - El resumen del reporte: puntaje, éxito por tarea, embudo, toques sin efecto, "qué arreglar" y
   las respuestas a las preguntas, **incluidas las respuestas abiertas** que escribieron los
@@ -166,5 +168,5 @@ un Taptana corriendo; variables `TAPTANA_URL` y `TAPTANA_KEY`) y `POST /mcp` en 
 `get_study_format` sale de [`skills/taptana-study/SKILL.md`](../skills/taptana-study/SKILL.md).
 
 Herramientas: `get_info`, `get_study_format`, `list_prototypes`, `list_screens`,
-`list_studies`, `get_study`, `validate_study`, `create_study`, `update_study`,
+`get_screen_html` (usa `GET /api/v1/prototypes/:id/source?path=`), `list_studies`, `get_study`, `validate_study`, `create_study`, `update_study`,
 `duplicate_study`, `get_report`, `upload_prototype`. Prompt: `armar_estudio`.

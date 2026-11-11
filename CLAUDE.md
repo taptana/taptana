@@ -180,7 +180,7 @@ La sesión vive en `sessionStorage` (una pestaña). Cada carga de página es un 
 - **API** (`routes/api.ts`): `/info`, `/events`, `/sessions` (lista, detalle, eventos,
   export, import con 409 salvo `?replace=1`, PATCH con `manual`/`label`/`notes`/`excluded`),
   `/studies` (CRUD, `/report?variant=&device=`, `/export.csv`, `/duplicate`), `/prototypes`
-  (subir, nueva versión, PATCH `name`/`root`, `/screens`), `/example`, `/qr.svg`.
+  (subir, nueva versión, PATCH `name`/`root`, `/screens`, `/source?path=` con el HTML en disco), `/example`, `/qr.svg`.
 - **Guardia del panel**: pasa la conexión local, la que trae la llave (`?key=` → cookie) o
   todo si el modo es abierto. Bloquea peticiones entre sitios. La llave está en
   `<dataDir>/panel.key` y la terminal imprime el link. En Docker no hay conexión "local": el

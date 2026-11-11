@@ -164,7 +164,7 @@ export type {
   StudyReport,
   ReportOptions,
 } from './report.js';
-export { OUTCOME_LABELS, SIMILAR_WIDTH_RATIO, similarWidth, computeStudyReport, studyCsv, shortSessionId } from './report.js';
+export { OUTCOME_LABELS, REPORT_DEFINITIONS, SIMILAR_WIDTH_RATIO, similarWidth, computeStudyReport, studyCsv, shortSessionId } from './report.js';
 
 export type { RecorderMessage, PanelMessage } from './preview.js';
 export {

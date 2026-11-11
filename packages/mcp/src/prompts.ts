@@ -25,10 +25,11 @@ Sigue estos pasos con las herramientas de Taptana:
 1. get_study_format: lee la guía completa del formato antes de escribir nada.
 2. list_prototypes: si hay más de uno y no está claro cuál, pregúntame.
 3. list_screens con ese prototipo. Usa solo esas pantallas; no inventes ninguna.
-4. Escribe un estudio corto (de 5 a 9 bloques) que responda a lo que quiero averiguar${goal ? '' : ' (si no lo dije, el flujo principal del prototipo)'}. Instrucciones en palabras del participante, de tú, sin nombrar botones.
-5. validate_study. Corrige los errores y vuelve a validar hasta que no haya ninguno; cuéntame los avisos que importen.
-6. create_study para guardarlo.
-7. Dame el link tryout para probarlo sin grabar, el link para editarlo en el panel, y un resumen de dos o tres líneas de qué mide cada tarea.`;
+4. get_screen_html con las pantallas que vas a usar, para ver sus textos, links, botones y selectores reales. Escribe reglas "tapped" o "visible" solo con selectores y textos que aparezcan ahí.
+5. Escribe un estudio corto (de 5 a 9 bloques) que responda a lo que quiero averiguar${goal ? '' : ' (si no lo dije, el flujo principal del prototipo)'}. Instrucciones en palabras del participante, de tú, sin nombrar botones.
+6. validate_study. Corrige los errores y vuelve a validar hasta que no haya ninguno; cuéntame los avisos que importen.
+7. create_study para guardarlo.
+8. Dame el link tryout para probarlo sin grabar, el link para editarlo en el panel, y un resumen de dos o tres líneas de qué mide cada tarea.`;
   return {
     description: PROMPTS[0]?.description,
     messages: [{ role: 'user', content: { type: 'text', text } }],

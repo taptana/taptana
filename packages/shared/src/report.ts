@@ -303,6 +303,53 @@ export interface ReportOptions {
   screens?: ReadonlyArray<{ id: string; name?: string; title?: string }>;
 }
 
+/**
+ * "Cómo se calcula": la definición de cada número del reporte, en palabras para el diseñador.
+ * La muestran el panel y el MCP (`get_report`), así que dicen lo mismo.
+ */
+export const REPORT_DEFINITIONS: ReadonlyArray<{ term: string; text: string }> = [
+  {
+    term: 'Participantes',
+    text: 'Las personas que abrieron el link del estudio, aceptaron que se grabe y empezaron al menos un bloque. Quienes aceptaron y salieron sin empezar se cuentan aparte ("entraron y salieron sin empezar"). Las sesiones que marcaste como "Excluir del reporte" no cuentan. En cada tarea solo cuentan quienes la empezaron.',
+  },
+  {
+    term: 'Éxito directo e indirecto',
+    text: 'Hay éxito cuando se cumple la regla de la tarea o cuando tú lo marcas. Es directo si la persona siguió exactamente el camino esperado, e indirecto si llegó dando vueltas. Si la tarea no tiene camino esperado, se usa el camino más común de quienes lo lograron.',
+  },
+  {
+    term: 'Dijo que terminó, No pudo, Sin terminar',
+    text: '"Dijo que terminó": tocó "Listo" pero la regla no se cumplió. "No pudo": tocó "No pude". "Sin terminar": dejó el estudio a mitad de la tarea.',
+  },
+  {
+    term: 'Por revisar',
+    text: 'En las tareas que decide el moderador, tocar "Listo" deja el resultado por revisar. No cuenta en el éxito ni en el puntaje hasta que lo marques como logrado o no logrado.',
+  },
+  {
+    term: 'Tiempo',
+    text: 'Desde que toca "Empezar tarea" hasta que se cumple la regla (o hasta "Listo" o "No pude" si no se cumplió). Leer la instrucción no cuenta. El tiempo mediano es solo de quienes lo lograron.',
+  },
+  {
+    term: 'Primer clic',
+    text: 'La tarea termina en el primer toque. Acierta si toca el elemento correcto, o si ese toque lleva a la pantalla correcta en los 2 segundos siguientes.',
+  },
+  {
+    term: 'Misclick (toque sin efecto)',
+    text: 'Un toque sobre algo que no es tocable y que no produjo ningún cambio. Muchos misclicks en un mismo lugar indican que algo parece un botón y no lo es. La tasa de misclicks de una tarea son sus toques sin efecto divididos entre todos los toques hechos durante esa tarea (no entre personas). Las grabaciones antiguas sin este dato no cuentan.',
+  },
+  {
+    term: 'Puntaje de una tarea (0 a 100)',
+    text: '100 × éxito directo + 50 × éxito indirecto − 50 × tasa de misclicks − penalización por lentitud (hasta 10 puntos cuando se tarda más de 5 segundos por pantalla). Las tasas se calculan sobre los intentos ya decididos. En primer clic: el porcentaje de aciertos.',
+  },
+  {
+    term: 'Puntaje del estudio',
+    text: 'El promedio del puntaje de las tareas que ya tienen resultados decididos. "Tareas logradas" junta los intentos de todas las tareas: intentos logrados (directo + indirecto) divididos entre todos los intentos ya decididos. Los que están por revisar o sin terminar no entran.',
+  },
+  {
+    term: 'Mapas de calor',
+    text: 'El fondo es lo que vio una persona real con el tamaño de pantalla más común. Solo se dibujan los toques de pantallas de ancho parecido (±20 %); debajo de cada mapa dice cuántos quedaron fuera.',
+  },
+];
+
 /** Cómo se llama cada resultado de una tarea, en el reporte, en las listas y en el CSV. */
 export const OUTCOME_LABELS: Record<keyof TaskOutcomeCounts, string> = {
   direct: 'Éxito directo',

@@ -85,6 +85,11 @@ async function fullFlow(client: Client, label: string): Promise<void> {
   const ids = screens.map((s: { id: string }) => s.id);
   for (const id of ['/index.html', '/producto.html', '/carrito.html', '/gracias.html']) assert.ok(ids.includes(id), `${label}: ${id}`);
 
+  const html = await client.callTool({ name: 'get_screen_html', arguments: { prototypeId: EXAMPLE_PROTOTYPE_ID, screen: '/index.html' } });
+  assert.notEqual((html as TextResult).isError, true, textOf(html));
+  assert.match(textOf(html), /<body/i);
+  assert.doesNotMatch(textOf(html), /recorder\.js/);
+
   const study = {
     v: 2,
     name: `Prueba ${label}`,

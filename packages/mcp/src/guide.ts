@@ -21,14 +21,16 @@ preguntas.
 2. \`list_screens\` con ese id. Usa SOLO esos identificadores de pantalla en \`startPath\`,
    \`success.path\`, \`expectedPath\` y \`variants[].startPath\`. Si falta una pantalla que
    necesitas, dilo en vez de inventarla.
-3. Escribe el estudio siguiendo esta guía y pásalo a \`validate_study\`. Corrige todos los
+3. \`get_screen_html\` con las pantallas que importan: ahí ves los textos, links, botones, ids y
+   clases reales para escribir instrucciones y reglas.
+4. Escribe el estudio siguiendo esta guía y pásalo a \`validate_study\`. Corrige todos los
    errores; revisa los avisos (no impiden guardar).
-4. \`create_study\` lo guarda. Entrega al diseñador el link para probarlo sin grabar y recuérdale
+5. \`create_study\` lo guarda. Entrega al diseñador el link para probarlo sin grabar y recuérdale
    que lo revise en el panel antes de compartirlo. La IA propone; el diseñador decide.
 
-Los selectores de \`tapped\` y \`visible\` no se pueden comprobar desde aquí: úsalos solo si
-conoces el HTML del prototipo (el diseñador te lo pasó o lo escribiste tú). Si no, prefiere
-\`reached\` con una pantalla de la lista, o \`manual\`.
+Comprueba los selectores de \`tapped\` y los textos de \`visible\` con \`get_screen_html\`:
+usa solo los que aparecen en el HTML de esa pantalla. Si la pantalla la arma JavaScript y no
+encuentras el elemento, prefiere \`reached\` con una pantalla de la lista, o \`manual\`.
 
 `;
 

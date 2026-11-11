@@ -23,6 +23,7 @@ import {
 } from '@taptana/shared';
 import { apiError, FriendlyError, type ApiRequest, type ApiResponse } from './api.js';
 import { studyFormatGuide } from './guide.js';
+import { cleanHtml } from './html.js';
 import { summarizeReport } from './summary.js';
 
 export interface ToolContext {
@@ -255,7 +256,7 @@ export const TOOLS: ToolDefinition[] = [
     name: 'list_screens',
     title: 'Pantallas de un prototipo',
     description:
-      'Las pantallas conocidas de un prototipo: id de pantalla (por ejemplo "/producto.html", "/index.html#/carrito" o "/index.html~checkout") y nombre. Usa SOLO estos ids en startPath, success.path y expectedPath; nunca inventes pantallas.',
+      'Las pantallas conocidas de un prototipo: id de pantalla (por ejemplo "/producto.html", "/index.html#/carrito" o "/index.html~checkout") y nombre. Usa SOLO estos ids en startPath, success.path y expectedPath; nunca inventes pantallas. Después, get_screen_html para leer los textos, links y selectores reales de las pantallas que te importan.',
     inputSchema: {
       type: 'object',
       properties: { prototypeId: { type: 'string', description: 'El id del prototipo, de list_prototypes.' } },
@@ -275,6 +276,37 @@ export const TOOLS: ToolDefinition[] = [
         `${screens.length === 1 ? '1 pantalla' : `${screens.length} pantallas`}. "file" es un archivo HTML del prototipo; "seen" es una pantalla vista en alguna sesión (por ejemplo una ruta de una app de una página).`,
         screens.map((s) => ({ id: s.id, name: s.name ?? s.label, source: s.source })),
       );
+    },
+  },
+  {
+    name: 'get_screen_html',
+    title: 'HTML de una pantalla',
+    description:
+      'El HTML de una pantalla del prototipo (sin scripts, estilos ni imágenes incrustadas): textos, links, botones, ids y clases reales. Úsalo para escribir instrucciones con lo que de verdad hay en la pantalla y reglas "tapped" o "visible" con selectores y textos que existen. Pide solo las pantallas que necesitas; las de una app de una página ("/index.html#/carrito" o "/index.html~checkout") comparten el mismo archivo.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prototypeId: { type: 'string', description: 'El id del prototipo, de list_prototypes.' },
+        screen: { type: 'string', description: 'El id de la pantalla, de list_screens (por ejemplo "/producto.html").' },
+      },
+      required: ['prototypeId', 'screen'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    run: async (args, ctx) => {
+      const id = stringArg(args, 'prototypeId', true);
+      const screen = stringArg(args, 'screen', true);
+      const res = await call(ctx, 'GET', `/prototypes/${enc(id)}/source?path=${enc(screen)}`);
+      if (res.status !== 200) return fail(`${apiError(res, 'No pude leer el HTML')} Revisa el id con list_prototypes y la pantalla con list_screens.`);
+      const { path, html } = res.data as { path: string; html: string };
+      const clean = cleanHtml(html);
+      const notes = [`Archivo ${path} del prototipo ${id}.`];
+      if (path !== screen) notes.push(`La pantalla «${screen}» vive en este archivo.`);
+      if (clean.truncated) notes.push(`truncado: la página es larga y aquí va solo el principio (${clean.html.length} de ${clean.originalChars} caracteres).`);
+      if (clean.scriptsEmptied > 0) {
+        notes.push('Se quitó el código de los <script>: si parte de la pantalla la arma JavaScript, ese contenido no aparece aquí. Prefiere selectores que sí veas.');
+      }
+      return text(`${notes.join(' ')}\n\n${clean.html}${clean.truncated ? '\n\n[… truncado]' : ''}`);
     },
   },
   {
@@ -379,7 +411,7 @@ export const TOOLS: ToolDefinition[] = [
       required: ['studyId', 'study'],
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     run: async (args, ctx) => {
       const id = stringArg(args, 'studyId', true);
       const current = await get<StudyRecord>(ctx, `/studies/${enc(id)}`, 'el estudio');

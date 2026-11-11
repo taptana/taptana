@@ -21,8 +21,8 @@ export const SERVER_NAME = 'taptana';
 export const INSTRUCTIONS =
   'Taptana es una herramienta de pruebas de usabilidad para prototipos HTML en celulares reales. ' +
   'Con estas herramientas puedes ver los prototipos y sus pantallas, escribir un estudio (formato v2, por bloques), revisarlo, guardarlo y leer su reporte. ' +
-  'Para armar un estudio: get_study_format → list_prototypes → list_screens → escribe el estudio → validate_study → create_study → entrega el link tryout. ' +
-  'Usa solo pantallas de list_screens; no inventes pantallas ni selectores. Escribe los textos para participantes en español, de tú. ' +
+  'Para armar un estudio: get_study_format → list_prototypes → list_screens → get_screen_html → escribe el estudio → validate_study → create_study → entrega el link tryout. ' +
+  'Usa solo pantallas de list_screens y selectores o textos que veas en get_screen_html; no los inventes. Escribe los textos para participantes en español, de tú. ' +
   'No hay herramientas para borrar ni para ver grabaciones.';
 
 export const JSONRPC_ERRORS = {

@@ -137,6 +137,15 @@ function fakeApi(opts: { sessions?: number; locked?: boolean } = {}) {
       studies.set(saved.id, saved);
       return reply(201, saved);
     }
+    if (method === 'GET' && route === '/prototypes/pr_tienda/source') {
+      const file = new URLSearchParams(query).get('path')?.split('#')[0]?.split('~')[0];
+      if (file !== '/index.html') return reply(404, { error: `No hay un archivo HTML en «${file}» dentro de este prototipo.` });
+      return reply(200, {
+        path: '/index.html',
+        html: `<html><head><style>body{color:red}</style></head><body><a class="cart-link" href="carrito.html">Carrito</a><script>${'x'.repeat(5000)}</script><img src="data:image/png;base64,${'A'.repeat(500)}"><script src="/__taptana/recorder.js" data-prototype="pr_tienda"></script></body></html>`,
+      });
+    }
+    if (method === 'GET' && route === '/prototypes/pr_vacio/source') return reply(404, { error: 'Este prototipo no tiene archivos en Taptana.' });
     if (method === 'POST' && route === '/prototypes') {
       assert.ok(body instanceof FormData);
       return reply(201, { id: 'pr_nuevo', name: body.get('name'), source: 'upload', url: '/p/pr_nuevo/', createdAt: 9 });
@@ -219,7 +228,7 @@ test('tools/list declares every tool with schema and annotations, and no delete 
   const { tools } = (await rpc(handler, 'tools/list')).result as { tools: Array<{ name: string; description: string; inputSchema: { type: string }; annotations: Record<string, unknown> }> };
   assert.deepEqual(
     tools.map((t) => t.name),
-    ['get_info', 'get_study_format', 'list_prototypes', 'list_screens', 'list_studies', 'get_study', 'validate_study', 'create_study', 'update_study', 'duplicate_study', 'get_report', 'upload_prototype'],
+    ['get_info', 'get_study_format', 'list_prototypes', 'list_screens', 'get_screen_html', 'list_studies', 'get_study', 'validate_study', 'create_study', 'update_study', 'duplicate_study', 'get_report', 'upload_prototype'],
   );
   for (const t of tools) {
     assert.equal(t.inputSchema.type, 'object');
@@ -229,6 +238,10 @@ test('tools/list declares every tool with schema and annotations, and no delete 
   }
   assert.equal(tools.find((t) => t.name === 'get_report')?.annotations['readOnlyHint'], true);
   assert.equal(tools.find((t) => t.name === 'create_study')?.annotations['readOnlyHint'], false);
+  const update = tools.find((t) => t.name === 'update_study')?.annotations;
+  assert.equal(update?.['destructiveHint'], true);
+  assert.equal(update?.['idempotentHint'], false);
+  assert.equal(tools.find((t) => t.name === 'get_screen_html')?.annotations['readOnlyHint'], true);
 });
 
 test('an unknown tool is a protocol error', async () => {
@@ -384,12 +397,20 @@ test('get_report: compact summary, filters passed through, no heatmap points or 
   assert.equal(res.data['score'], 62);
   assert.equal(task.successPercent, 50);
   assert.equal(task.medianSeconds, 12.3);
-  assert.deepEqual(task.expectedPath, ['Inicio', 'Producto', 'Gracias']);
+  assert.deepEqual(task.expectedPath, [
+    { id: '/index.html', name: 'Inicio' },
+    { id: '/producto.html', name: 'Producto' },
+    { id: '/gracias.html', name: 'Gracias' },
+  ]);
+  assert.deepEqual(task.funnel[2].screen, { id: '/gracias.html', name: 'Gracias' });
+  assert.deepEqual(task.topPaths[0].screens[1], { id: '/producto.html', name: 'Producto' });
+  assert.match(res.data['howToRead'].expectedPathInferred, /camino más común/);
+  assert.match(res.data['howToRead'].score, /100 × éxito directo/);
   assert.deepEqual(
     task.funnel.map((f: { droppedHere: number }) => f.droppedHere),
     [0, 0, 1],
   );
-  assert.equal(task.misclickScreens[0].name, 'Producto');
+  assert.deepEqual(task.misclickScreens[0].screen, { id: '/producto.html', name: 'Producto' });
   assert.deepEqual(res.data['questions'][0].answers, ['El botón']);
   assert.doesNotMatch(res.text, /"taps"|"sessionId"|Ana/);
 });
@@ -443,6 +464,7 @@ test('every tool answers (no protocol error) with a fake API', async () => {
     duplicate_study: { studyId: 'st_1' },
     get_report: { studyId: 'st_1' },
     upload_prototype: { name: 'n', html: '<p>x</p>' },
+    get_screen_html: { prototypeId: 'pr_tienda', screen: '/index.html' },
   };
   for (const t of TOOLS) {
     const res = await tool(handler, t.name, args[t.name] ?? {});
@@ -482,4 +504,21 @@ test('stdio: one JSON message per line, only protocol on stdout', async () => {
   assert.equal((byId.get(1)?.result as { protocolVersion: string }).protocolVersion, '2025-06-18');
   assert.equal(byId.get(null)?.error?.code, -32700);
   assert.match(JSON.stringify(byId.get(2)?.result), /pr_tienda/);
+});
+
+test('get_screen_html: cleaned HTML of the screen file, friendly errors otherwise', async () => {
+  const { handler, calls } = setup();
+  const res = await tool(handler, 'get_screen_html', { prototypeId: 'pr_tienda', screen: '/index.html#/carrito' });
+  assert.equal(res.isError, false);
+  assert.ok(calls.some((c) => c.path === '/api/v1/prototypes/pr_tienda/source?path=%2Findex.html%23%2Fcarrito'));
+  assert.match(res.text, /class="cart-link"/);
+  assert.match(res.text, /vive en este archivo/);
+  assert.match(res.text, /código de los <script>/);
+  assert.doesNotMatch(res.text, /xxxx|AAAA|recorder\.js|color:red/);
+  const missing = await tool(handler, 'get_screen_html', { prototypeId: 'pr_tienda', screen: '/nada.html' });
+  assert.equal(missing.isError, true);
+  assert.match(missing.text, /list_screens/);
+  const empty = await tool(handler, 'get_screen_html', { prototypeId: 'pr_vacio', screen: '/index.html' });
+  assert.equal(empty.isError, true);
+  assert.match(empty.text, /no tiene archivos/);
 });
