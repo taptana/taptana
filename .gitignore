@@ -8,3 +8,4 @@ dist/
 site/
 dist-pages/
 packages/server/public/
+tests/e2e/.artifacts/

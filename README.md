@@ -138,6 +138,16 @@ pnpm seed:record    # vuelve a grabar las sesiones de ejemplo
 pnpm screenshots    # vuelve a tomar las capturas de docs/img
 ```
 
+### Pruebas de punta a punta (`pnpm e2e`)
+
+Abren un servidor real y un navegador de verdad (Chromium con Playwright): suben un prototipo,
+arman un estudio, hacen de participante en un celular simulado y revisan que la privacidad se cumpla.
+Antes: `pnpm build` y, una sola vez, `npx playwright install chromium` (o define `TAPTANA_CHROMIUM`
+con la ruta de un Chromium que ya tengas). Cada archivo de `tests/e2e/*.test.mjs` levanta su propio
+servidor en un puerto libre con una carpeta temporal, así que no toca tus datos ni el puerto 4321.
+Tardan unos 2 minutos. Si una falla, deja una captura en `tests/e2e/.artifacts/` (no se sube a git).
+Corre una sola con `node --test tests/e2e/privacy.test.mjs`. En GitHub corren en un job aparte.
+
 El plan y las decisiones están en [`docs/plan-v1.md`](docs/plan-v1.md) y en [`CLAUDE.md`](CLAUDE.md).
 
 ## Licencia

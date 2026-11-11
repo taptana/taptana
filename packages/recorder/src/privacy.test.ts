@@ -62,3 +62,9 @@ test('lo escrito solo se tapa cuando aparece entero, como palabra o frase', () =
   const code = buildMask(tokensOf('4111'));
   assert.equal(maskWith('Tarjeta 4111 · 41112', code), 'Tarjeta **** · 41112');
 });
+
+test('lo escrito con guiones u otros símbolos no rompe la máscara', () => {
+  const typed = 'Ana-Maria 555-0123 a.b+c (x) [y] {z} 1/2 ^$ | \\';
+  const mask = buildMask(tokensOf(typed).concat(typed));
+  assert.equal(maskWith('Hola Ana-Maria, tu número 555-0123', mask), 'Hola *********, tu número ********');
+});

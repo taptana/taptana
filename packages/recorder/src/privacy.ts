@@ -47,7 +47,8 @@ export function tokensOf(value: string): string[] {
 export function buildMask(strings: Iterable<string>): RegExp | null {
   const list = [...new Set(strings)].filter((s) => s.length >= MIN_LENGTH).sort((a, b) => b.length - a.length);
   if (list.length === 0) return null;
-  const escaped = list.map((s) => s.replace(/[.*+?^${}()|[\]\\\/-]/g, '\\$&').replace(/ /g, '\\s+'));
+  // El guion no se escapa: con la bandera `u`, «\-» fuera de una clase es una expresión inválida.
+  const escaped = list.map((s) => s.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&').replace(/ /g, '\\s+'));
   return new RegExp(`(^|[^\\p{L}\\p{N}])(${escaped.join('|')})(?![\\p{L}\\p{N}])`, 'giu');
 }
 
