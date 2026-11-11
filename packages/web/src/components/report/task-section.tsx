@@ -19,7 +19,7 @@ import { loadSession, SnapshotView, type Backdrop } from './snapshot-view.tsx';
 
 type OutcomeKey = keyof TaskOutcomeCounts;
 
-const OUTCOME_COLOR: Record<OutcomeKey, string> = {
+export const OUTCOME_COLOR: Record<OutcomeKey, string> = {
   direct: 'bg-emerald-600',
   indirect: 'bg-emerald-300',
   review: 'bg-sky-400',
@@ -28,7 +28,7 @@ const OUTCOME_COLOR: Record<OutcomeKey, string> = {
   incomplete: 'bg-zinc-300 dark:bg-zinc-600',
 };
 
-const OUTCOME_BADGE: Record<OutcomeKey, string> = {
+export const OUTCOME_BADGE: Record<OutcomeKey, string> = {
   direct: 'border-emerald-600/40 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10',
   indirect: 'border-emerald-600/40 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10',
   review: 'border-sky-600/40 text-sky-700 dark:text-sky-400 bg-sky-500/10',
@@ -37,7 +37,7 @@ const OUTCOME_BADGE: Record<OutcomeKey, string> = {
   incomplete: 'border-border text-muted-foreground',
 };
 
-const OUTCOME_HELP: Record<OutcomeKey, string> = {
+export const OUTCOME_HELP: Record<OutcomeKey, string> = {
   direct: 'Lo logró por el camino esperado',
   indirect: 'Lo logró dando vueltas',
   review: 'Tocó "Listo"; falta que decidas si lo logró',
@@ -47,7 +47,7 @@ const OUTCOME_HELP: Record<OutcomeKey, string> = {
 };
 
 /** En primer clic solo hay acierto o fallo. */
-function outcomeLabel(key: OutcomeKey, firstClick: boolean): string {
+export function outcomeLabel(key: OutcomeKey, firstClick: boolean): string {
   if (firstClick && (key === 'direct' || key === 'indirect')) return 'Acertó';
   if (firstClick && key === 'failed') return 'Tocó en otro lado';
   return OUTCOME_LABELS[key];

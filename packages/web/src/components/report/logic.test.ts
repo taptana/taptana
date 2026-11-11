@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { HeatPoint } from '@taptana/shared';
-import { biggestDrop, fallbackHeight, funnelSteps, placePoints, recordingOffset, ruleSelector, ruleText, samePages, scoreBand } from './logic.ts';
+import { arrangePeople, biggestDrop, fallbackHeight, funnelSteps, placePoints, recordingOffset, ruleSelector, ruleText, samePages, scoreBand } from './logic.ts';
 
 const pt = (p: Partial<HeatPoint>): HeatPoint => ({ x: 100, y: 200, vw: 390, misclick: false, sessionId: 's1', ...p });
 
@@ -93,4 +93,18 @@ test('samePages y recordingOffset', () => {
   assert.equal(recordingOffset(1000, 4000, 500), 2500);
   assert.equal(recordingOffset(1000, 900), 0);
   assert.equal(recordingOffset(undefined, 900), undefined);
+});
+
+test('arrangePeople ordena por llegada, por tareas logradas o por duración, y filtra problemas', () => {
+  const people = [
+    { id: 'a', achieved: 1, problems: 1, durationMs: 30_000 },
+    { id: 'b', achieved: 2, problems: 0, durationMs: 10_000 },
+    { id: 'c', achieved: 1, problems: 0, durationMs: 50_000 },
+  ];
+  const ids = (list: Array<{ id: string }>): string[] => list.map((p) => p.id);
+  assert.deepEqual(ids(arrangePeople(people, 'arrival')), ['a', 'b', 'c']);
+  assert.deepEqual(ids(arrangePeople(people, 'achieved')), ['b', 'c', 'a']);
+  assert.deepEqual(ids(arrangePeople(people, 'duration')), ['c', 'a', 'b']);
+  assert.deepEqual(ids(arrangePeople(people, 'arrival', true)), ['a']);
+  assert.equal(people[0]!.id, 'a', 'no cambia la lista original');
 });

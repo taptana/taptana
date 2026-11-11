@@ -24,6 +24,7 @@ import { EmptyState, ErrorState, Layout, Notice, PageHeader, PageSkeleton } from
 import { BlockPicker, blockAnchor, type IndexEntry } from '@/components/report/block-index';
 import { ReportContext, type ReportContextValue } from '@/components/report/context';
 import { InsightsCard, Overview, ScoreChip, VariantsCard } from '@/components/report/overview';
+import { ParticipantsPrint, ParticipantsSection } from '@/components/report/participants-section';
 import { QuestionBody } from '@/components/report/question-section';
 import { ReviewDialog } from '@/components/report/review-dialog';
 import { clearSnapshotCache, whenSnapshotsReady } from '@/components/report/snapshot-view';
@@ -51,8 +52,8 @@ interface Base {
 }
 
 /** Pestañas del reporte. Van en la dirección (`?tab=`) para que un link o una recarga vuelvan al mismo lugar. */
-type ReportTab = 'resumen' | 'tareas' | 'preguntas';
-const REPORT_TABS: ReportTab[] = ['resumen', 'tareas', 'preguntas'];
+type ReportTab = 'resumen' | 'tareas' | 'preguntas' | 'participantes';
+const REPORT_TABS: ReportTab[] = ['resumen', 'tareas', 'preguntas', 'participantes'];
 
 function readTabParams(): { tab: ReportTab; task: string | null } {
   const q = new URLSearchParams(location.search);
@@ -473,16 +474,18 @@ export function ReportPage({ id }: { id: string }) {
                 {summary}
                 {entries.map(renderBlock)}
                 {entries.length === 0 && noBlocks}
+                <ParticipantsPrint report={report} />
               </div>
             ) : (
               <Tabs value={activeTab} onValueChange={(v) => setTab(v as ReportTab)} className="gap-10">
                 <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 border-b">
-                  <TabsList aria-label="Partes del reporte" className="h-auto -mb-px gap-6 rounded-none bg-transparent p-0">
+                  <TabsList aria-label="Partes del reporte" className="h-auto -mb-px flex-wrap gap-x-3 gap-y-0 overflow-visible rounded-none bg-transparent p-0 sm:gap-x-6">
                     {(
                       [
                         { id: 'resumen', label: 'Resumen', count: null },
                         { id: 'tareas', label: 'Tareas', count: taskEntries.length },
                         ...(questionEntries.length > 0 ? [{ id: 'preguntas', label: 'Preguntas', count: questionEntries.length }] : []),
+                        { id: 'participantes', label: 'Participantes', count: (report.people ?? []).length },
                       ] as Array<{ id: ReportTab; label: string; count: number | null }>
                     ).map((t) => (
                       <TabsTrigger
@@ -515,6 +518,10 @@ export function ReportPage({ id }: { id: string }) {
                       {renderBlock(entry)}
                     </div>
                   ))}
+                </TabsContent>
+
+                <TabsContent value="participantes" className="space-y-10">
+                  <ParticipantsSection report={report} />
                 </TabsContent>
               </Tabs>
             )}

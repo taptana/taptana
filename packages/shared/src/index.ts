@@ -163,8 +163,11 @@ export type {
   VariantReport,
   StudyReport,
   ReportOptions,
+  ParticipantReport,
+  ParticipantTask,
+  ParticipantAnswer,
 } from './report.js';
-export { OUTCOME_LABELS, REPORT_DEFINITIONS, SIMILAR_WIDTH_RATIO, similarWidth, computeStudyReport, studyCsv, shortSessionId } from './report.js';
+export { NOT_STARTED_LABEL, OUTCOME_LABELS, REPORT_DEFINITIONS, SIMILAR_WIDTH_RATIO, similarWidth, computeStudyReport, studyCsv, shortSessionId } from './report.js';
 
 export type { RecorderMessage, PanelMessage } from './preview.js';
 export {

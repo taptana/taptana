@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OUTCOME_LABELS, computeStudyReport, similarWidth, studyCsv, shortSessionId, type ReportSession, type TaskOutcomeCounts } from './report.js';
+import { NOT_STARTED_LABEL, OUTCOME_LABELS, computeStudyReport, type ParticipantAnswer, type ParticipantReport, type ParticipantTask, similarWidth, studyCsv, shortSessionId, type ReportSession, type TaskOutcomeCounts } from './report.js';
 import type { TapEvent, TargetInfo, TaptanaEvent } from './events.js';
 import type { SessionSummary } from './session.js';
 import type { Block, StudyRecord, TaskBlock } from './study.js';
@@ -502,6 +502,74 @@ test('studyCsv: one row per participant, with tasks first and then questions', (
   assert.equal(shortSessionId('s1'), 's1');
   assert.equal(shortSessionId('s_demo_estudio_1').length, 6
   );
+});
+
+test('people: one entry per participant, blocks in study order, filters respected, excluded listed apart', () => {
+  const s = studyOf(
+    [
+      { id: 'c0', kind: 'context', title: 'Hola', text: '…' },
+      { ...buy, expectedPath: ['/', '/gracias.html'] },
+      { id: 'q1', kind: 'scale', question: '¿Fácil?', max: 5 },
+      { id: 't2', title: 'Envío', instruction: '…', success: { type: 'manual' } },
+      { id: 'q2', kind: 'choice', question: '¿Qué faltó?', options: ['Precio', 'Fotos'], multiple: true },
+      { id: 'q3', kind: 'text', question: '¿Algo más?' },
+    ],
+    { variants: [{ id: 'A', name: 'Con fotos' }] },
+  );
+  const ana = session('s1', [
+    nav(1, '/'), task(1000, 'start'), tap(2000, false), nav(3000, '/gracias.html'), task(4000, 'done'),
+    answer(5000, 'q1', 4), task(6000, 'start', 't2'), task(7000, 'done', 't2'), answer(8000, 'q2', ['Fotos', 'Fotos']), finish(9000),
+  ], { label: 'P1 · Ana', variantId: 'A', startedAt: 100, durationMs: 9000 });
+  const beto = session('s2', [nav(1, '/'), task(1000, 'start'), task(5000, 'skip'), answer(6000, 'q1', null)], {
+    participant: 'beto', touch: false, deviceLabel: 'Mac · Chrome', startedAt: 200, durationMs: 6000,
+  });
+  const hidden = session('s_hidden_1234', [nav(1, '/'), task(2, 'start')], { excluded: true, startedAt: 50 });
+  const bounced = session('s4', [nav(1, '/')], { startedAt: 300 });
+  const all = [beto, hidden, ana, bounced];
+  const r = computeStudyReport(s, all);
+
+  assert.equal(r.people.length, r.participants);
+  assert.deepEqual(r.people.map((p) => p.label), ['P1 · Ana', 'beto'], 'by arrival; bounced and excluded are out');
+  const [p1, p2] = r.people as [ParticipantReport, ParticipantReport];
+  assert.equal(p1.variantName, 'Con fotos');
+  assert.equal(p1.finished, true);
+  assert.equal(p1.touch, true);
+  assert.deepEqual(p1.blocks.map((b) => b.blockId), ['t1', 'q1', 't2', 'q2', 'q3'], 'context blocks are left out');
+  assert.deepEqual(p1.blocks[0], { type: 'task', blockId: 't1', title: 'Comprar', kind: 'task', outcome: 'direct', misclicks: 1, durationMs: 2000, startedAt: 1000, goalAt: 3000 });
+  assert.equal((p1.blocks[2] as ParticipantTask).outcome, 'review');
+  assert.deepEqual(p1.blocks[1], { type: 'question', blockId: 'q1', question: '¿Fácil?', kind: 'scale', status: 'answered', answer: 4 });
+  assert.deepEqual((p1.blocks[3] as ParticipantAnswer).answer, ['Fotos']);
+  assert.equal((p1.blocks[4] as ParticipantAnswer).status, 'not-seen');
+  assert.equal(p1.achieved, 1);
+  assert.equal(p1.problems, 0);
+
+  assert.equal(p2.who, 'beto');
+  assert.equal(p2.touch, false);
+  assert.equal((p2.blocks[0] as ParticipantTask).outcome, 'failed');
+  assert.equal((p2.blocks[1] as ParticipantAnswer).status, 'skipped');
+  assert.equal((p2.blocks[2] as ParticipantTask).outcome, 'not-started');
+  assert.equal(p2.problems, 1);
+
+  // Lo mismo que cada tarea dice de esa persona.
+  for (const p of r.people) {
+    for (const b of p.blocks) {
+      if (b.type !== 'task' || b.outcome === 'not-started') continue;
+      const row = r.tasks.find((t) => t.taskId === b.blockId)?.results.find((x) => x.sessionId === p.sessionId);
+      assert.equal(row?.outcome, b.outcome);
+      assert.equal(row?.durationMs, b.durationMs);
+      assert.equal(row?.misclicks, b.misclicks);
+    }
+  }
+
+  assert.deepEqual(r.excludedSessions, [{ sessionId: 's_hidden_1234', label: shortSessionId('s_hidden_1234'), startedAt: 50 }]);
+  assert.deepEqual(computeStudyReport(s, all, { device: 'desktop' }).people.map((p) => p.sessionId), ['s2']);
+  assert.deepEqual(computeStudyReport(s, all, { variantId: 'A' }).people.map((p) => p.sessionId), ['s1']);
+  assert.equal(computeStudyReport(s, all, { variantId: 'A' }).excludedSessions.length, 1, 'excluded are not filtered, like `excluded`');
+
+  // El CSV tiene una fila por persona de `people`, en el mismo orden.
+  const csvRows = studyCsv(s, all).slice(1).trim().split('\r\n').slice(1);
+  assert.deepEqual(csvRows.map((l) => l.split(',')[1]), r.people.map((p) => p.sessionId));
+  assert.equal(csvRows[1]!.includes(NOT_STARTED_LABEL.toLowerCase()), true);
 });
 
 test('studyCsv: every outcome has its Spanish label', () => {

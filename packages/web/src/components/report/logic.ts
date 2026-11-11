@@ -3,7 +3,7 @@
  * foto de la pantalla, cómo se lee el puntaje y cómo se explica el embudo. Con pruebas.
  */
 
-import { similarWidth, type HeatPoint, type SuccessRule, type TaskOutcomeCounts, type TaskReport } from '@taptana/shared';
+import { similarWidth, type HeatPoint, type ParticipantReport, type SuccessRule, type TaskOutcomeCounts, type TaskReport } from '@taptana/shared';
 
 export type ScoreTone = 'good' | 'ok' | 'warn' | 'bad' | 'none';
 
@@ -149,4 +149,20 @@ export function samePages(a: readonly string[], b: readonly string[]): boolean {
 export function recordingOffset(sessionStartedAt: number | undefined, at: number | undefined, leadMs = 0): number | undefined {
   if (sessionStartedAt === undefined || at === undefined) return undefined;
   return Math.max(0, Math.round(at - sessionStartedAt - leadMs));
+}
+
+/** Cómo ordenar la lista de participantes. */
+export type PeopleSort = 'arrival' | 'achieved' | 'duration';
+
+/**
+ * La lista de participantes como la pide el panel. `arrival` deja el orden del reporte (por
+ * llegada); `achieved`, de más a menos tareas logradas (a igualdad, menos problemas primero);
+ * `duration`, de la sesión más larga a la más corta. Con `onlyProblems`, solo quienes tienen
+ * alguna tarea "No pudo" o "Dijo que terminó".
+ */
+export function arrangePeople<T extends Pick<ParticipantReport, 'achieved' | 'problems' | 'durationMs'>>(people: readonly T[], sort: PeopleSort, onlyProblems = false): T[] {
+  const list = people.map((p, i) => ({ p, i })).filter(({ p }) => !onlyProblems || p.problems > 0);
+  if (sort === 'achieved') list.sort((a, b) => b.p.achieved - a.p.achieved || a.p.problems - b.p.problems || a.i - b.i);
+  else if (sort === 'duration') list.sort((a, b) => b.p.durationMs - a.p.durationMs || a.i - b.i);
+  return list.map(({ p }) => p);
 }

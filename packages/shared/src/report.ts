@@ -244,6 +244,56 @@ export interface VariantReport {
   score: number | null;
 }
 
+/** Lo que hizo un participante en una tarea. `not-started`: llegó al estudio pero no la empezó. */
+export interface ParticipantTask {
+  type: 'task';
+  blockId: string;
+  title: string;
+  kind: TaskKind;
+  outcome: keyof TaskOutcomeCounts | 'not-started';
+  durationMs?: number;
+  misclicks: number;
+  /** Cuándo empezó la tarea y cuándo se cumplió la regla (reloj de los eventos), para saltar al reproductor. */
+  startedAt?: number;
+  goalAt?: number;
+}
+
+/** La respuesta de un participante a una pregunta. */
+export interface ParticipantAnswer {
+  type: 'question';
+  blockId: string;
+  question: string;
+  kind: QuestionKind;
+  /** `answered`: respondió; `skipped`: la vio y la saltó; `not-seen`: no llegó a ella. */
+  status: 'answered' | 'skipped' | 'not-seen';
+  /** scale: el número. yesno: "Sí" o "No". choice: las opciones elegidas. text: lo que escribió. */
+  answer?: number | string | string[];
+}
+
+/** Una persona del reporte, con todo su recorrido: lo mismo que su fila del CSV. */
+export interface ParticipantReport {
+  sessionId: string;
+  /** Etiqueta del moderador, o el alias que escribió, o el id corto de la sesión. */
+  label: string;
+  /** Etiqueta del moderador o alias del participante, si hay. */
+  who?: string;
+  startedAt: number;
+  deviceLabel?: string;
+  touch: boolean;
+  variantId?: string;
+  /** El nombre de la variante (o su id si ya no está en el estudio). */
+  variantName?: string;
+  durationMs: number;
+  /** Llegó al final del estudio. */
+  finished: boolean;
+  /** Tareas y preguntas en el orden del estudio (sin los bloques de contexto). */
+  blocks: Array<ParticipantTask | ParticipantAnswer>;
+  /** Tareas logradas (éxito directo o indirecto). */
+  achieved: number;
+  /** Tareas con problemas: "No pudo" (incluye "No pude") o "Dijo que terminó" sin cumplir la regla. */
+  problems: number;
+}
+
 export interface StudyReport {
   studyId: string;
   /**
@@ -275,6 +325,13 @@ export interface StudyReport {
   score: number | null;
   /** Sesiones excluidas del estudio (no cuentan en nada de lo anterior). */
   excluded: number;
+  /**
+   * Cada participante (los mismos de `participants`, dentro del filtro), por orden de llegada.
+   * Es lo mismo que las filas de `studyCsv`.
+   */
+  people: ParticipantReport[];
+  /** Las sesiones excluidas (sin filtrar, como `excluded`), por orden de llegada, para volver a ellas. */
+  excludedSessions: Array<{ sessionId: string; label: string; startedAt: number }>;
   /** Resultados manuales por revisar, sumando todas las tareas. */
   pendingReview: number;
   /** Participantes (sin los que no empezaron nada) por tipo de dispositivo, antes de filtrar. */
@@ -359,6 +416,9 @@ export const OUTCOME_LABELS: Record<keyof TaskOutcomeCounts, string> = {
   incomplete: 'Sin terminar',
   review: 'Por revisar',
 };
+
+/** Una tarea que el participante no llegó a empezar (en el CSV y en la lista de participantes). */
+export const NOT_STARTED_LABEL = 'No empezó';
 
 /** El panel dibuja en un mismo mapa de calor los toques de pantallas de ancho parecido (±20 %). */
 export const SIMILAR_WIDTH_RATIO = 0.2;
@@ -909,6 +969,75 @@ function questionReport(block: QuestionBlock, ctxs: Ctx[]): QuestionReport {
   return out;
 }
 
+/** Etiqueta del moderador, o el alias, o el id corto de la sesión: como se nombra en el CSV. */
+function participantLabel(session: SessionSummary): string {
+  return session.label?.trim() || session.participant?.trim() || shortSessionId(session.id);
+}
+
+/** La respuesta tal como se muestra, o undefined si no respondió (vacía o fuera de rango). */
+function answerValue(block: QuestionBlock, answer: AnswerResult | undefined): ParticipantAnswer['answer'] {
+  const v = answer?.value;
+  if (block.kind === 'scale') return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= block.max ? v : undefined;
+  if (block.kind === 'yesno') return typeof v === 'boolean' ? (v ? 'Sí' : 'No') : undefined;
+  if (block.kind === 'choice') {
+    const picked = (Array.isArray(v) ? v : typeof v === 'string' ? [v] : []).filter((x): x is string => typeof x === 'string' && x.trim() !== '');
+    return picked.length > 0 ? [...new Set(picked)] : undefined;
+  }
+  return typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined;
+}
+
+function participantReport(study: StudyRecord, ctx: Ctx, tasks: TaskReport[], variantNames: ReadonlyMap<string, string>): ParticipantReport {
+  const { session } = ctx;
+  const byTask = new Map(tasks.map((t) => [t.taskId, t]));
+  const blocks: ParticipantReport['blocks'] = [];
+  for (const block of studyBlocks(study)) {
+    const kind = blockKind(block);
+    if (kind === 'context') continue;
+    const report = byTask.get(block.id);
+    if (report) {
+      const row = report.results.find((r) => r.sessionId === session.id);
+      const cell: ParticipantTask = { type: 'task', blockId: block.id, title: report.title, kind: report.kind, outcome: row?.outcome ?? 'not-started', misclicks: row?.misclicks ?? 0 };
+      if (row?.durationMs !== undefined) cell.durationMs = row.durationMs;
+      if (row?.startedAt !== undefined) cell.startedAt = row.startedAt;
+      if (row?.goalAt !== undefined) cell.goalAt = row.goalAt;
+      blocks.push(cell);
+      continue;
+    }
+    const question = questionBlocks(study).find((q) => q.id === block.id);
+    if (!question) continue;
+    const raw = ctx.answers.get(question.id);
+    const value = answerValue(question, raw);
+    const cell: ParticipantAnswer = {
+      type: 'question',
+      blockId: question.id,
+      question: blockTitle(question),
+      kind: question.kind,
+      status: value !== undefined ? 'answered' : raw ? 'skipped' : 'not-seen',
+    };
+    if (value !== undefined) cell.answer = value;
+    blocks.push(cell);
+  }
+  const outcomes = blocks.filter((b): b is ParticipantTask => b.type === 'task').map((b) => b.outcome);
+  const out: ParticipantReport = {
+    sessionId: session.id,
+    label: participantLabel(session),
+    startedAt: session.startedAt,
+    touch: Boolean(session.touch),
+    durationMs: session.durationMs || 0,
+    finished: ctx.finished,
+    blocks,
+    achieved: outcomes.filter((o) => o === 'direct' || o === 'indirect').length,
+    problems: outcomes.filter((o) => o === 'failed' || o === 'reported').length,
+  };
+  if (ctx.who) out.who = ctx.who;
+  if (session.deviceLabel) out.deviceLabel = session.deviceLabel;
+  if (session.variantId) {
+    out.variantId = session.variantId;
+    out.variantName = variantNames.get(session.variantId) ?? session.variantId;
+  }
+  return out;
+}
+
 interface Analysis {
   study: StudyRecord;
   report: StudyReport;
@@ -991,6 +1120,13 @@ function analyze(input: StudyRecord, sessions: ReportSession[], filter: ReportFi
     t.results.forEach((r) => r.pages.forEach(named));
   }
 
+  const variantNames = new Map(variantList.map((v) => [v.id, v.name]));
+  const people = ctxs.map((ctx) => participantReport(study, ctx, tasks, variantNames));
+  const excludedSessions = mine
+    .filter((s) => s.session.excluded)
+    .sort((a, b) => a.session.startedAt - b.session.startedAt || (a.session.id < b.session.id ? -1 : 1))
+    .map((s) => ({ sessionId: s.session.id, label: participantLabel(s.session), startedAt: s.session.startedAt }));
+
   const base: Omit<StudyReport, 'insights'> = {
     studyId: study.id,
     participants: ctxs.length,
@@ -1003,6 +1139,8 @@ function analyze(input: StudyRecord, sessions: ReportSession[], filter: ReportFi
     variants,
     score: scores.length ? Math.round(mean(scores)) : null,
     excluded: mine.length - counted.length,
+    people,
+    excludedSessions,
     pendingReview: tasks.reduce((a, t) => a + t.outcomes.review, 0),
     devices: {
       touch: engaged.filter((c) => c.session.touch).length,
@@ -1036,15 +1174,6 @@ function csvCell(value: string | number): string {
   return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
-function answerCell(block: QuestionBlock, answer: AnswerResult | undefined): string | number {
-  const v = answer?.value;
-  if (v === undefined || v === null) return '';
-  if (typeof v === 'boolean') return v ? 'Sí' : 'No';
-  if (Array.isArray(v)) return v.filter((x) => typeof x === 'string').join(' | ');
-  if (typeof v === 'number') return block.kind === 'scale' ? v : String(v);
-  return v;
-}
-
 /** Id corto de una sesión, para nombrar a un participante sin etiqueta ni alias. */
 export function shortSessionId(id: string): string {
   const bare = id.replace(/^s(es)?_/, '');
@@ -1062,36 +1191,37 @@ export function shortSessionId(id: string): string {
  */
 export function studyCsv(study: StudyRecord, sessions: ReportSession[], options?: ReportOptions): string {
   const { study: s, report, ctxs } = analyze(study, sessions, {}, options);
-  const tasks = taskBlocks(s);
-  const questions = questionBlocks(s);
-  const variantName = new Map((Array.isArray(s.variants) ? s.variants : []).filter(Boolean).map((v) => [v.id, v.name]));
-
   const header: Array<string | number> = ['participante', 'sesión', 'fecha_utc', 'dispositivo', 'variante', 'duración_s'];
-  for (const t of tasks) {
+  for (const t of taskBlocks(s)) {
     const title = blockTitle(t);
     header.push(`${title} · resultado`, `${title} · tiempo_s`, `${title} · misclicks`);
   }
-  for (const q of questions) header.push(blockTitle(q));
+  // Las columnas siguen el orden de `people[].blocks`: primero las tareas, después las preguntas.
+  for (const q of questionBlocks(s)) header.push(blockTitle(q));
   header.push('notas');
 
+  const notes = new Map(ctxs.map((c) => [c.session.id, c.session.notes]));
   const rows: Array<Array<string | number>> = [header];
-  for (const ctx of ctxs) {
-    const { session } = ctx;
+  for (const p of report.people) {
     const row: Array<string | number> = [
-      ctx.who ?? shortSessionId(session.id),
-      session.id,
-      Number.isFinite(session.startedAt) ? new Date(session.startedAt).toISOString() : '',
-      session.deviceLabel ?? '',
-      session.variantId ? (variantName.get(session.variantId) ?? session.variantId) : '',
-      Math.round((session.durationMs || 0) / 1000),
+      p.label,
+      p.sessionId,
+      Number.isFinite(p.startedAt) ? new Date(p.startedAt).toISOString() : '',
+      p.deviceLabel ?? '',
+      p.variantName ?? '',
+      Math.round(p.durationMs / 1000),
     ];
-    for (const t of tasks) {
-      const r = report.tasks.find((x) => x.taskId === t.id)?.results.find((x) => x.sessionId === session.id);
-      if (!r) row.push('no empezó', '', '');
-      else row.push(OUTCOME_LABELS[r.outcome].toLowerCase(), r.durationMs === undefined ? '' : Math.round(r.durationMs / 1000), r.misclicks);
+    for (const b of p.blocks) {
+      if (b.type !== 'task') continue;
+      if (b.outcome === 'not-started') row.push(NOT_STARTED_LABEL.toLowerCase(), '', '');
+      else row.push(OUTCOME_LABELS[b.outcome].toLowerCase(), b.durationMs === undefined ? '' : Math.round(b.durationMs / 1000), b.misclicks);
     }
-    for (const q of questions) row.push(answerCell(q, ctx.answers.get(q.id)));
-    row.push(typeof session.notes === 'string' ? session.notes : '');
+    for (const b of p.blocks) {
+      if (b.type !== 'question') continue;
+      row.push(Array.isArray(b.answer) ? b.answer.join(' | ') : (b.answer ?? ''));
+    }
+    const note = notes.get(p.sessionId);
+    row.push(typeof note === 'string' ? note : '');
     rows.push(row);
   }
   return '﻿' + rows.map((r) => r.map(csvCell).join(',') + '\r\n').join('');

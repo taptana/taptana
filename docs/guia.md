@@ -126,11 +126,16 @@ En el estudio, pestaña **Resultados**.
 
 ![El reporte](img/reporte.png)
 
-El reporte tiene tres pestañas. **Resumen**: el puntaje y **Lo más importante**, un resumen
+El reporte tiene cuatro pestañas. **Resumen**: el puntaje y **Lo más importante**, un resumen
 hecho con reglas fijas (sin IA) de qué arreglar primero y qué salió bien; cada frase tiene un
 "Ver" que te lleva a su tarea. **Tareas**: una tarea a la vez (la eliges arriba), con sus
 números, el embudo, los mapas de calor, los caminos y los participantes. **Preguntas**: las
-respuestas de cada pregunta. La pestaña queda en el link, así que puedes compartirlo tal cual.
+respuestas de cada pregunta. **Participantes**: una fila por persona con un cuadrito de color
+por tarea (el mismo color que la barra de resultados) y su tiempo total; tócala para ver, en
+orden, cada tarea (resultado, tiempo, misclicks y el link a ese momento de la grabación) y cada
+respuesta. Puedes ordenar por llegada, por tareas logradas o por tiempo, y dejar "Solo con
+problemas" (alguna tarea en "No pudo" o "Dijo que terminó"). Es lo mismo que una fila del CSV.
+La pestaña queda en el link, así que puedes compartirlo tal cual.
 
 ![Una tarea](img/reporte-tarea.png)
 
