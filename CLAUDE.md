@@ -33,8 +33,10 @@ qué resuelven para la prueba de usabilidad.
 - **v1 (actual): lista para piloto.** Estudios por bloques, apps de una sola página, reporte
   con puntaje y resumen, privacidad sin huecos, guardia del panel, Docker, demo en Pages.
   El plan y el contrato entre paquetes: `docs/plan-v1.md`.
-- **Después:** `packages/mcp` (la API como herramientas para una IA), cuentas y equipos,
-  servidor hospedado público.
+- **Hecho después de v1:** `packages/mcp`, la API como herramientas para una IA (stdio y
+  `POST /mcp`). Ver `docs/mcp.md`.
+- **Después:** cuentas y equipos, servidor hospedado público (que también abre el MCP a las IA
+  en la web).
 - **Fuera de alcance por ahora** (plan, sección 6): HTTPS propio, reclutamiento, card sorting,
   tree testing, test de 5 segundos, clips de video, comparar versiones, Postgres.
 
@@ -61,20 +63,23 @@ Reglas duras:
   precompilados (esbuild, Tailwind v4) y Playwright están bien: no corren en producción.
 - **Nunca** acoplar a un proveedor cloud. Todo tiene que correr con `node` y una carpeta.
 - **El servidor nunca llama a un modelo de IA.** La IA la pone el usuario; Taptana da un
-  formato importable y un prompt para copiar.
+  formato importable, un prompt para copiar y un MCP al que la IA se conecta.
 - **Privacidad** (no hay opciones para desactivarla):
   - En un estudio nada sale del celular antes del consentimiento; si rechaza o termina, esa
     pestaña no graba más.
   - Lo escrito en el prototipo se enmascara en el celular: campos, `contenteditable`, texto que
     el prototipo repite, y valores de la URL (`maskUrl`). `target.text` de un campo es su etiqueta.
-  - El panel y la API pasan por la guardia (`panel-guard.ts`); solo son públicos
+  - El panel, la API y `/mcp` pasan por la guardia (`panel-guard.ts`); solo son públicos
     `POST /events`, `GET /studies/:id` y `GET /info` reducido.
+  - El MCP nunca entrega grabaciones, eventos de rrweb ni nombres de participantes, y no tiene
+    herramientas para borrar.
 - Textos de interfaz en español, de tú. Identificadores de código en inglés.
 
 ## Decisiones de arquitectura
 
 1. **Un solo binario.** `taptana start [carpeta]` (abre el navegador), `taptana dev [carpeta]`
-   (no lo abre), `taptana seed [archivos]`. Sin carpeta, sirve el panel y los prototipos subidos.
+   (no lo abre), `taptana seed [archivos]`, `taptana mcp` (el MCP por stdio). Sin carpeta,
+   sirve el panel y los prototipos subidos.
 2. **El recorder funciona solo.** Se pega como `<script>` en cualquier HTML. Lee
    `data-endpoint`, `data-prototype`, `data-transport`, `data-base`, `data-export`. Nunca asume
    que el servidor es el mismo origen.
@@ -86,6 +91,12 @@ Reglas duras:
 6. **API con versión.** Todo bajo `/api/v1/`.
 7. **`packages/shared` es el contrato.** Formato del estudio, eventos, pantallas, resultados y
    reporte viven ahí como funciones puras con pruebas. Servidor y demo calculan con lo mismo.
+8. **El MCP es un cliente más de la API.** `packages/mcp` no tiene dependencias en ejecución:
+   implementa a mano la parte de MCP que usa (JSON-RPC: `initialize`, `ping`, `tools/*`,
+   `prompts/*`). Su núcleo (`createMcpHandler({ request })`) no sabe de transportes: stdio
+   llama por HTTP a un Taptana corriendo; `POST /mcp` llama a la propia app con `app.request`.
+   La guía del formato (`get_study_format`) es la skill `skills/taptana-study/SKILL.md`,
+   copiada en el build: una sola fuente.
 
 ## Estructura del monorepo
 
@@ -96,11 +107,14 @@ taptana/
 │   │                report.ts, insights.ts, preview.ts, api.ts (sin dependencias)
 │   ├── recorder/    Script que corre en el celular: rrweb, gestos, pantallas (screens.ts),
 │   │                flujo del participante (study.ts, study-ui.ts), privacidad, cola de envío
+│   ├── mcp/         MCP para herramientas de IA: núcleo JSON-RPC, herramientas, stdio
+│   │                (`taptana-mcp`), resumen del reporte. Sin dependencias (el SDK oficial
+│   │                solo como devDependency, para la prueba con un cliente real)
 │   ├── web/         Panel: React + Vite + shadcn. Modo http (servidor) y modo demo (Pages)
 │   └── server/      CLI `taptana`, Hono, SQLite, guardia del panel, subidas, ejemplo
 │       └── seed/    Sesiones de ejemplo (*.json), grabadas con scripts/record-seed.mjs
 ├── examples/tienda/ Prototipo de ejemplo + study.json (v2) + study-v1.json (formato viejo)
-├── skills/taptana-study/   Skill para que una IA escriba un study.json
+├── skills/taptana-study/   Skill para que una IA escriba un study.json (y guía del MCP)
 ├── scripts/
 │   ├── start.mjs         `pnpm start`: revisa Node, instala/compila si hace falta, arranca
 │   ├── build-site.mjs    Demo estática para Pages en ./site (TAPTANA_BASE)
@@ -117,13 +131,14 @@ taptana/
     ├── guia.md                 Guía para diseñadores: prueba moderada y no moderada, métricas
     ├── prototipos.md           Qué HTML funciona, apps de una página, data-screen
     ├── estudios-con-ia.md      Formato de bloques, prompt, skill
+    ├── mcp.md                  Conectar una IA por MCP: configuración por herramienta, límites
     ├── servidor-hospedado.md   A dónde vamos con el hospedado
     ├── img/                    Capturas (generadas)
     └── propuesta-v0.1.md, constructor-de-estudios.md   Históricos
 ```
 
-Dependencias entre paquetes: `shared` no depende de nadie. `recorder`, `web` y `server`
-dependen de `shared`. El build de `server` copia a su carpeta el bundle de `recorder`
+Dependencias entre paquetes: `shared` no depende de nadie. `recorder`, `web` y `mcp`
+dependen de `shared`; `server` depende de `shared` y `mcp`. El build de `server` copia a su carpeta el bundle de `recorder`
 (`public/recorder.js`), el panel compilado (`public/panel`) y el ejemplo (`example/tienda`),
 con `packages/server/scripts/copy-assets.mjs`. Por eso el orden de build importa (`pnpm build`
 lo respeta) y, tras cambiar `web` o `recorder`, hay que volver a compilar `server`.
@@ -159,6 +174,9 @@ La sesión vive en `sessionStorage` (una pestaña). Cada carga de página es un 
   subidos, con respaldo de app de una página y redirección por `Referer` para rutas
   absolutas), `/` (la carpeta servida, el prototipo marcado "Abrir en la raíz" o una página
   amable), `/__taptana/recorder.js`.
+- **MCP** (`routes/mcp.ts`): `POST /mcp`, sin estado (respuesta JSON; 202 para
+  notificaciones; `GET` → 405). Pasa por `guard.mcp`, que además acepta
+  `Authorization: Bearer <llave>`.
 - **API** (`routes/api.ts`): `/info`, `/events`, `/sessions` (lista, detalle, eventos,
   export, import con 409 salvo `?replace=1`, PATCH con `manual`/`label`/`notes`/`excluded`),
   `/studies` (CRUD, `/report?variant=&device=`, `/export.csv`, `/duplicate`), `/prototypes`
@@ -227,6 +245,7 @@ pnpm seed                       # carga el ejemplo en la base local
 pnpm seed:record                # vuelve a grabar packages/server/seed (Playwright)
 pnpm screenshots                # vuelve a tomar docs/img (Playwright)
 pnpm site                       # demo estática en ./site (TAPTANA_BASE=/taptana/)
+node packages/mcp/dist/bin.js   # MCP por stdio contra un Taptana corriendo (TAPTANA_URL, TAPTANA_KEY)
 docker compose up -d            # servidor en contenedor; el link del panel sale en los logs
 ```
 

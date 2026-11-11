@@ -12,6 +12,7 @@ RUN corepack enable && corepack prepare pnpm@10.28.0 --activate
 # Primero solo los manifiestos: así la instalación queda en caché mientras no cambien.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/
+COPY packages/mcp/package.json packages/mcp/
 COPY packages/recorder/package.json packages/recorder/
 COPY packages/web/package.json packages/web/
 COPY packages/server/package.json packages/server/
@@ -19,6 +20,8 @@ COPY packages/server/package.json packages/server/
 RUN pnpm install --frozen-lockfile --filter "./packages/*"
 COPY packages packages
 COPY examples examples
+# La guía del formato de estudio que entrega el MCP sale de la skill.
+COPY skills skills
 RUN pnpm build
 # El servidor con sus dependencias de producción, listo para copiar (sin node_modules de desarrollo).
 RUN pnpm --filter @taptana/server deploy --prod --legacy /out

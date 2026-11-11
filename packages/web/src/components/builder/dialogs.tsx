@@ -3,7 +3,7 @@
  * importar un study.json y el panel de "Grabar el camino correcto".
  */
 import { useEffect, useRef, useState } from 'react';
-import { Check, CircleCheck, ClipboardPaste, Copy, EyeOff, FileUp, Hand, MonitorSmartphone, RotateCcw, Smartphone, Sparkles, Wifi } from 'lucide-react';
+import { Check, CircleCheck, ClipboardPaste, Copy, ExternalLink, EyeOff, FileUp, Hand, MonitorSmartphone, Plug, RotateCcw, Smartphone, Sparkles, Wifi } from 'lucide-react';
 import {
   TRYOUT_PARAM,
   TRYOUT_WINDOW,
@@ -11,6 +11,7 @@ import {
   type Prototype,
   type RecorderMessage,
   type ScreenInfo,
+  type ServerInfo,
   type Study,
   type StudyRecord,
   type SuccessRule,
@@ -22,6 +23,7 @@ import { Input, NativeSelect, Textarea } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
 import { copyText } from '@/lib/download';
 import { friendlyError } from '@/lib/errors';
+import { MCP_DOC_URL, mcpSnippets } from '@/lib/mcp';
 import { buildStudyPrompt } from '@/lib/prompt';
 import { nameScreen } from '@/lib/screens';
 import { demoResult, parseStudyText, type DemoStep } from './draft';
@@ -253,6 +255,63 @@ function Problems({ messages }: { messages: string[] }) {
   );
 }
 
+/** Un bloque de configuración para copiar, con su botón. */
+function Snippet({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium">{label}</span>
+        <Button variant="ghost" size="sm" onClick={() => void copy(value, 'Copiado.')}>
+          <Copy /> Copiar
+        </Button>
+      </div>
+      <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted p-2 font-mono text-[11px] leading-snug">{value}</pre>
+    </div>
+  );
+}
+
+/**
+ * "Conecta tu IA (MCP)": la otra forma de armar el estudio. La IA se conecta a Taptana y ve los
+ * prototipos y pantallas reales; Taptana sigue sin llamar a ningún modelo.
+ */
+function McpSection({ info, demo }: { info: ServerInfo | undefined; demo: boolean }) {
+  const snippets = mcpSnippets({ origin: location.origin, local: Boolean(info?.panelKeyUrl), bin: info?.mcpBin });
+  return (
+    <details className="group rounded-xl border p-3 text-sm">
+      <summary className="flex cursor-pointer list-none items-center gap-2 font-medium">
+        <Plug className="size-4 text-muted-foreground" /> Conecta tu IA (MCP)
+        <span className="text-xs font-normal text-muted-foreground">sin copiar y pegar</span>
+      </summary>
+      <div className="mt-3 space-y-3">
+        <p className="text-muted-foreground">
+          Si usas Claude Desktop, Claude Code, Cursor o LM Studio, puedes conectarlos a Taptana. Tu IA verá tus prototipos y sus pantallas, armará el estudio, lo revisará y
+          lo guardará aquí. Después lo revisas tú, como siempre.
+        </p>
+        {demo ? (
+          <Alert variant="warning">
+            <AlertTitle>Necesitas Taptana instalado</AlertTitle>
+            <AlertDescription>Esta demo vive solo en tu navegador, así que una IA no tiene a qué conectarse. Instala Taptana en tu computadora y vuelve a este cuadro.</AlertDescription>
+          </Alert>
+        ) : (
+          <>
+            {!info?.panelKeyUrl && (
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Estás en otro dispositivo: la configuración lleva la llave del panel. Cámbiala por lo que va después de «key=» en el link que muestra Taptana al arrancar.
+              </p>
+            )}
+            <Snippet label="Con la dirección (Cursor, LM Studio y otras)" value={snippets.http} />
+            <Snippet label="Claude Code (en la terminal)" value={snippets.claudeCode} />
+            <Snippet label="Con un comando (Claude Desktop y otras; Taptana tiene que estar corriendo)" value={snippets.stdio} />
+          </>
+        )}
+        <a href={MCP_DOC_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs underline underline-offset-2">
+          Cómo configurarlo, paso a paso <ExternalLink className="size-3" />
+        </a>
+      </div>
+    </details>
+  );
+}
+
 export function AiDialog({
   open,
   onOpenChange,
@@ -260,6 +319,8 @@ export function AiDialog({
   screens,
   replaces,
   onApply,
+  info,
+  demo = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -268,6 +329,10 @@ export function AiDialog({
   /** El borrador ya tiene bloques: usar el JSON los reemplaza. */
   replaces: boolean;
   onApply: (study: Study) => void;
+  /** Datos del servidor, para la configuración del MCP. */
+  info?: ServerInfo | undefined;
+  /** Demo estática: no hay servidor al que conectar una IA. */
+  demo?: boolean;
 }) {
   const [goal, setGoal] = useState('');
   const [text, setText] = useState('');
@@ -347,6 +412,7 @@ export function AiDialog({
             </li>
           </ol>
         )}
+        <McpSection info={info} demo={demo} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar

@@ -1,0 +1,36 @@
+{
+  "name": "@taptana/mcp",
+  "version": "1.0.0",
+  "description": "Servidor MCP de Taptana: deja que tu IA vea tus prototipos, arme estudios de usabilidad y lea el reporte. Sin dependencias.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "taptana-mcp": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./bin": "./dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json && node scripts/copy-guide.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --no-warnings=ExperimentalWarning --test \"dist/**/*.test.js\"",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@taptana/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.0"
+  }
+}

@@ -3,14 +3,15 @@
  *
  *   /__taptana/recorder.js   el script de grabación
  *   /api/v1/...              la API (recorder y panel)
+ *   /mcp                     el MCP para herramientas de IA (POST), detrás de la guardia
  *   /panel, /panel/...       el panel compilado (packages/web), detrás de la guardia
  *   /sessions...             la dirección antigua del panel: redirige a /panel
  *   /p/<id>/...              prototipos subidos, con el recorder inyectado en cada HTML
  *   /*                       lo que esté montado en la raíz: la carpeta de `taptana dev <carpeta>`
  *                            o el prototipo subido marcado "abrir en la raíz"
  *
- * Direcciones reservadas: un prototipo en la raíz no puede usar /panel, /sessions, /api, /p
- * ni /__taptana para sus propias páginas.
+ * Direcciones reservadas: un prototipo en la raíz no puede usar /panel, /sessions, /api, /p,
+ * /mcp ni /__taptana para sus propias páginas.
  */
 
 import { Hono, type Context } from 'hono';
@@ -31,6 +32,7 @@ import { injectRecorder } from './inject.js';
 import { lostPage, notFoundPage, panelPlaceholderPage } from './pages.js';
 import { createPanelGuard, loadPanelKey } from './panel-guard.js';
 import { apiRoutes, UPLOADED_ID } from './routes/api.js';
+import { mountMcp } from './routes/mcp.js';
 import { mimeFor, parseRange, readFile, readRange, resolveFile, type ResolvedFile } from './static.js';
 import type { Store } from './store/store.js';
 import { prototypeDir as uploadedDir } from './uploads.js';
@@ -132,6 +134,9 @@ export function createApp(opts: AppOptions): Hono {
       ...(opts.seedDir && { seedDir: opts.seedDir }),
     }),
   );
+
+  // ── MCP ────────────────────────────────────────────────────────────
+  mountMcp(app, { guard, publicUrl: opts.publicUrl });
 
   // ── Archivos de un prototipo ───────────────────────────────────────
   const sendFile = async (c: Context, file: ResolvedFile, mount: Mount): Promise<Response> => {

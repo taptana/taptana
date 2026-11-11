@@ -44,7 +44,7 @@ function run(command, args) {
 // Lo que el servidor necesita para arrancar, y de qué fuentes sale cada cosa.
 const cli = join(root, 'packages/server/dist/cli.js');
 const outputs = [
-  [cli, ['packages/shared/src', 'packages/server/src']],
+  [cli, ['packages/shared/src', 'packages/mcp/src', 'skills/taptana-study', 'packages/server/src']],
   [join(root, 'packages/server/public/recorder.js'), ['packages/shared/src', 'packages/recorder/src']],
   [join(root, 'packages/server/public/panel/index.html'), ['packages/shared/src', 'packages/web/src', 'packages/web/index.html', 'packages/web/public']],
   [join(root, 'packages/server/example/tienda/index.html'), ['examples/tienda']],

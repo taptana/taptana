@@ -14,6 +14,7 @@ import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { randomBytes } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
 import {
   API_PREFIX,
@@ -74,6 +75,15 @@ const NO_SESSION = 'No existe esta sesión.';
 const NO_STUDY = 'No existe este estudio.';
 const NO_PROTOTYPE = 'No existe este prototipo.';
 const STUDY_PROTOTYPE_MISSING = 'Ese prototipo no existe aquí. Elige uno de tus prototipos para este estudio.';
+
+/** Dónde quedó instalado el MCP por stdio, para mostrar su configuración en el panel. */
+const MCP_BIN = ((): string | undefined => {
+  try {
+    return fileURLToPath(import.meta.resolve('@taptana/mcp/bin'));
+  } catch {
+    return undefined;
+  }
+})();
 
 export interface ApiOptions {
   store: Store;
@@ -173,6 +183,7 @@ export function apiRoutes({ store, guard, prototypeDir, dataDir, info, publicUrl
       const url = new URL(PANEL_PATH, participantUrl);
       if (guard.key && !guard.open) url.searchParams.set(PANEL_KEY_PARAM, guard.key);
       full.panelKeyUrl = url.toString();
+      if (MCP_BIN) full.mcpBin = MCP_BIN;
     }
     return c.json<ServerInfo>(full);
   });

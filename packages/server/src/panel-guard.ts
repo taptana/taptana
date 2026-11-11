@@ -15,7 +15,8 @@
  *    - trae la llave: en las PÁGINAS del panel, `?key=…` la guarda en la cookie `taptana_key`
  *      (HttpOnly) y redirige a la misma dirección sin el parámetro. La API no acepta `?key=`
  *      (una llave en la URL queda en historiales y registros): solo la cookie o la cabecera
- *      `x-taptana-key` (para scripts);
+ *      `x-taptana-key` (para scripts). La ruta del MCP (`/mcp`) acepta además
+ *      `Authorization: Bearer <llave>`, que es como las herramientas de IA configuran cabeceras;
  *    - el panel está en modo abierto (`--open-panel`, `TAPTANA_PANEL=open`).
  *
  * La llave vive en `<dataDir>/panel.key` y la terminal la imprime dentro del link
@@ -75,6 +76,8 @@ export interface PanelGuard {
   pages: MiddlewareHandler;
   /** Para la API: responde JSON. */
   api: MiddlewareHandler;
+  /** Para el MCP (`/mcp`): como `api`, y además acepta `Authorization: Bearer <llave>`. */
+  mcp: MiddlewareHandler;
 }
 
 /** Lee la llave del panel o la crea la primera vez. */
@@ -168,15 +171,18 @@ export function createPanelGuard(opts: PanelGuardOptions = {}): PanelGuard {
     return originHost !== requestHost(c) && originHost !== forwarded;
   };
 
-  const hasKey = (c: Context): boolean => {
+  const hasKey = (c: Context, bearer = false): boolean => {
     if (!key) return false;
     const cookie = getCookie(c, PANEL_KEY_COOKIE);
     if (cookie !== undefined && safeEqual(cookie, key)) return true;
     const header = c.req.header(PANEL_KEY_HEADER);
-    return header !== undefined && safeEqual(header, key);
+    if (header !== undefined && safeEqual(header, key)) return true;
+    if (!bearer) return false;
+    const auth = /^Bearer\s+(\S+)\s*$/i.exec(c.req.header('authorization') ?? '');
+    return auth?.[1] !== undefined && safeEqual(auth[1], key);
   };
 
-  const allowed = (c: Context): boolean => open || isLocal(c) || hasKey(c);
+  const allowed = (c: Context, bearer = false): boolean => open || isLocal(c) || hasKey(c, bearer);
 
   const deny = (c: Context, kind: 'pages' | 'api', status: 401 | 403, wrongKey = false): Response => {
     c.header('cache-control', 'no-store');
@@ -185,10 +191,10 @@ export function createPanelGuard(opts: PanelGuardOptions = {}): PanelGuard {
   };
 
   const middleware =
-    (kind: 'pages' | 'api'): MiddlewareHandler =>
+    (kind: 'pages' | 'api', bearer = false): MiddlewareHandler =>
     async (c, next) => {
       if (isCrossSite(c)) return deny(c, kind, 403);
-      let ok = allowed(c);
+      let ok = allowed(c, bearer);
       // `?key=` solo vale en las páginas del panel; en la API se ignora.
       const given = kind === 'pages' ? c.req.query(PANEL_KEY_PARAM) : undefined;
       if (given !== undefined) {
@@ -218,5 +224,6 @@ export function createPanelGuard(opts: PanelGuardOptions = {}): PanelGuard {
     allows: (c) => !isCrossSite(c) && allowed(c),
     pages: middleware('pages'),
     api: middleware('api'),
+    mcp: middleware('api', true),
   };
 }

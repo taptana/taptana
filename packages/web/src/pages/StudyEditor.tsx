@@ -836,7 +836,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
         study={tryout ? { ...tryout.study, ...(record ? { id: record.id, createdAt: record.createdAt, updatedAt: record.updatedAt } : {}) } : null}
         startAt={tryout?.startAt}
       />
-      <AiDialog open={aiOpen} onOpenChange={setAiOpen} proto={proto} screens={screens} replaces={draft.blocks.length > 0} onApply={applyImported} />
+      <AiDialog open={aiOpen} onOpenChange={setAiOpen} proto={proto} screens={screens} replaces={draft.blocks.length > 0} onApply={applyImported} info={info} demo={IS_DEMO} />
       <ConfirmDialog
         open={leave !== null}
         onOpenChange={(o) => !o && setLeave(null)}

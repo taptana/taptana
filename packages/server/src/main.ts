@@ -4,12 +4,13 @@
  *   taptana start [carpeta]   arranca y abre el panel en el navegador
  *   taptana dev [carpeta]     lo mismo, sin abrir el navegador
  *   taptana seed [archivos]   carga el ejemplo, o importa sesiones exportadas
+ *   taptana mcp               el MCP por stdio, para conectar una herramienta de IA
  */
 
 import { parseArgs } from 'node:util';
 import { basename, join, resolve } from 'node:path';
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { LOCAL_PROTOTYPE_ID, PANEL_PATH, validateSessionExport, type ServerInfo } from '@taptana/shared';
+import { DEFAULT_PORT, LOCAL_PROTOTYPE_ID, PANEL_PATH, validateSessionExport, type ServerInfo } from '@taptana/shared';
 import { invocationDir, resolveConfig, type Flags, type ServerConfig } from './config.js';
 import { createApp } from './app.js';
 import { ExampleError, loadExample } from './example.js';
@@ -29,6 +30,8 @@ Uso:
   taptana dev [carpeta]        Como start, pero sin abrir el navegador
   taptana seed                 Carga el ejemplo: una tienda, su estudio y sesiones ya grabadas
   taptana seed <archivo.json>  Importa sesiones exportadas desde el panel
+  taptana mcp                  Conecta tu herramienta de IA (MCP por stdio) a un Taptana
+                               que ya está corriendo (TAPTANA_URL, TAPTANA_KEY). Ver docs/mcp.md
 
 Opciones:
   --port <n>          Puerto (TAPTANA_PORT, 4321). Si está ocupado se usa el siguiente libre
@@ -105,6 +108,7 @@ export async function main(argv: string[]): Promise<void> {
   try {
     if (command === 'start' || command === 'dev') return await run(command, rest[0], flags);
     if (command === 'seed') return await seed(rest, flags);
+    if (command === 'mcp') return await mcp(values.port);
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err));
   }
@@ -236,6 +240,16 @@ async function run(command: 'start' | 'dev', dir: string | undefined, flags: Fla
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+}
+
+/**
+ * El MCP por stdio. Por la salida estándar solo sale protocolo: nada de mensajes aquí.
+ * Habla por HTTP con el Taptana que ya está corriendo (`TAPTANA_URL`, o localhost con el puerto).
+ */
+async function mcp(port: string | undefined): Promise<void> {
+  const { runStdio } = await import('@taptana/mcp');
+  const url = process.env['TAPTANA_URL'] || `http://localhost:${port ?? process.env['TAPTANA_PORT'] ?? DEFAULT_PORT}`;
+  await runStdio({ url, key: process.env['TAPTANA_KEY'] });
 }
 
 /**

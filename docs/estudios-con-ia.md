@@ -7,7 +7,11 @@ resultado entre a Taptana sin trabajo manual.
 (Claude, ChatGPT, Cursor, la que uses). Taptana solo define un formato de estudio que cualquier
 IA puede escribir, y lo importa. Así el servidor sigue simple, local y sin llaves que cuidar.
 
-## Dos formas de hacerlo
+## Tres formas de hacerlo
+
+La más directa es conectar tu IA a Taptana por MCP: ve tus prototipos y pantallas reales,
+arma el estudio, lo revisa y lo guarda, sin copiar y pegar. Está en [mcp.md](mcp.md). Las otras
+dos sirven con cualquier IA, sin configurar nada:
 
 ### 1. Desde el panel: "Armar con IA"
 
@@ -117,15 +121,17 @@ Al importar, Taptana valida todo y explica los problemas en español, con el blo
 ("La tarea 2 no tiene instrucción"). Algunos son solo avisos: por ejemplo, un selector que es
 solo una etiqueta (`a`) se acepta, pero avisa que cualquier enlace contaría como acierto.
 
-## Lo que viene después: MCP
+## MCP: tu IA conectada a Taptana
 
-Un MCP (`packages/mcp`, todavía no existe) expondrá la API de Taptana como herramientas para
-que una IA cree el estudio directo y, sobre todo, lea las sesiones: "resume las pruebas de
-hoy", "dónde se trabaron en la tarea 2". Será delgado, sobre la API que ya existe, y opcional.
+`packages/mcp` expone la API de Taptana como herramientas: listar prototipos y pantallas,
+revisar y guardar estudios, y leer el resumen del reporte ("¿dónde se trabaron en la tarea
+2?"). Es delgado, sobre la API que ya existe, y opcional. La guía del formato que le entrega a
+la IA sale de la skill de arriba, así que las dos dicen lo mismo. Cómo conectarlo:
+[mcp.md](mcp.md).
 
 ## Lo que no hacemos
 
 - No metemos una IA dentro de Taptana.
 - No generamos el prototipo: eso ya lo hace tu herramienta de diseño o de código.
-- No mandamos tus grabaciones a ningún lado. Si quieres que una IA las lea, tú exportas el CSV
-  o las sesiones y decides con quién compartirlas.
+- No mandamos tus grabaciones a ningún lado, tampoco por MCP. Si quieres que una IA las lea, tú
+  exportas el CSV o las sesiones y decides con quién compartirlas.

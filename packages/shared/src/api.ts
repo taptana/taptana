@@ -114,6 +114,11 @@ export interface ServerInfo {
   panelKeyUrl?: string;
   /** El ejemplo ya está cargado. */
   exampleLoaded?: boolean;
+  /**
+   * Ruta en esta computadora del MCP por stdio (`taptana-mcp`), para la configuración que se
+   * copia en una herramienta de IA. Como `panelKeyUrl`, solo se le dice a quien está aquí.
+   */
+  mcpBin?: string;
   /** 'local': servidor real. 'demo': sitio estático, los datos viven en este navegador. */
   mode?: 'local' | 'demo';
 }

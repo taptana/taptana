@@ -105,7 +105,9 @@ software joven. Conviene saber esto antes de empezar:
   borra esa carpeta. Para llevarte una sesión, expórtala desde el panel.
 - **El panel no queda abierto a la red.** Los participantes solo pueden abrir el prototipo.
 - Taptana nunca llama a un modelo de IA. Si quieres que una IA te arme el estudio, tú la
-  eliges y le pasas el prompt que el panel te da ([cómo](docs/estudios-con-ia.md)).
+  eliges y le pasas el prompt que el panel te da ([cómo](docs/estudios-con-ia.md)), o la
+  conectas a Taptana por MCP para que vea tus prototipos, arme el estudio y lea el reporte
+  ([cómo](docs/mcp.md)). Nunca ve las grabaciones.
 
 ## Otras formas de correrlo
 
@@ -116,6 +118,7 @@ software joven. Conviene saber esto antes de empezar:
 | Usar otro puerto | `pnpm start --port 5000` |
 | Cargar el ejemplo desde la terminal | `pnpm seed` |
 | Correrlo en un servidor con Docker | `docker compose up -d` y luego `docker compose logs taptana` |
+| Conectar mi IA (Claude, Cursor, LM Studio) | `http://localhost:4321/mcp` o `taptana mcp` ([guía](docs/mcp.md)) |
 
 Con Docker, el panel se abre con el link con llave (`…/panel?key=…`) que aparece en los
 registros. Los datos quedan en el volumen `/data`. Más detalle en la [guía](docs/guia.md#en-un-servidor-con-docker).
@@ -123,8 +126,8 @@ registros. Los datos quedan en el volumen `/data`. Más detalle en la [guía](do
 ## Para quien quiera meterle mano
 
 Monorepo con pnpm y TypeScript. `packages/shared` (formato y cálculos), `packages/recorder`
-(el script que graba en el celular), `packages/web` (el panel) y `packages/server` (el
-programa `taptana`). Sin dependencias nativas ni servicios en la nube: Node y una carpeta.
+(el script que graba en el celular), `packages/web` (el panel), `packages/mcp` (el MCP para
+herramientas de IA) y `packages/server` (el programa `taptana`). Sin dependencias nativas ni servicios en la nube: Node y una carpeta.
 
 ```
 pnpm build          # compila todo
