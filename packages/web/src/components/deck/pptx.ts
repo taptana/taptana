@@ -12,7 +12,7 @@
 
 import { visibleSlides, type Deck, type StudyReport } from '@taptana/shared';
 import { heatmapViewport, layoutSlide, type Shape } from './layout.ts';
-import { MUTED, PPTX_FONT, SOFT } from './theme.ts';
+import { MUTED, PPTX_FONT, PPTX_MONO, SOFT } from './theme.ts';
 
 /** px de la diapositiva (1280×720) → pulgadas (13,333×7,5). */
 const inch = (px: number): number => Math.round((px / 96) * 1000) / 1000;
@@ -52,7 +52,7 @@ function draw(pptx: Pptx, page: PptxSlide, s: Shape): void {
         y: inch(s.y),
         w: inch(s.w),
         h: inch(s.h),
-        fontFace: PPTX_FONT,
+        fontFace: s.mono ? PPTX_MONO : PPTX_FONT,
         fontSize: pt(s.size),
         color: s.color,
         bold: s.bold ?? false,
@@ -81,7 +81,7 @@ function draw(pptx: Pptx, page: PptxSlide, s: Shape): void {
       page.addShape(pptx.ShapeType.ellipse, { x: inch(s.x), y: inch(s.y), w: inch(s.d), h: inch(s.d), fill: { color: s.fill }, line: { type: 'none' } });
       return;
     case 'heatmap':
-      page.addShape(pptx.ShapeType.roundRect, { x: inch(s.x), y: inch(s.y), w: inch(s.w), h: inch(s.h), fill: { color: SOFT }, line: { type: 'none' }, rectRadius: inch(24) });
+      page.addShape(pptx.ShapeType.roundRect, { x: inch(s.x), y: inch(s.y), w: inch(s.w), h: inch(s.h), fill: { color: SOFT }, line: { type: 'none' }, rectRadius: inch(4) });
       page.addText(
         [
           { text: `Pantalla «${s.screenName}»`, options: { bold: true, fontSize: 16, breakLine: true } },

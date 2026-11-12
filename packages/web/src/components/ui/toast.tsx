@@ -53,7 +53,7 @@ export function Toaster() {
           key={t.id}
           role={t.kind === 'error' ? 'alert' : 'status'}
           className={cn(
-            'pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-xl border bg-popover text-popover-foreground px-4 py-3 text-sm shadow-lg animate-rise',
+            'pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-lg border border-foreground/20 bg-popover text-popover-foreground px-4 py-3 text-sm shadow-lg animate-rise',
             t.kind === 'error' && 'border-destructive/50',
           )}
         >

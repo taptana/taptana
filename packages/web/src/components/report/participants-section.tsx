@@ -33,8 +33,8 @@ function OutcomeChip({ task, number }: { task: ParticipantTask; number: number }
     <span
       title={label}
       className={cn(
-        'grid size-7 shrink-0 place-items-center rounded-md text-2xs font-semibold tabular-nums',
-        task.outcome === 'not-started' ? 'border border-dashed border-border text-muted-foreground' : OUTCOME_COLOR[task.outcome],
+        'grid size-6 shrink-0 place-items-center rounded-xs num text-2xs font-medium',
+        task.outcome === 'not-started' ? 'border border-dashed border-input text-muted-foreground' : OUTCOME_COLOR[task.outcome],
         (task.outcome === 'direct' || task.outcome === 'failed') && 'text-white',
         (task.outcome === 'indirect' || task.outcome === 'review' || task.outcome === 'reported' || task.outcome === 'incomplete') && 'text-zinc-900/80',
       )}
@@ -68,14 +68,14 @@ function PersonRow({ person, maxOf }: { person: ParticipantReport; maxOf: (block
   const meta = [person.deviceLabel ?? 'Dispositivo desconocido', formatShortDate(person.startedAt), person.variantName].filter(Boolean).join(' · ');
 
   return (
-    <li className="rounded-xl border bg-card" data-testid="participant">
-      <div className="flex min-h-[4.5rem] flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-6 sm:px-5">
+    <li className="border-b" data-testid="participant">
+      <div className="flex min-h-[4.5rem] flex-col gap-3 py-4 sm:flex-row sm:items-center sm:gap-6">
         <button
           type="button"
           aria-expanded={open}
           aria-controls={panelId}
           onClick={() => setOpen((v) => !v)}
-          className="-m-2 flex min-w-0 flex-1 flex-col gap-3 rounded-lg p-2 text-left outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:gap-6"
+          className="-my-2 flex min-w-0 flex-1 cursor-pointer flex-col gap-3 rounded-sm py-2 text-left outline-none hover:bg-muted/50 focus-ink sm:flex-row sm:items-center sm:gap-6"
         >
           <span className="flex min-w-0 items-start gap-3 sm:w-64 sm:shrink-0">
             <ChevronDown className={cn('mt-1 size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden="true" />
@@ -92,8 +92,8 @@ function PersonRow({ person, maxOf }: { person: ParticipantReport; maxOf: (block
                 ))}
               </span>
             )}
-            <span className="text-[15px] text-muted-foreground tabular-nums">
-              {tasks.length > 0 && <span className="text-foreground font-semibold">{person.achieved} de {tasks.length}</span>}
+            <span className="num text-sm text-muted-foreground">
+              {tasks.length > 0 && <span className="text-foreground font-medium">{person.achieved} de {tasks.length}</span>}
               {tasks.length > 0 && ' logradas · '}
               {seconds(person.durationMs)}
               {!person.finished && ' · no terminó'}
@@ -108,11 +108,11 @@ function PersonRow({ person, maxOf }: { person: ParticipantReport; maxOf: (block
         </Button>
       </div>
       {open && (
-        <div id={panelId} className="border-t px-4 py-6 sm:px-5 sm:pl-12">
+        <div id={panelId} className="border-t border-dashed py-6 pl-7">
           <ol className="max-w-3xl space-y-6">
             {items.map(({ block, number }) => (
               <li key={block.blockId} className="flex gap-3">
-                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-sm font-semibold tabular-nums">{number}</span>
+                <span className="num w-7 shrink-0 pt-px text-sm text-muted-foreground">{String(number).padStart(2, '0')}</span>
                 {block.type === 'task' ? (
                   <TaskDetail task={block} sessionId={person.sessionId} name={name} />
                 ) : (
@@ -148,8 +148,8 @@ function TaskDetail({ task, sessionId, name }: { task: ParticipantTask; sessionI
             <Badge variant="outline" className={OUTCOME_BADGE[task.outcome]} title={OUTCOME_HELP[task.outcome]}>
               {outcomeLabel(task.outcome, firstClick)}
             </Badge>
-            <span className="tabular-nums text-muted-foreground">{seconds(task.durationMs)}</span>
-            {!firstClick && <span className="tabular-nums text-muted-foreground">{plural(task.misclicks, 'misclick', 'misclicks', 'sin misclicks')}</span>}
+            <span className="num text-muted-foreground">{seconds(task.durationMs)}</span>
+            {!firstClick && <span className="num text-muted-foreground">{plural(task.misclicks, 'misclick', 'misclicks', 'sin misclicks')}</span>}
           </>
         )}
       </div>
@@ -183,13 +183,13 @@ function Legend({ people }: { people: ParticipantReport[] }) {
     <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground" aria-label="Qué significa cada color">
       {keys.map((k) => (
         <li key={k} className="flex items-center gap-2" title={OUTCOME_HELP[k]}>
-          <span className={cn('size-3 shrink-0 rounded-sm', OUTCOME_COLOR[k])} aria-hidden="true" />
+          <span className={cn('size-2.5 shrink-0 rounded-xs', OUTCOME_COLOR[k])} aria-hidden="true" />
           {outcomeLabel(k, false)}
         </li>
       ))}
       {seen.has('not-started') && (
         <li className="flex items-center gap-2">
-          <span className="size-3 shrink-0 rounded-sm border border-dashed border-muted-foreground/60" aria-hidden="true" />
+          <span className="size-2.5 shrink-0 rounded-xs border border-dashed border-muted-foreground/60" aria-hidden="true" />
           {NOT_STARTED_LABEL}
         </li>
       )}
@@ -235,7 +235,7 @@ export function ParticipantsSection({ report }: { report: StudyReport }) {
           <div className="flex items-center gap-2">
             <Switch id="solo-problemas" checked={onlyProblems} onCheckedChange={setOnlyProblems} />
             <Label htmlFor="solo-problemas" className="mb-0 font-normal">
-              Solo con problemas <span className="text-muted-foreground tabular-nums">({withProblems})</span>
+              Solo con problemas <span className="num text-sm text-muted-foreground">({withProblems})</span>
             </Label>
           </div>
         </div>
@@ -243,9 +243,9 @@ export function ParticipantsSection({ report }: { report: StudyReport }) {
       </div>
 
       {shown.length === 0 ? (
-        <p className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">Nadie tuvo problemas: todos lograron o siguen con sus tareas.</p>
+        <p className="border-y py-8 text-sm text-muted-foreground">Nadie tuvo problemas: todos lograron o siguen con sus tareas.</p>
       ) : (
-        <ul className="space-y-3" aria-label="Participantes">
+        <ul className="border-t border-foreground" aria-label="Participantes">
           {shown.map((p) => (
             <PersonRow key={p.sessionId} person={p} maxOf={maxOf} />
           ))}
@@ -261,7 +261,7 @@ export function ParticipantsSection({ report }: { report: StudyReport }) {
             {excluded.map((x, i) => (
               <span key={x.sessionId}>
                 {i > 0 && ', '}
-                <Link to={{ name: 'player', id: x.sessionId }} className="underline decoration-primary/40 underline-offset-4 hover:text-primary hover:decoration-primary">
+                <Link to={{ name: 'player', id: x.sessionId }} className="link-ink">
                   {ctx.names.get(x.sessionId) ?? x.label}
                 </Link>
               </span>
@@ -281,7 +281,7 @@ export function ParticipantsPrint({ report }: { report: StudyReport }) {
   if (people.length === 0) return null;
   const tasks = (people[0] as ParticipantReport).blocks.flatMap((b, i) => (b.type === 'task' ? [{ id: b.blockId, number: i + 1, title: b.title }] : []));
   return (
-    <section className="rounded-xl border bg-card p-4 sm:p-6 space-y-4" aria-labelledby="titulo-participantes" data-report-block>
+    <section className="border-t border-foreground pt-4 space-y-4" aria-labelledby="titulo-participantes" data-report-block>
       <h2 id="titulo-participantes" className="type-section" data-print="heading">
         Participantes
       </h2>
@@ -315,7 +315,7 @@ export function ParticipantsPrint({ report }: { report: StudyReport }) {
                   </TableCell>
                 ) : null,
               )}
-              <TableCell className="text-right tabular-nums">{seconds(p.durationMs)}</TableCell>
+              <TableCell className="text-right num">{seconds(p.durationMs)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

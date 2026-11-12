@@ -29,7 +29,6 @@ import { QuestionBody } from '@/components/report/question-section';
 import { ReviewDialog } from '@/components/report/review-dialog';
 import { clearSnapshotCache, whenSnapshotsReady } from '@/components/report/snapshot-view';
 import { StudyTabs } from '@/components/report/study-tabs';
-import { KindIcon } from '@/components/builder/fields';
 import { TaskBody } from '@/components/report/task-section';
 import { copyText, downloadText } from '@/lib/download';
 import { friendlyError } from '@/lib/errors';
@@ -359,22 +358,22 @@ export function ReportPage({ id }: { id: string }) {
         id={blockAnchor(entry.id)}
         data-report-block
         aria-labelledby={`titulo-${entry.id}`}
-        className={cn('scroll-mt-6 min-w-0', printing ? 'rounded-xl border bg-card p-4 sm:p-6 space-y-5' : 'space-y-8')}
+        className={cn('scroll-mt-6 min-w-0', printing ? 'border-t border-foreground pt-4 space-y-5' : 'space-y-8')}
       >
         <header className="flex items-start gap-4" data-print="heading">
-          <KindIcon kind={entry.kind} size="lg" />
-          <div className="min-w-0 flex-1 space-y-1">
+          <div className="min-w-0 flex-1 space-y-1.5">
             <p className="type-eyebrow">
-              {entry.number}. {entry.kindLabel}
+              {String(entry.number).padStart(2, '0')} — {entry.kindLabel}
             </p>
             <h2 id={`titulo-${entry.id}`} className="type-section break-words">
               {entry.title}
             </h2>
           </div>
           {task && task.participants > 0 && (
-            <div className="text-right shrink-0">
+            <div className="shrink-0 space-y-1 text-right">
+              <p className="type-eyebrow">Puntaje</p>
               <ScoreChip score={task.score} className="text-2xl" />
-              <p className="text-sm text-muted-foreground tabular-nums">{plural(task.participants, 'participante', 'participantes')}</p>
+              <p className="num text-xs text-muted-foreground">{plural(task.participants, 'participante', 'participantes')}</p>
             </div>
           )}
         </header>
@@ -404,14 +403,14 @@ export function ReportPage({ id }: { id: string }) {
       )}
       <InsightsCard insights={report.insights} onJump={jump} />
       <VariantsCard report={report} />
-      <section aria-labelledby="titulo-presentacion" className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6" data-print="hide">
-        <div className="space-y-1">
-          <h2 id="titulo-presentacion" className="type-subsection font-sans">
+      <section aria-labelledby="titulo-presentacion" className="flex flex-col gap-4 border-t border-foreground pt-5 sm:flex-row sm:items-end sm:justify-between" data-print="hide">
+        <div className="space-y-1.5">
+          <h2 id="titulo-presentacion" className="type-section">
             Presentación lista para compartir
           </h2>
           <p className="text-sm text-muted-foreground max-w-[65ch]">Las diapositivas con lo más importante, armadas solas con estos resultados. Preséntalas o descárgalas en PowerPoint o PDF.</p>
         </div>
-        <Button asChild className="shrink-0">
+        <Button asChild variant="outline" className="shrink-0">
           <Link to={presentation}>
             <Presentation />
             Crear presentación
@@ -437,7 +436,7 @@ export function ReportPage({ id }: { id: string }) {
   const sessionsLink = (
     <p className="text-sm text-muted-foreground" data-print="hide">
       ¿Buscas una grabación completa?{' '}
-      <Link to={{ name: 'recordings', study: id }} className="underline decoration-primary/40 underline-offset-4 hover:text-primary hover:decoration-primary">
+      <Link to={{ name: 'recordings', study: id }} className="link-ink text-foreground">
         Ver las sesiones de este estudio
       </Link>
     </p>
@@ -457,11 +456,10 @@ export function ReportPage({ id }: { id: string }) {
             </Button>
           }
           title={study.name}
+          eyebrow={<>Resultados · {plural(tasks.length, 'tarea', 'tareas')}</>}
           description={
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span>
-                Resultados · {plural(tasks.length, 'tarea', 'tareas')} · prototipo {proto?.name ?? study.prototypeId}
-              </span>
+              <span>Prototipo: {proto?.name ?? study.prototypeId}</span>
               {study.closed && <Badge variant="outline">Cerrado: ya no recibe respuestas</Badge>}
             </span>
           }
@@ -508,7 +506,7 @@ export function ReportPage({ id }: { id: string }) {
                 <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 border-b">
                   <TabsList
                     aria-label="Partes del reporte"
-                    className="h-auto -mb-px w-full sm:w-fit flex-nowrap gap-x-5 overflow-x-auto overflow-y-hidden rounded-none bg-transparent p-0 sm:gap-x-7 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:[mask-image:linear-gradient(to_right,#000_85%,transparent)] max-sm:pr-6"
+                    className="h-auto -mb-px w-full sm:w-fit flex-nowrap gap-x-5 overflow-x-auto overflow-y-hidden border-b-0 sm:gap-x-7 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:[mask-image:linear-gradient(to_right,#000_85%,transparent)] max-sm:pr-6"
                   >
                     {(
                       [
@@ -521,10 +519,10 @@ export function ReportPage({ id }: { id: string }) {
                       <TabsTrigger
                         key={t.id}
                         value={t.id}
-                        className="min-h-11 rounded-none border-b-2 border-transparent px-0.5 pt-1 pb-3 text-[15px] font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:font-semibold data-[state=active]:shadow-none"
+                        className="mb-0 min-h-11 px-0.5 pt-1 pb-3 text-[15px] data-[state=active]:font-semibold"
                       >
                         {t.label}
-                        {t.count !== null && <span className="rounded-full bg-muted px-1.5 text-2xs font-semibold text-muted-foreground tabular-nums">{t.count}</span>}
+                        {t.count !== null && <span className="num text-2xs font-medium text-muted-foreground">{String(t.count).padStart(2, '0')}</span>}
                       </TabsTrigger>
                     ))}
                   </TabsList>
@@ -607,8 +605,8 @@ function NoParticipants({ base, excluded }: { base: Base; excluded: number }) {
       ) : link ? (
         <>
           <p>Comparte este link con tus participantes (o muéstrales el código QR). Cuando alguien termine, los resultados aparecen aquí solos.</p>
-          <p className="rounded-md border bg-muted/50 px-3 py-2 font-mono text-sm break-all select-all text-foreground">{link}</p>
-          {qr && <img src={qr} alt="Código QR del link del estudio" className="mx-auto size-40 rounded-lg border bg-white p-2" />}
+          <p className="border-y py-2 font-mono text-sm break-all select-all text-foreground">{link}</p>
+          {qr && <img src={qr} alt="Código QR del link del estudio" className="size-40 rounded-sm border bg-white p-2" />}
           <p className="text-sm">{IS_DEMO ? 'En esta demo el link solo funciona en este mismo navegador.' : 'El celular del participante tiene que estar en la misma red Wi-Fi que esta computadora.'}</p>
         </>
       ) : (

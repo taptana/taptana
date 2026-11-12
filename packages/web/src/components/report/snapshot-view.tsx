@@ -290,7 +290,7 @@ export function SnapshotView({
   const shownHeight = Math.round(docHeight * scale);
 
   return (
-    <div ref={root} className="tt-map relative overflow-hidden rounded-xl border bg-white shadow-sm" style={{ width: displayWidth, maxWidth: '100%' }}>
+    <div ref={root} className="tt-map relative overflow-hidden rounded-sm border border-foreground/25 bg-white" style={{ width: displayWidth, maxWidth: '100%' }}>
       <div className="tt-map-scroll overflow-y-auto overflow-x-hidden" style={{ maxHeight }} tabIndex={shownHeight > maxHeight ? 0 : -1} role="img" aria-label={label}>
         <div className="relative" style={{ width: displayWidth, height: shownHeight }}>
           <div ref={host} className="tt-snapshot" style={{ ['--tt-scale' as string]: String(scale), visibility: backdrop === 'snapshot' ? 'visible' : 'hidden' }} />

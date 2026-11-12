@@ -14,7 +14,9 @@ import { cn } from '@/lib/utils';
 import { Link } from '@/router';
 import { recordingRoute, useReport } from './context.tsx';
 import { biggestDrop, fallbackHeight, funnelSteps, OUTCOME_ORDER, placePoints, ruleSelector, ruleText, samePages } from './logic.ts';
-import { ScoreChip, Stat } from './overview.tsx';
+import { DotRow } from '@/components/brand/dot-board';
+import { scoreBand } from './logic.ts';
+import { Kpi, ScoreChip, Stat, TONE_DOT } from './overview.tsx';
 import { loadSession, SnapshotView, type Backdrop } from './snapshot-view.tsx';
 
 type OutcomeKey = keyof TaskOutcomeCounts;
@@ -56,11 +58,11 @@ function OutcomeBar({ task }: { task: TaskReport }) {
   const summary = present.map((k) => `${outcomeLabel(k, firstClick)}: ${task.outcomes[k]}`).join(', ');
   return (
     <div className="space-y-3" data-print="keep">
-      <div className="flex h-9 w-full overflow-hidden rounded-lg bg-muted" role="img" aria-label={`Resultados de ${plural(task.participants, 'participante', 'participantes')}. ${summary}`}>
+      <div className="flex h-8 w-full overflow-hidden rounded-xs bg-muted" role="img" aria-label={`Resultados de ${plural(task.participants, 'participante', 'participantes')}. ${summary}`}>
         {present.map((k) => (
           <div
             key={k}
-            className={cn('grid place-items-center text-xs font-semibold tabular-nums text-white min-w-1', OUTCOME_COLOR[k], (k === 'indirect' || k === 'incomplete' || k === 'reported' || k === 'review') && 'text-zinc-900/80')}
+            className={cn('grid place-items-center num text-xs font-medium text-white min-w-1', OUTCOME_COLOR[k], (k === 'indirect' || k === 'incomplete' || k === 'reported' || k === 'review') && 'text-zinc-900/80')}
             style={{ width: `${(task.outcomes[k] / total) * 100}%` }}
             title={`${outcomeLabel(k, firstClick)}: ${task.outcomes[k]}`}
           >
@@ -71,9 +73,9 @@ function OutcomeBar({ task }: { task: TaskReport }) {
       <ul className="flex flex-wrap gap-x-6 gap-y-2 text-[15px]">
         {present.map((k) => (
           <li key={k} className="flex items-center gap-2" title={OUTCOME_HELP[k]}>
-            <span className={cn('size-3 rounded-sm shrink-0', OUTCOME_COLOR[k])} aria-hidden="true" />
+            <span className={cn('size-2.5 rounded-xs shrink-0', OUTCOME_COLOR[k])} aria-hidden="true" />
             <span>{outcomeLabel(k, firstClick)}</span>
-            <span className="font-medium tabular-nums">{task.outcomes[k]}</span>
+            <span className="num font-medium">{task.outcomes[k]}</span>
           </li>
         ))}
       </ul>
@@ -101,18 +103,18 @@ function Funnel({ task }: { task: TaskReport }) {
         {steps.map((step, i) => (
           <li key={`${step.path}-${i}`}>
             {step.note && (
-              <p className={cn('ml-10 mb-2 text-sm', i === worst ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground')}>
+              <p className={cn('ml-11 mb-2 text-sm', i === worst ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground')}>
                 ↓ {step.note}
                 {i === worst && steps.filter((s) => s.lost > 0).length > 1 && ' (la caída más grande)'}
               </p>
             )}
             <div className="flex items-center gap-3">
-              <span className="size-7 shrink-0 rounded-full bg-muted grid place-items-center text-sm font-semibold tabular-nums">{i + 1}</span>
-              <div className="relative flex-1 min-w-0 h-11 rounded-lg bg-muted overflow-hidden">
+              <span className="num w-8 shrink-0 text-sm text-muted-foreground">{String(i + 1).padStart(2, '0')}</span>
+              <div className="relative flex-1 min-w-0 h-10 rounded-xs bg-muted overflow-hidden">
                 <div className="absolute inset-y-0 left-0 bg-emerald-500/30 dark:bg-emerald-500/40" style={{ width: `${step.rate * 100}%` }} />
                 <div className="relative h-full flex items-center justify-between gap-3 px-4 text-[15px]">
                   <span className="truncate">{screenName(step.path)}</span>
-                  <span className="tabular-nums whitespace-nowrap">
+                  <span className="num text-sm whitespace-nowrap">
                     <span className="font-medium">{step.reached}</span> de {task.participants} · {pct(step.rate)}
                   </span>
                 </div>
@@ -132,9 +134,9 @@ function VariantTable({ task }: { task: TaskReport }) {
   return (
     <div className="space-y-3" data-print="keep">
       <h3 className="type-subsection" data-print="heading">Por variante (A/B)</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
         {task.byVariant.map((v) => (
-          <div key={v.variantId} className="rounded-lg border p-4 space-y-3">
+          <div key={v.variantId} className="border-t pt-4 space-y-3">
             <div className="font-medium text-sm truncate">{name(v.variantId)}</div>
             <dl className="grid grid-cols-3 gap-x-3 gap-y-2 text-sm">
               <Stat label="Puntaje" value={<ScoreChip score={v.score} />} />
@@ -186,7 +188,7 @@ function ScreenCard({ screen, task, mode, anchor, highlighted }: { screen: Scree
   const drawn = screen.taps.length - left;
 
   return (
-    <article id={anchor} className={cn('rounded-xl border bg-card p-5 sm:p-6 space-y-5 scroll-mt-20 min-w-0', wide && 'col-span-full', highlighted && 'ring-2 ring-primary/60')} data-print="keep">
+    <article id={anchor} className={cn('rounded-xl border bg-card p-5 sm:p-6 space-y-5 scroll-mt-20 min-w-0', wide && 'col-span-full', highlighted && 'border-foreground ring-1 ring-foreground')} data-print="keep">
       <header className="space-y-1">
         <h5 className="text-[17px] font-semibold leading-snug break-words">{name}</h5>
         <p className="font-mono text-xs text-muted-foreground break-all">{screen.path}</p>
@@ -222,7 +224,7 @@ function ScreenCard({ screen, task, mode, anchor, highlighted }: { screen: Scree
         {backdrop === 'snapshot' && screen.sample && (
           <p className="text-xs text-muted-foreground">
             Fondo: lo que vio {ctx.names.get(screen.sample.sessionId) ?? 'un participante'} ({vw} px de ancho).{' '}
-            <Link to={recordingRoute(ctx, screen.sample.sessionId, screen.sample.t)} className="underline decoration-primary/40 underline-offset-4 hover:text-primary hover:decoration-primary" data-print="hide">
+            <Link to={recordingRoute(ctx, screen.sample.sessionId, screen.sample.t)} className="link-ink" data-print="hide">
               Ver ese momento
             </Link>
           </p>
@@ -236,7 +238,7 @@ function ScreenCard({ screen, task, mode, anchor, highlighted }: { screen: Scree
             {screen.topMisclicks.map((m) => (
               <li key={m.label} className="flex items-baseline justify-between gap-3">
                 <span className="min-w-0 break-words">{m.label}</span>
-                <span className="tabular-nums text-muted-foreground whitespace-nowrap">{plural(m.count, 'vez', 'veces')}</span>
+                <span className="num text-muted-foreground whitespace-nowrap">{plural(m.count, 'vez', 'veces')}</span>
               </li>
             ))}
           </ul>
@@ -286,7 +288,7 @@ function ScreensPanel({ task, focusScreen, limit }: { task: TaskReport; focusScr
         </div>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div role="radiogroup" aria-label="Qué mostrar sobre las pantallas" className="flex w-fit max-w-full flex-wrap rounded-lg bg-muted p-1 gap-1" data-print="hide">
+          <div role="radiogroup" aria-label="Qué mostrar sobre las pantallas" className="flex w-fit max-w-full flex-wrap rounded-md border border-input p-0.5 gap-0.5" data-print="hide">
             {MODES.map((m) => (
               <button
                 key={m.id}
@@ -295,8 +297,8 @@ function ScreensPanel({ task, focusScreen, limit }: { task: TaskReport; focusScr
                 aria-checked={mode === m.id}
                 onClick={() => setMode(m.id)}
                 className={cn(
-                  'min-h-9 shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                  mode === m.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                  'min-h-9 shrink-0 cursor-pointer rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap outline-none focus-ink',
+                  mode === m.id ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {m.label}
@@ -341,10 +343,14 @@ function ShowAll({ total, open, onToggle, noun }: { total: number; open: boolean
 /** Una sección dentro de una tarea: título, una línea de ayuda opcional y su contenido. */
 export function TaskSection({ title, description, aside, keep, children }: { title: ReactNode; description?: ReactNode; aside?: ReactNode; keep?: boolean; children: ReactNode }) {
   return (
-    <section className="space-y-5 min-w-0" {...(keep ? { 'data-print': 'keep' } : {})}>
+    <section className="space-y-5 min-w-0 border-t border-foreground pt-4" {...(keep ? { 'data-print': 'keep' } : {})}>
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2" data-print="heading">
-        <div className="min-w-0 space-y-1">
-          <h3 className="type-subsection">{title}</h3>
+        <div className="min-w-0 space-y-1.5">
+          <h3 className="type-subsection flex items-baseline gap-3">
+            {/* El número de la sección lo pone un contador de CSS (`tt-numbered`): así sigue bien si una sección no sale. */}
+            <span data-sec-no aria-hidden className="num text-sm font-normal text-muted-foreground" />
+            <span>{title}</span>
+          </h3>
           {description && <p className="max-w-[65ch] text-[15px] text-muted-foreground leading-relaxed">{description}</p>}
         </div>
         {aside}
@@ -363,7 +369,7 @@ function PathChips({ pages }: { pages: string[] }) {
       {pages.map((p, i) => (
         <span key={`${p}-${i}`} className="inline-flex items-center gap-2">
           {i > 0 && <ArrowRight className="size-3.5 text-muted-foreground" aria-label="luego" />}
-          <span className="rounded-md border bg-card px-2.5 py-1 text-[13.5px] leading-tight" title={p}>
+          <span className="rounded-sm border px-2 py-1 text-[13.5px] leading-tight" title={p}>
             {screenName(p)}
           </span>
         </span>
@@ -402,7 +408,7 @@ function PathsPanel({ task, limit }: { task: TaskReport; limit?: number }) {
   return (
     <div className="space-y-3">
       {task.expectedPath.length > 0 && (
-        <div className="rounded-xl bg-muted p-5 space-y-3" data-print="keep">
+        <div className="border-l-2 border-foreground py-1 pl-4 space-y-3 mb-5" data-print="keep">
           <p className="text-[15px] font-semibold">
             Camino esperado{' '}
             {task.expectedPathInferred && <span className="font-normal text-muted-foreground">(deducido: el más común de quienes lo lograron)</span>}
@@ -410,14 +416,14 @@ function PathsPanel({ task, limit }: { task: TaskReport; limit?: number }) {
           <PathChips pages={task.expectedPath} />
         </div>
       )}
-      <ul className="space-y-3">
+      <ul className="border-t">
         {paths.map((p, i) => {
           const isExpected = samePages(p.pages, task.expectedPath);
           return (
-            <li key={i} className="rounded-xl border bg-card p-5 space-y-3.5" data-print="keep">
+            <li key={i} className="border-b py-4 space-y-3" data-print="keep">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-[15px]">
                 <span>
-                  <span className="font-medium">{plural(p.count, 'persona', 'personas')}</span>
+                  <span className="num font-medium">{plural(p.count, 'persona', 'personas')}</span>
                   <span className="text-muted-foreground">
                     {' · '}
                     {p.successes === p.count ? (p.count === 1 ? 'lo logró' : 'todas lo lograron') : p.successes === 0 ? (p.count === 1 ? 'no lo logró' : 'ninguna lo logró') : `${p.successes} lo lograron`}
@@ -474,12 +480,12 @@ function ParticipantsPanel({ task }: { task: TaskReport }) {
 
   return (
     <div className="space-y-3">
-    <ul className="divide-y rounded-xl border bg-card">
+    <ul className="divide-y border-y">
       {rows.map((r) => {
         const session = ctx.sessions.get(r.sessionId);
         const variant = variantName(r.variantId);
         return (
-          <li key={r.sessionId} className="grid min-h-[4.5rem] gap-x-6 gap-y-2 px-5 py-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_auto] sm:items-center" data-print="keep">
+          <li key={r.sessionId} className="grid min-h-[4.5rem] gap-x-6 gap-y-2 py-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_auto] sm:items-center" data-print="keep">
             <div className="min-w-0 space-y-0.5">
               <div className="font-semibold truncate">{who(r)}</div>
               <div className="text-sm text-muted-foreground truncate">
@@ -491,8 +497,8 @@ function ParticipantsPanel({ task }: { task: TaskReport }) {
               <Badge variant="outline" className={OUTCOME_BADGE[r.outcome]} title={OUTCOME_HELP[r.outcome]}>
                 {outcomeLabel(r.outcome, firstClick)}
               </Badge>
-              <span className="tabular-nums text-muted-foreground">{seconds(r.durationMs)}</span>
-              {!firstClick && <span className="tabular-nums text-muted-foreground">{plural(r.misclicks, 'misclick', 'misclicks', 'sin misclicks')}</span>}
+              <span className="num text-sm text-muted-foreground">{seconds(r.durationMs)}</span>
+              {!firstClick && <span className="num text-sm text-muted-foreground">{plural(r.misclicks, 'misclick', 'misclicks', 'sin misclicks')}</span>}
             </div>
             <div className="flex flex-wrap items-center gap-1" data-print="hide">
               <Button variant="ghost" size="sm" asChild>
@@ -575,10 +581,10 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
   }
 
   return (
-    <div className="space-y-12 lg:space-y-14">
+    <div className="tt-numbered space-y-12 lg:space-y-14">
       {(block?.instruction || block?.success) && (
         <div className="space-y-2">
-          {block.instruction && <p className="text-lg leading-relaxed max-w-[65ch] text-foreground/85">“{block.instruction}”</p>}
+          {block.instruction && <p className="border-l-2 border-foreground pl-4 text-lg leading-relaxed max-w-[65ch]">“{block.instruction}”</p>}
           <p className="text-sm text-muted-foreground max-w-[65ch]" data-testid="rule-text">
             <span title={selector ? `Selector: ${selector}` : undefined}>{ruleText(block.success, screenName, elementText)}</span>
             {selector && !elementText && (
@@ -594,35 +600,33 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
       )}
 
       <TaskSection title="Resultado" keep>
-      <dl className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-1.5">
-          <dt className="text-sm font-medium text-foreground/80">Puntaje</dt>
-          <dd className="text-[1.75rem] leading-tight font-display">
-            <ScoreChip score={task.score} />
-          </dd>
-        </div>
-        <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-1.5">
-          <dt className="text-sm font-medium text-foreground/80">{firstClick ? 'Acertaron' : 'Lo lograron'}</dt>
-          <dd className="font-display text-[1.75rem] leading-tight font-bold tabular-nums">{task.decided ? pct(task.successRate) : '—'}</dd>
-          <dd className="text-sm leading-snug text-muted-foreground">
-            {task.decided
-              ? `${task.outcomes.direct + task.outcomes.indirect} de ${task.decided}${task.outcomes.review > 0 ? ' ya decididos' : ''}`
-              : 'Sin resultados decididos'}
-            {task.outcomes.review > 0 && ` · ${task.outcomes.review} por revisar`}
-          </dd>
-        </div>
-        <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-1.5">
-          <dt className="text-sm font-medium text-foreground/80">Tiempo mediano</dt>
-          <dd className="font-display text-[1.75rem] leading-tight font-bold tabular-nums">{seconds(task.medianTimeMs)}</dd>
-          <dd className="text-sm leading-snug text-muted-foreground">{firstClick ? 'Hasta el primer toque, de quienes acertaron' : 'De quienes lo lograron'}</dd>
-        </div>
-        <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-1.5">
-          <dt className="text-sm font-medium text-foreground/80">Misclicks</dt>
-          <dd className="font-display text-[1.75rem] leading-tight font-bold tabular-nums">{task.tapCount > 0 ? pct(task.misclickRate) : '—'}</dd>
-          <dd className="text-sm leading-snug text-muted-foreground">
-            {task.tapCount > 0 ? `de ${plural(task.tapCount, 'toque', 'toques')} · ${task.avgMisclicks.toFixed(1).replace('.', ',')} por persona` : 'Sin toques'}
-          </dd>
-        </div>
+      <dl className="grid border-b sm:grid-cols-2 sm:pb-6 lg:grid-cols-4">
+        <Kpi
+          label="Puntaje"
+          value={task.score === null ? '—' : String(task.score)}
+          sub={
+            <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <DotRow value={task.score} className={TONE_DOT[scoreBand(task.score).tone]} />
+              {scoreBand(task.score).label}
+            </span>
+          }
+        />
+        <Kpi
+          label={firstClick ? 'Acertaron' : 'Lo lograron'}
+          value={task.decided ? pct(task.successRate) : '—'}
+          sub={
+            <>
+              {task.decided ? `${task.outcomes.direct + task.outcomes.indirect} de ${task.decided}${task.outcomes.review > 0 ? ' ya decididos' : ''}` : 'Sin resultados decididos'}
+              {task.outcomes.review > 0 && ` · ${task.outcomes.review} por revisar`}
+            </>
+          }
+        />
+        <Kpi label="Tiempo mediano" value={seconds(task.medianTimeMs)} sub={firstClick ? 'Hasta el primer toque, de quienes acertaron' : 'De quienes lo lograron'} />
+        <Kpi
+          label="Misclicks"
+          value={task.tapCount > 0 ? pct(task.misclickRate) : '—'}
+          sub={task.tapCount > 0 ? `de ${plural(task.tapCount, 'toque', 'toques')} · ${task.avgMisclicks.toFixed(1).replace('.', ',')} por persona` : 'Sin toques'}
+        />
       </dl>
       <OutcomeBar task={task} />
       </TaskSection>

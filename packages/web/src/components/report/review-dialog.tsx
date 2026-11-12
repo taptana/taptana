@@ -58,7 +58,7 @@ export function ReviewDialog({ report, open, onOpenChange }: { report: StudyRepo
         {pending.length === 0 ? (
           <p className="text-sm text-muted-foreground">No queda nada por revisar.</p>
         ) : (
-          <ul className="divide-y rounded-lg border">
+          <ul className="divide-y border-y">
             {pending.map(({ task, row }) => {
               const key = `${row.sessionId}:${task.taskId}`;
               const who = ctx.names.get(row.sessionId) ?? row.who ?? 'Participante';

@@ -7,8 +7,8 @@ function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
       type={type}
       data-slot="input"
       className={cn(
-        'file:text-foreground placeholder:text-muted-foreground border-input h-11 sm:h-10 w-full min-w-0 rounded-md border bg-card dark:bg-input/30 px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
-        'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+        'file:text-foreground placeholder:text-muted-foreground border-input h-11 sm:h-10 w-full min-w-0 rounded-md border bg-card dark:bg-input/30 px-3 py-1 text-base transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+        'focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground',
         'aria-invalid:ring-destructive/20 aria-invalid:border-destructive',
         className,
       )}
@@ -22,7 +22,7 @@ function Textarea({ className, ...props }: React.ComponentProps<'textarea'>) {
     <textarea
       data-slot="textarea"
       className={cn(
-        'border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive flex field-sizing-content min-h-20 w-full rounded-md border bg-card dark:bg-input/30 px-3 py-2.5 text-base leading-normal shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+        'border-input placeholder:text-muted-foreground focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground aria-invalid:border-destructive flex field-sizing-content min-h-20 w-full rounded-md border bg-card dark:bg-input/30 px-3 py-2.5 text-base leading-normal transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
         className,
       )}
       {...props}
@@ -46,7 +46,7 @@ function NativeSelect({ className, children, ...props }: React.ComponentProps<'s
     <select
       data-slot="select"
       className={cn(
-        'border-input h-11 sm:h-10 w-full rounded-md border bg-transparent px-3 py-1 text-base md:text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:opacity-50',
+        'border-input h-11 sm:h-10 w-full rounded-md border bg-transparent px-3 py-1 text-base md:text-sm outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground disabled:opacity-50',
         'dark:bg-input/30 bg-card',
         className,
       )}

@@ -21,16 +21,16 @@ export const KIND_INFO: Record<BlockKind, { label: string; hint: string; icon: L
   context: { label: 'Pantalla de contexto', hint: 'Un texto para leer antes de seguir. No pide nada.', icon: FileText, untitled: 'Contexto sin título' },
 };
 
-const KIND_ICON_SIZES = { sm: 'size-7 rounded-md [&_svg]:size-4', md: 'size-9 rounded-lg [&_svg]:size-[18px]', lg: 'size-11 rounded-xl [&_svg]:size-5' } as const;
+const KIND_ICON_SIZES = { sm: 'size-6 [&_svg]:size-3.5', md: 'size-8 [&_svg]:size-4', lg: 'size-10 [&_svg]:size-5' } as const;
 
 /**
- * El ícono de un tipo de bloque en un cuadrado gris. Es la única forma de dibujar un bloque: el
- * dibujo dice el tipo (no el color), igual en el constructor y el reporte.
+ * La marca de un tipo de bloque: un cuadrado con borde fino y su dibujo, sin relleno ni color. Es
+ * la única forma de dibujar un bloque, igual en el constructor y el reporte.
  */
 export function KindIcon({ kind, size = 'md', className }: { kind: BlockKind; size?: keyof typeof KIND_ICON_SIZES; className?: string }) {
   const Icon = KIND_INFO[kind].icon;
   return (
-    <span className={cn('grid shrink-0 place-items-center', KIND_ICON_SIZES[size], 'bg-muted text-foreground/75', className)} aria-hidden>
+    <span className={cn('grid shrink-0 place-items-center', KIND_ICON_SIZES[size], 'rounded-sm border border-input text-foreground/80 [&_svg]:stroke-[1.75]', className)} aria-hidden>
       <Icon />
     </span>
   );
@@ -70,7 +70,7 @@ export function Field({
     <div className={cn('space-y-2', className)} onBlur={() => setTouched(true)}>
       <label htmlFor={id} className="flex items-baseline gap-2 text-[15px] leading-snug font-medium">
         {label}
-        {optional && <span className="text-xs font-normal text-muted-foreground">opcional</span>}
+        {optional && <span className="font-mono text-2xs font-normal uppercase tracking-[0.05em] text-muted-foreground">opcional</span>}
       </label>
       {children({ id, 'aria-invalid': Boolean(shown), 'aria-describedby': describedBy })}
       {shown && (
@@ -185,8 +185,8 @@ export function OptionCards<T extends string>({
           <label
             key={o.value}
             className={cn(
-              'flex cursor-pointer items-start gap-3 rounded-lg border bg-card p-4 transition-colors has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50',
-              checked ? 'border-primary ring-1 ring-primary' : 'hover:bg-accent/50',
+              'flex cursor-pointer items-start gap-3 rounded-md border border-input p-4 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-foreground',
+              checked ? 'border-foreground ring-1 ring-foreground' : 'hover:border-foreground/60',
             )}
           >
             <input type="radio" name={name} className="mt-1 size-4 shrink-0 accent-[var(--primary)]" checked={checked} onChange={() => onChange(o.value)} />

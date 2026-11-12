@@ -3,7 +3,7 @@
  * importar un study.json y el panel de "Grabar el camino correcto".
  */
 import { useEffect, useRef, useState } from 'react';
-import { Check, CircleCheck, ClipboardPaste, Copy, ExternalLink, EyeOff, FileUp, Hand, MonitorSmartphone, Plug, RotateCcw, Smartphone, Sparkles, Wifi } from 'lucide-react';
+import { Check, CircleCheck, ClipboardPaste, Copy, ExternalLink, EyeOff, FileUp, Hand, MonitorSmartphone, Plug, RotateCcw, Smartphone,  Wifi } from 'lucide-react';
 import {
   TRYOUT_PARAM,
   TRYOUT_WINDOW,
@@ -84,7 +84,7 @@ export function ShareDialog({
               </Alert>
             )}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-              {qr && <img src={qr} alt="Código QR con el link del estudio" className="mx-auto size-40 shrink-0 rounded-lg border bg-white p-2 sm:mx-0" />}
+              {qr && <img src={qr} alt="Código QR con el link del estudio" className="mx-auto size-40 shrink-0 rounded-sm border bg-white p-2 sm:mx-0" />}
               <div className="min-w-0 flex-1 space-y-3">
                 <div className="space-y-1.5">
                   <label htmlFor="share-link" className="text-sm font-medium">
@@ -97,13 +97,13 @@ export function ShareDialog({
                     <Copy /> Copiar link
                   </Button>
                   <Button variant="outline" onClick={() => void copy(invitationText(link), 'Invitación copiada')}>
-                    <Hand /> Copiar invitación
+                    Copiar invitación
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">"Copiar invitación" copia un mensaje amable con el link, listo para pegar en WhatsApp o correo.</p>
               </div>
             </div>
-            <p className="flex items-start gap-2 rounded-lg bg-muted/50 px-3.5 py-3 text-sm text-muted-foreground">
+            <p className="flex items-start gap-2 border-l-2 border-input py-1 pl-4 text-sm text-muted-foreground">
               {demo ? <MonitorSmartphone className="mt-0.5 size-4 shrink-0" /> : <Wifi className="mt-0.5 size-4 shrink-0" />}
               {demo
                 ? 'Esto es la demo: el link solo funciona en este navegador, porque los datos viven aquí. Para compartirlo con otras personas instala Taptana en tu computadora.'
@@ -206,10 +206,10 @@ export function TryoutDialog({
             hideRibbon
             banner={
               <div className="space-y-2">
-              <p className="mx-auto flex w-fit items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-800 dark:text-amber-300" role="status">
+              <p className="mx-auto flex w-fit items-center gap-1.5 rounded-sm border border-amber-600/50 px-2 py-0.5 font-mono text-2xs font-medium uppercase tracking-[0.05em] text-amber-800 dark:text-amber-300" role="status">
                 <EyeOff className="size-3.5" /> Vista previa · no se graba
               </p>
-              <div className="flex items-center gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm" aria-live="polite">
+              <div className="flex items-center gap-2 border-l-2 border-input py-1 pl-4 text-sm" aria-live="polite">
                 {finished ? (
                   <>
                     <CircleCheck className="size-4 shrink-0 text-emerald-600" />
@@ -279,7 +279,7 @@ function Snippet({ label, value }: { label: string; value: string }) {
 function McpSection({ info, demo }: { info: ServerInfo | undefined; demo: boolean }) {
   const snippets = mcpSnippets({ origin: location.origin, local: Boolean(info?.panelKeyUrl), bin: info?.mcpBin });
   return (
-    <details className="group rounded-xl border p-3 text-sm">
+    <details className="group border-y py-3 text-sm">
       <summary className="flex cursor-pointer list-none items-center gap-2 font-medium">
         <Plug className="size-4 text-muted-foreground" /> Conecta tu IA (MCP)
         <span className="text-xs font-normal text-muted-foreground">sin copiar y pegar</span>
@@ -388,7 +388,7 @@ export function AiDialog({
               </label>
               <Textarea id="ai-goal" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Si la gente encuentra el carrito y entiende el costo de envío" />
               <Button variant={copied ? 'outline' : 'default'} onClick={() => void copyPrompt()}>
-                {copied ? <Check /> : <Sparkles />} {copied ? 'Prompt copiado' : 'Copiar prompt para IA'}
+                {copied ? <Check /> : <Copy />} {copied ? 'Prompt copiado' : 'Copiar prompt para IA'}
               </Button>
               <p className="text-xs text-muted-foreground">
                 Incluye el formato del estudio y {screens.length > 0 ? `las ${screens.length} pantallas de "${proto.name}"` : `el nombre de "${proto.name}" (aún no hay pantallas detectadas)`}.
@@ -420,7 +420,7 @@ export function AiDialog({
             Cancelar
           </Button>
           <Button disabled={!proto || !text.trim()} onClick={apply}>
-            <ClipboardPaste /> Usar este estudio
+            Usar este estudio
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -562,7 +562,7 @@ export function ImportDialog({
           </div>
           {problems && <Problems messages={problems} />}
           {study && (
-            <div className="space-y-3 rounded-lg border bg-muted/40 px-4 py-3">
+            <div className="space-y-3 border-l-2 border-emerald-500 py-1 pl-4">
               <p className="flex items-start gap-2 text-sm">
                 <CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
                 <span>
@@ -643,7 +643,7 @@ export function RecordPanel({
   };
 
   return (
-    <div className="space-y-3 rounded-xl border border-red-500/40 bg-card p-4 shadow-sm">
+    <div className="space-y-3 rounded-lg border border-red-500/60 bg-card p-4">
       <div className="flex items-center gap-2">
         <span className="relative flex size-2.5">
           <span className="absolute inline-flex size-full animate-ping rounded-full bg-red-500 opacity-60 motion-reduce:hidden" />

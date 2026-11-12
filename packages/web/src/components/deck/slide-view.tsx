@@ -6,7 +6,7 @@ import { SnapshotView } from '@/components/report/snapshot-view';
 import { prototypeFrameUrl } from '@/lib/links';
 import { SLIDE_H, SLIDE_W } from './fit.ts';
 import { heatmapViewport, layoutSlide, type EditKey, type HeatmapShape, type LayoutContext, type TextShape } from './layout.ts';
-import { DISPLAY_STACK, FAINT, FONT_STACK, hex, MUTED, PAPER, SOFT } from './theme.ts';
+import { DISPLAY_STACK, FAINT, FONT_STACK, hex, MONO_STACK, MUTED, PAPER, SOFT } from './theme.ts';
 
 export type EditHandler = (key: EditKey, value: string) => void;
 
@@ -55,11 +55,11 @@ function TextBox({ shape, editable, onEdit }: { shape: TextShape; editable: bool
     fontSize: shape.size,
     lineHeight: shape.lineHeight,
     color: hex(shape.color),
-    fontWeight: shape.display ? 700 : shape.bold ? 650 : 400,
-    ...(shape.display ? { fontFamily: DISPLAY_STACK } : {}),
+    fontWeight: shape.mono ? (shape.bold ? 500 : 400) : shape.display ? 700 : shape.bold ? 600 : 400,
+    ...(shape.display ? { fontFamily: DISPLAY_STACK } : shape.mono ? { fontFamily: MONO_STACK, fontVariantNumeric: 'tabular-nums' } : {}),
     fontStyle: shape.italic ? 'italic' : 'normal',
     textAlign: shape.align ?? 'left',
-    letterSpacing: shape.upper ? '0.06em' : shape.display ? '-0.02em' : shape.bold && shape.size >= 36 ? '-0.015em' : undefined,
+    letterSpacing: shape.upper ? '0.06em' : shape.display ? '-0.025em' : shape.bold && shape.size >= 36 ? '-0.015em' : undefined,
     display: '-webkit-box',
     WebkitBoxOrient: 'vertical',
     WebkitLineClamp: shape.lines,
@@ -119,7 +119,7 @@ function HeatmapHole({ shape, report, proto, lite, eager }: { shape: HeatmapShap
   if (lite || !screen) {
     return (
       <div style={frame}>
-        <div style={{ width: '100%', height: '100%', borderRadius: 24, background: hex(SOFT), display: 'grid', placeItems: 'center', color: hex(MUTED), fontSize: 22, textAlign: 'center', padding: 24 }}>
+        <div style={{ width: '100%', height: '100%', borderRadius: 4, background: hex(SOFT), display: 'grid', placeItems: 'center', color: hex(MUTED), fontSize: 22, textAlign: 'center', padding: 24 }}>
           {screen ? `Mapa de «${shape.screenName}»` : 'Esta pantalla ya no está en el reporte'}
         </div>
       </div>

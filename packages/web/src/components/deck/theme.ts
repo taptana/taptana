@@ -6,21 +6,18 @@
 
 import type { ScoreTone, TaskOutcomeCounts } from '@taptana/shared';
 
-/* Tinta casi negra, grises neutros y blanco: los mismos de `index.css`, en hexadecimal para PowerPoint. */
-export const INK = '18181F';
-export const MUTED = '52525C';
-export const FAINT = '71717B';
-export const LINE = 'E4E4E8';
-export const SOFT = 'F4F4F6';
+/* Tinta, papel y reglas finas: los mismos de `index.css`, en hexadecimal para PowerPoint. */
+export const INK = '151411';
+export const MUTED = '51504B';
+export const FAINT = '6F6E69';
+export const LINE = 'DAD9D5';
+/** El hoyo vacío del tablero y las barras que no son la más alta. */
+export const HOLE = 'B8B7B3';
+export const SOFT = 'F1F0ED';
 export const PAPER = 'FFFFFF';
 
-/** El único acento: el violeta de la acción principal. */
-export const VIOLET = '5F3ED8';
-export const VIOLET_SOFT = 'EEEBFF';
-
-/** Los colores del logo (solo para dibujar la marca). */
-export const LOGO_TAP = 'FB794A';
-export const LOGO_DOT = 'F8D14F';
+/** El único acento: el resaltador, detrás de la cifra clave de una diapositiva y en el punto «tocado». */
+export const MARK = 'F9E03F';
 
 /** Puntaje (los mismos tonos que el reporte: emerald, lime, amber, red). */
 export const TONE: Record<ScoreTone, string> = {
@@ -48,16 +45,18 @@ export const PROBLEM = 'D97706';
 export const GOOD = '059669';
 /** La barra más alta, en tinta; las demás, en gris. */
 export const BAR = INK;
-export const BAR_MID = 'A1A1AA';
+export const BAR_MID = HOLE;
 
 /**
- * Fuente: la del sistema en pantalla y Arial en PowerPoint (está en todas las computadoras). Los
- * títulos van con la tipografía de marca en pantalla y en el PDF; en PowerPoint, también Arial,
- * porque quien abra el archivo no la tiene instalada.
+ * Fuentes: en pantalla y en el PDF, las del panel (títulos en Bricolage Grotesque, texto en IBM
+ * Plex Sans, datos en IBM Plex Mono). En PowerPoint, Arial y Courier New, que están en todas las
+ * computadoras: quien abra el archivo no tiene las del panel.
  */
 export const DISPLAY_STACK = "'Bricolage Grotesque Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
-export const FONT_STACK = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+export const FONT_STACK = "'IBM Plex Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
+export const MONO_STACK = "'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Courier New', monospace";
 export const PPTX_FONT = 'Arial';
+export const PPTX_MONO = 'Courier New';
 
 export const hex = (c: string): string => `#${c}`;
 

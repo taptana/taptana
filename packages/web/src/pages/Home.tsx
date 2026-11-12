@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowRight, BarChart3, Check, FileArchive, FlaskConical, Info, Lock, Share2, Smartphone, Sparkles, Code2 } from 'lucide-react';
+import { ArrowRight, Check, Info } from 'lucide-react';
 import { EXAMPLE_PROTOTYPE_ID, EXAMPLE_STUDY_ID, type Prototype, type SessionSummary, type StudyRecord } from '@taptana/shared';
 import { getClient, IS_DEMO } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { ErrorState, Layout, Notice } from '@/components/layout';
 import { friendlyError } from '@/lib/errors';
 import { plural } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { HeroArt } from '@/components/brand/art';
+import { TapBoard } from '@/components/brand/art';
 import { Link, useRouter, type Route } from '@/router';
 
 interface HomeData {
@@ -26,7 +26,6 @@ interface Step {
   action: { label: string; to: Route } | null;
   /** Por qué todavía no se puede. */
   blocked?: string;
-  icon: typeof FileArchive;
 }
 
 function buildSteps({ prototypes, studies, sessions }: HomeData): Step[] {
@@ -42,7 +41,6 @@ function buildSteps({ prototypes, studies, sessions }: HomeData): Step[] {
   return [
     {
       title: 'Sube tu prototipo',
-      icon: FileArchive,
       done: ownProtos.length > 0,
       text:
         ownProtos.length > 0
@@ -55,7 +53,6 @@ function buildSteps({ prototypes, studies, sessions }: HomeData): Step[] {
     },
     {
       title: 'Crea un estudio',
-      icon: FlaskConical,
       done: ownStudies.length > 0,
       text:
         ownStudies.length > 0
@@ -66,7 +63,6 @@ function buildSteps({ prototypes, studies, sessions }: HomeData): Step[] {
     },
     {
       title: 'Comparte el link',
-      icon: Share2,
       done: ownSessions.length > 0,
       text:
         ownSessions.length > 0
@@ -79,7 +75,6 @@ function buildSteps({ prototypes, studies, sessions }: HomeData): Step[] {
     },
     {
       title: 'Mira los resultados',
-      icon: BarChart3,
       done: false,
       text:
         ownSessions.length > 0
@@ -130,41 +125,51 @@ export function HomePage() {
 
   return (
     <Layout>
-      <section className="relative pt-2 sm:pt-4 pb-2 md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-10">
+      <section className="pt-1 sm:pt-2 md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-12 lg:gap-16">
         <div className="min-w-0">
-        <p className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-[13px] font-medium text-foreground/80">
-          <span aria-hidden className="size-1.5 rounded-full bg-primary" />
-          Pruebas de usabilidad para prototipos HTML
-        </p>
-        <h1 className="mt-5 max-w-3xl text-[2.375rem] sm:text-[3.5rem] font-bold tracking-[-0.01em] text-balance leading-[1.05]">
-          Prueba tu prototipo con <span className="whitespace-nowrap">personas reales</span>
-        </h1>
-        <p className="mt-6 max-w-[60ch] text-muted-foreground text-lg leading-relaxed">
-          Sube tu prototipo, arma las tareas, comparte un link y mira qué pasó: quién lo logró, dónde se trabó y la grabación de cada sesión.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          {next?.action && !next.blocked ? (
-            <Button size="lg" asChild>
-              <Link to={next.action.to}>
-                {next.action.label} <ArrowRight />
-              </Link>
-            </Button>
-          ) : (
-            <Button size="lg" asChild>
-              <Link to={{ name: 'prototypes' }}>
-                Subir prototipo <ArrowRight />
-              </Link>
-            </Button>
-          )}
-          <Button size="lg" variant="outline" disabled={loadingExample} onClick={() => void openExample()}>
-            <Sparkles /> {loadingExample ? 'Cargando el ejemplo…' : 'Ver un ejemplo'}
-          </Button>
+          <p className="type-eyebrow">Pruebas de usabilidad · prototipos HTML</p>
+          <h1 className="mt-5 max-w-[14ch] font-display text-[2.75rem] sm:text-[4rem] lg:text-[4.5rem] font-extrabold tracking-[-0.035em] leading-[0.98]">
+            Prueba tu prototipo con <span className="mark whitespace-nowrap">personas reales</span>
+          </h1>
+          <p className="mt-7 max-w-[52ch] text-lg leading-relaxed text-foreground/85">
+            Sube tu prototipo, arma las tareas, comparte un link y mira qué pasó: quién lo logró, dónde se trabó y la grabación de cada sesión.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+            {next?.action && !next.blocked ? (
+              <Button size="lg" asChild>
+                <Link to={next.action.to}>
+                  {next.action.label} <ArrowRight />
+                </Link>
+              </Button>
+            ) : (
+              <Button size="lg" asChild>
+                <Link to={{ name: 'prototypes' }}>
+                  Subir prototipo <ArrowRight />
+                </Link>
+              </Button>
+            )}
+            <button
+              type="button"
+              disabled={loadingExample}
+              onClick={() => void openExample()}
+              className="link-ink min-h-11 cursor-pointer rounded-sm text-base font-medium outline-none focus-ink disabled:opacity-60"
+            >
+              {loadingExample ? 'Cargando el ejemplo…' : 'Ver un ejemplo'}
+            </button>
+          </div>
+          <p className="mt-5 max-w-[52ch] text-sm text-muted-foreground leading-relaxed">
+            El ejemplo es una tienda con un estudio ya hecho y varios participantes, para que veas un reporte completo antes de armar el tuyo.
+          </p>
         </div>
-        <p className="mt-4 max-w-[65ch] text-sm text-muted-foreground leading-relaxed">
-          El ejemplo es una tienda con un estudio ya hecho y varios participantes, para que veas un reporte completo antes de armar el tuyo.
-        </p>
-        </div>
-        <HeroArt className="hidden md:block w-[300px] lg:w-[340px] shrink-0" />
+        <figure className="hidden md:block w-[300px] lg:w-[360px] shrink-0">
+          <div className="rounded-xl border border-foreground bg-card p-2">
+            <TapBoard className="w-full" />
+          </div>
+          <figcaption className="type-eyebrow mt-3 flex justify-between gap-4">
+            <span>Fig. 1 — El camino de una persona</span>
+            <span className="whitespace-nowrap">6 toques</span>
+          </figcaption>
+        </figure>
       </section>
 
       {IS_DEMO && (
@@ -177,16 +182,16 @@ export function HomePage() {
         </Notice>
       )}
 
-      <section aria-labelledby="pasos" className="space-y-6">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <section aria-labelledby="pasos" className="border-t border-foreground pt-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 pb-5">
           <h2 id="pasos" className="type-section">
             Tu primera prueba, en 4 pasos
           </h2>
           {steps && (
-            <p className="flex items-center gap-2.5 text-sm text-muted-foreground">
+            <p className="type-eyebrow flex items-center gap-2.5">
               <span aria-hidden className="flex gap-1">
                 {steps.map((s) => (
-                  <span key={s.title} className={cn('size-2 rounded-full', s.done ? 'bg-primary' : 'bg-input')} />
+                  <span key={s.title} className={cn('size-2 rounded-full border', s.done ? 'border-foreground bg-foreground' : 'border-input')} />
                 ))}
               </span>
               {steps.filter((s) => s.done).length} de 4 listos
@@ -198,30 +203,30 @@ export function HomePage() {
         ) : !steps ? (
           <div className="space-y-3" aria-busy="true" aria-label="Cargando">
             {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className={cn('rounded-xl', i === 0 ? 'h-36' : 'h-12')} />
+              <Skeleton key={i} className="h-14" />
             ))}
           </div>
         ) : (
-          <ol className="relative">
+          <ol className="border-t">
             {steps.map((step, i) => (
-              <StepItem key={step.title} step={step} index={i} current={i === current} last={i === steps.length - 1} />
+              <StepItem key={step.title} step={step} index={i} current={i === current} />
             ))}
           </ol>
         )}
       </section>
 
-      <section aria-labelledby="que-es" className="space-y-6">
+      <section aria-labelledby="que-es" className="border-t border-foreground pt-5">
         <h2 id="que-es" className="type-section">
           Qué es Taptana
         </h2>
-        <div className="grid gap-4 sm:gap-6 sm:grid-cols-3">
-          <Fact icon={<Code2 className="size-5" />} title="Funciona con tu HTML">
+        <div className="mt-6 grid gap-x-10 gap-y-8 sm:grid-cols-3">
+          <Fact index="Formato" title="Funciona con tu HTML">
             Prototipos hechos con IA o a mano: varias páginas, una sola página o un solo archivo. Se suben tal cual.
           </Fact>
-          <Fact icon={<Smartphone className="size-5" />} title="En celulares reales">
+          <Fact index="Dispositivo" title="En celulares reales">
             Cada persona usa el prototipo en su propio celular. Se graba lo que toca y por dónde navega, sin video.
           </Fact>
-          <Fact icon={<Lock className="size-5" />} title="Tus datos son tuyos">
+          <Fact index="Privacidad" title="Tus datos son tuyos">
             {IS_DEMO
               ? 'Es de código abierto y se instala donde quieras. Lo que alguien escribe en el prototipo nunca se guarda.'
               : 'Todo queda en esta computadora. Lo que alguien escribe en el prototipo nunca se guarda.'}
@@ -233,76 +238,59 @@ export function HomePage() {
 }
 
 /**
- * Un paso del recorrido. Solo el paso actual se abre (texto y botón); los hechos muestran una
- * marca y una línea; los que vienen quedan en gris, en una sola línea.
+ * Un paso del recorrido, como fila de una lista con reglas: número en mono, título, una línea y
+ * la acción a la derecha. El paso actual lleva el número resaltado y el texto completo.
  */
-function StepItem({ step, index, current, last }: { step: Step; index: number; current: boolean; last: boolean }) {
-  const Icon = step.icon;
+function StepItem({ step, index, current }: { step: Step; index: number; current: boolean }) {
   const future = !step.done && !current;
   return (
-    <li className="relative flex gap-4 sm:gap-5">
-      {!last && <span aria-hidden className="absolute left-[17px] top-10 bottom-0 w-0.5 -translate-x-px rounded-full bg-[radial-gradient(circle,var(--input)_1.5px,transparent_1.6px)] bg-[length:4px_8px]" />}
-      <div
-        className={cn(
-          'relative z-10 size-9 shrink-0 rounded-full grid place-items-center font-display text-[15px] font-bold tabular-nums',
-          step.done ? 'bg-foreground text-background' : current ? 'bg-primary text-primary-foreground ring-4 ring-primary/15' : 'border bg-card text-muted-foreground',
+    <li className={cn('grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3 gap-y-3 border-b py-5 sm:grid-cols-[3.5rem_minmax(0,16rem)_minmax(0,1fr)_auto] sm:items-baseline sm:gap-x-6', future && 'text-muted-foreground')}>
+      <span className="num text-[15px] font-medium" aria-hidden>
+        <span className={cn(current && 'mark')}>{String(index + 1).padStart(2, '0')}</span>
+      </span>
+      <h3 className={cn('text-[17px] leading-snug', current ? 'font-semibold' : 'font-medium')}>
+        <span className="sr-only">Paso {index + 1}: </span>
+        {step.title}
+        {step.done && (
+          <>
+            <Check className="ml-2 inline size-4 align-[-2px]" aria-hidden />
+            <span className="sr-only"> Listo.</span>
+          </>
         )}
-        aria-hidden
-      >
-        {step.done ? <Check className="size-4.5" /> : index + 1}
-      </div>
-      <div className={cn('min-w-0 flex-1', last ? 'pb-0' : current ? 'pb-8' : 'pb-6')}>
+      </h3>
+      <p className={cn('col-start-2 sm:col-start-auto max-w-[60ch] text-[15px] leading-relaxed text-muted-foreground', !current && 'sm:truncate')}>
+        {current || step.done ? step.text : (step.blocked ?? step.text)}
+      </p>
+      <div className="col-start-2 sm:col-start-auto sm:justify-self-end">
         {current ? (
-          <div className="rounded-2xl border bg-card shadow-sm p-(--card-pad) space-y-4 -mt-1">
-            <div className="space-y-2">
-              <h3 className="type-subsection flex flex-wrap items-center gap-2.5">
-                <Icon className="size-[18px] text-muted-foreground" aria-hidden />
-                <span>
-                  <span className="sr-only">Paso {index + 1}: </span>
-                  {step.title}
-                </span>
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-2xs font-semibold text-primary">Sigue aquí</span>
-              </h3>
-              <p className="max-w-[65ch] text-muted-foreground leading-relaxed">{step.text}</p>
-            </div>
-            {step.action && !step.blocked ? (
-              <Button asChild>
-                <Link to={step.action.to}>{step.action.label}</Link>
-              </Button>
-            ) : (
-              step.blocked && <p className="text-sm text-muted-foreground">{step.blocked}</p>
-            )}
-          </div>
+          step.action && !step.blocked ? (
+            <Button asChild>
+              <Link to={step.action.to}>{step.action.label}</Link>
+            </Button>
+          ) : (
+            step.blocked && <p className="text-sm text-muted-foreground">{step.blocked}</p>
+          )
         ) : (
-          <div className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1">
-            <h3 className={cn('text-[17px] font-medium', future && 'text-muted-foreground')}>
-              <span className="sr-only">Paso {index + 1}: </span>
-              {step.title}
-            </h3>
-            {step.done && (
-              <>
-                <span className="sr-only">Listo.</span>
-                <span className="min-w-0 truncate text-sm text-muted-foreground">{step.text}</span>
-                {step.action && (
-                  <Link to={step.action.to} className="text-sm text-muted-foreground underline decoration-primary/40 underline-offset-4 hover:text-primary hover:decoration-primary">
-                    {step.action.label}
-                  </Link>
-                )}
-              </>
-            )}
-          </div>
+          step.done &&
+          step.action && (
+            <Link to={step.action.to} className="link-ink text-sm text-foreground">
+              {step.action.label}
+            </Link>
+          )
         )}
       </div>
     </li>
   );
 }
 
-function Fact({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+function Fact({ index, title, children }: { index: string; title: string; children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-border/80 bg-card p-(--card-pad) space-y-3">
-      <div className="size-10 rounded-lg grid place-items-center bg-muted text-foreground/75">{icon}</div>
-      <h3 className="type-subsection pt-1">{title}</h3>
-      <p className="text-[15px] text-muted-foreground leading-relaxed">{children}</p>
+    <div className="space-y-2">
+      <p className="type-eyebrow">
+        {index}
+      </p>
+      <h3 className="type-subsection">{title}</h3>
+      <p className="text-[15px] text-muted-foreground leading-relaxed max-w-[42ch]">{children}</p>
     </div>
   );
 }

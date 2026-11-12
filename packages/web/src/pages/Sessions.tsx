@@ -4,7 +4,6 @@ import { needsReview, SESSION_LIMITS, studyBlocks, type SessionExport, type Sess
 import { getClient, IS_DEMO, parseSessionFile } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -133,6 +132,7 @@ export function SessionsPage({ study: initialStudy }: { study?: string }) {
   return (
     <Layout>
       <PageHeader
+        eyebrow={sessions && sessions.length > 0 ? plural(sessions.length, 'sesión grabada', 'sesiones grabadas') : undefined}
         title="Sesiones"
         description={IS_DEMO ? 'Las sesiones de ejemplo y las que grabes o importes en este navegador.' : 'Cada vez que una persona usa tu prototipo queda una sesión grabada.'}
         actions={
@@ -142,7 +142,7 @@ export function SessionsPage({ study: initialStudy }: { study?: string }) {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="size-8" aria-label="Más acciones">
+                <Button variant="ghost" size="icon" className="size-9" aria-label="Más acciones">
                   <Ellipsis />
                 </Button>
               </DropdownMenuTrigger>
@@ -223,7 +223,7 @@ export function SessionsPage({ study: initialStudy }: { study?: string }) {
       ) : (
         <>
           {/* Celular: tarjetas */}
-          <ul className="space-y-3 md:hidden">
+          <ul className="border-t border-foreground md:hidden">
             {visible.map((s) => (
               <li key={s.id}>
                 <SessionCard {...rowProps(s)} />
@@ -231,15 +231,15 @@ export function SessionsPage({ study: initialStudy }: { study?: string }) {
             ))}
           </ul>
           {/* Pantallas grandes: tabla */}
-          <Card className="py-0 gap-0 overflow-hidden hidden md:block">
-            <Table className="[&_td]:py-4 [&_th]:h-12">
+          <div className="hidden md:block">
+            <Table className="[&_td]:py-4 [&_th]:h-11">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="pl-4">Sesión</TableHead>
+                  <TableHead className="pl-0">Sesión</TableHead>
                   <TableHead>Estudio</TableHead>
                   <TableHead>Dispositivo</TableHead>
                   <TableHead className="text-right">Duración</TableHead>
-                  <TableHead className="w-24 pr-4">
+                  <TableHead className="w-24 pr-0">
                     <span className="sr-only">Acciones</span>
                   </TableHead>
                 </TableRow>
@@ -250,7 +250,7 @@ export function SessionsPage({ study: initialStudy }: { study?: string }) {
                 ))}
               </TableBody>
             </Table>
-          </Card>
+          </div>
         </>
       )}
 
@@ -344,7 +344,7 @@ function RowMenu({ session, onExclude, onDelete }: Pick<RowProps, 'session' | 'o
 function SessionRow({ session: s, study, onLabel, onExclude, onDelete }: RowProps) {
   return (
     <TableRow className={cn(s.excluded && 'bg-muted/40')}>
-      <TableCell className="pl-4 whitespace-normal">
+      <TableCell className="pl-0 whitespace-normal">
         <LabelEditor session={s} onSave={onLabel} />
         <div className="text-muted-foreground text-xs mt-0.5">
           <Link to={{ name: 'player', id: s.id }} className="hover:underline">
@@ -364,15 +364,15 @@ function SessionRow({ session: s, study, onLabel, onExclude, onDelete }: RowProp
       </TableCell>
       <TableCell>
         <Device session={s} />
-        <div className="text-muted-foreground text-xs">
+        <div className="num text-muted-foreground text-xs">
           {s.viewport.width}×{s.viewport.height}
         </div>
       </TableCell>
-      <TableCell className="text-right tabular-nums">
+      <TableCell className="text-right num">
         {formatDuration(s.durationMs)}
         <div className="text-muted-foreground text-xs">{plural(s.tapCount, 'toque', 'toques')}</div>
       </TableCell>
-      <TableCell className="pr-4">
+      <TableCell className="pr-0">
         <div className="flex items-center justify-end gap-1">
           <Button variant="outline" size="sm" asChild>
             <Link to={{ name: 'player', id: s.id }}>
@@ -388,7 +388,7 @@ function SessionRow({ session: s, study, onLabel, onExclude, onDelete }: RowProp
 
 function SessionCard({ session: s, study, onLabel, onExclude, onDelete }: RowProps) {
   return (
-    <Card className={cn('py-4 gap-3 px-4', s.excluded && 'bg-muted/40')}>
+    <div className={cn('flex flex-col gap-3 border-b py-5', s.excluded && 'bg-muted/40')}>
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
           <LabelEditor session={s} onSave={onLabel} />
@@ -403,7 +403,7 @@ function SessionCard({ session: s, study, onLabel, onExclude, onDelete }: RowPro
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
         <Device session={s} />
-        <span className="tabular-nums">{formatDuration(s.durationMs)}</span>
+        <span className="num">{formatDuration(s.durationMs)}</span>
         <span>{plural(s.tapCount, 'toque', 'toques')}</span>
         {s.excluded && <Badge variant="outline">Excluida del reporte</Badge>}
       </div>
@@ -412,7 +412,7 @@ function SessionCard({ session: s, study, onLabel, onExclude, onDelete }: RowPro
           <Play /> Ver grabación
         </Link>
       </Button>
-    </Card>
+    </div>
   );
 }
 
@@ -476,7 +476,7 @@ export function LabelEditor({ session, onSave, size = 'sm' }: { session: Pick<Se
       onClick={start}
       title="Cambiar la etiqueta"
       className={cn(
-        'group inline-flex max-w-full items-center gap-1.5 rounded-md text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 cursor-pointer',
+        'group inline-flex max-w-full items-center gap-1.5 rounded-md text-left outline-none focus-ink cursor-pointer',
         size === 'lg' ? 'text-xl sm:text-2xl font-semibold tracking-tight' : 'font-medium',
       )}
     >
@@ -494,8 +494,8 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 max-w-full truncate',
-        active ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground hover:text-foreground',
+        'rounded-sm border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer outline-none focus-ink max-w-full truncate',
+        active ? 'bg-foreground text-background border-foreground' : 'border-input text-muted-foreground hover:border-foreground hover:text-foreground',
       )}
     >
       {children}

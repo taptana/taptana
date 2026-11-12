@@ -9,6 +9,9 @@ import { isQuestionBlock, isTaskBlock, studyBlocks, type Prototype, type Session
 import { getClient } from '@/api/client';
 import { ImportDialog } from '@/components/builder/dialogs';
 import { studyFileName, toDraft } from '@/components/builder/draft';
+import { DotRow } from '@/components/brand/dot-board';
+import { scoreBand } from '@/components/report/logic.ts';
+import { TONE_DOT } from '@/components/report/overview';
 import { EmptyState, ErrorState, Layout, ListSkeleton, PageHeader } from '@/components/layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,12 +31,6 @@ function contents(study: StudyRecord): string {
   const parts = [plural(tasks, 'tarea', 'tareas', 'sin tareas')];
   if (questions > 0) parts.push(plural(questions, 'pregunta', 'preguntas'));
   return parts.join(' · ');
-}
-
-function scoreTone(score: number): string {
-  if (score >= 70) return 'text-emerald-700 dark:text-emerald-400';
-  if (score >= 40) return 'text-amber-700 dark:text-amber-400';
-  return 'text-red-700 dark:text-red-400';
 }
 
 export function StudiesPage() {
@@ -129,7 +126,7 @@ export function StudiesPage() {
 
   return (
     <Layout>
-      <PageHeader title="Estudios" description="Tareas y preguntas sobre tu prototipo. Compartes un link y ves cómo le fue a cada persona." actions={actions} />
+      <PageHeader eyebrow={studies && studies.length > 0 ? plural(studies.length, 'estudio', 'estudios') : undefined} title="Estudios" description="Tareas y preguntas sobre tu prototipo. Compartes un link y ves cómo le fue a cada persona." actions={actions} />
 
       {error ? (
         <ErrorState message={error} onRetry={() => void load()} />
@@ -156,18 +153,18 @@ export function StudiesPage() {
           {protos.length === 0 && <p>Antes necesitas un prototipo: súbelo en la sección Prototipos.</p>}
         </EmptyState>
       ) : (
-        <ul className="space-y-3" aria-label="Estudios">
+        <ul className="border-t border-foreground" aria-label="Estudios">
           {studies.map((s) => {
             const proto = protos.find((p) => p.id === s.prototypeId);
             const report = reports[s.id] ?? null;
             const participants = report?.participants ?? sessions.filter((x) => x.studyId === s.id).length;
             const score = report?.score ?? null;
             return (
-              <li key={s.id} className="min-w-0 rounded-2xl border border-border/80 bg-card shadow-xs px-(--card-pad) py-5 transition-[border-color,box-shadow] hover:border-primary/30 hover:shadow-sm">
+              <li key={s.id} className="min-w-0 border-b py-6 sm:py-7">
                 <div className="flex flex-col gap-5 md:flex-row md:items-center md:gap-8">
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                      <Link to={{ name: 'study', id: s.id }} className="font-display text-xl font-bold tracking-[-0.01em] leading-snug break-words hover:text-primary">
+                      <Link to={{ name: 'study', id: s.id }} className="font-display text-[1.375rem] font-semibold tracking-[-0.015em] leading-snug break-words underline-offset-4 decoration-1 hover:underline rounded-sm outline-none focus-ink">
                         {s.name}
                       </Link>
                       {s.closed ? (
@@ -195,27 +192,27 @@ export function StudiesPage() {
                     <p className="text-xs text-muted-foreground">Actualizado {formatRelative(s.updatedAt)}</p>
                   </div>
                   <dl className="flex shrink-0 gap-8">
-                    <div>
-                      <dd className="font-display text-2xl font-bold tabular-nums">{participants}</dd>
-                      <dt className="text-sm text-muted-foreground">{participants === 1 ? 'participante' : 'participantes'}</dt>
+                    <div className="flex flex-col-reverse gap-1.5">
+                      <dd className="font-display text-[1.75rem] font-bold tabular-nums tracking-[-0.03em] leading-none">{participants}</dd>
+                      <dt className="type-eyebrow">{participants === 1 ? 'Participante' : 'Participantes'}</dt>
                     </div>
-                    <div>
-                      <dd className={`font-display text-2xl font-bold tabular-nums ${score === null ? '' : scoreTone(score)}`}>
+                    <div className="flex flex-col-reverse gap-1.5">
+                      <dd className="flex items-center gap-2.5 font-display text-[1.75rem] font-bold tabular-nums tracking-[-0.03em] leading-none">
                         {score === null ? '—' : score}
-                        {score !== null && <span className="font-sans text-sm font-normal text-muted-foreground">&thinsp;/&thinsp;100</span>}
+                        {score !== null && <DotRow value={score} className={TONE_DOT[scoreBand(score).tone]} />}
                       </dd>
-                      <dt className="text-sm text-muted-foreground">{score === null && participants > 0 ? 'puntaje: faltan resultados' : 'puntaje'}</dt>
+                      <dt className="type-eyebrow">{score === null && participants > 0 ? 'Puntaje: faltan resultados' : 'Puntaje'}</dt>
                     </div>
                   </dl>
                   <div className="flex shrink-0 items-center gap-2">
-                    <Button className="flex-1 md:flex-none" asChild>
+                    <Button variant="outline" className="flex-1 md:flex-none" asChild>
                       <Link to={{ name: 'report', id: s.id }}>
-                        <BarChart3 /> Ver resultados
+                        Ver resultados
                       </Link>
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="icon" disabled={busyId === s.id} aria-label={`Más acciones de "${s.name}"`}>
+                        <Button variant="ghost" size="icon" disabled={busyId === s.id} aria-label={`Más acciones de "${s.name}"`}>
                           <Ellipsis />
                         </Button>
                       </DropdownMenuTrigger>

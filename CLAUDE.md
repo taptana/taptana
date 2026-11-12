@@ -53,7 +53,7 @@ qué resuelven para la prueba de usabilidad.
 | Reproducción | rrweb-player 2.x | Reproductor listo con línea de tiempo |
 | Panel | React + Vite + Tailwind v4 + shadcn en `packages/web` | Se compila a estáticos que Hono sirve |
 | Zip | `fflate` | JavaScript puro |
-| Tipografía de títulos | `@fontsource-variable/bricolage-grotesque` en `packages/web` | Archivos de fuente dentro del build: sin pedir nada a otros sitios |
+| Tipografías | `@fontsource-variable/bricolage-grotesque` (títulos), `@fontsource-variable/ibm-plex-sans` (texto) y `@fontsource/ibm-plex-mono` (datos) en `packages/web` | Archivos de fuente dentro del build: sin pedir nada a otros sitios |
 | Presentación (.pptx) | `pptxgenjs` en `packages/web` | JavaScript puro (MIT), se carga solo al descargar |
 | Red | Escucha en `0.0.0.0`, puerto 4321 (o el siguiente libre) | Accesible desde el celular en la misma Wi-Fi |
 | Pruebas con navegador | Playwright (devDependency de la raíz) | Solo para e2e, semillas y capturas; nunca en producción |
@@ -226,20 +226,41 @@ La sesión vive en `sessionStorage` (una pestaña). Cada carga de página es un 
 - **Nunca accede a datos directamente**: siempre por `api/client.ts`, con `http.ts` (API real)
   y `static.ts` (demo). Cada método existe en los dos.
 - Componentes de shadcn copiados a `src/components/ui/`, no instalados. Sin `window.confirm`.
-- **Identidad visual** (sobria: «una herramienta profesional con un toque de carácter»): base
-  neutra de shadcn en `src/index.css` (blancos, grises, tinta casi negra) y **un solo acento, el
-  violeta** (`--primary`): acción principal, links, foco, lo seleccionado y el progreso. El color
-  se reserva para estados y resultados (verde, rojo, azul «por revisar», ámbar, puntaje); los
-  avisos son tarjeta blanca con ícono y filete del color del estado. Los tipos de bloque no tienen
-  color: `KindIcon` (`builder/fields.tsx`) es un cuadrado gris y el dibujo dice el tipo. La
-  personalidad la ponen el logo (`components/brand/logo.tsx`, el único con varios colores), la
-  tipografía de títulos y el motivo de puntos (`bg-dots`, ilustraciones casi monocromas con un
-  toque coral, `--tap`). Títulos en Bricolage Grotesque (`@fontsource-variable/bricolage-grotesque`,
-  servida por el panel; nunca desde otro sitio).
-- **Tipografía y ritmo**: escala en `@theme` (`text-2xs` 12px solo insignias y contadores, `xs` 13,
-  `sm` 15, `base` 16). Títulos con una sola definición: `type-page-title`, `type-section` (h2),
-  `type-subsection` (h3) y `type-eyebrow`. Nada que informe por debajo de 13px; texto corrido y
-  ayudas a `max-w-[65ch]`; `--muted-foreground` con ≥ 7:1 sobre fondo, tarjeta y `--muted`.
+- **Identidad visual: «instrumento de medición / cuaderno de campo»** (sobria y profesional, pero
+  reconocible). Tokens en `src/index.css`. Cuatro elementos, pocos y siempre los mismos:
+  - **Tinta y papel.** `--primary` es la tinta (casi negro): botón principal negro, foco (contorno
+    de 2px, `focus-ink`), lo seleccionado (barra o subrayado de tinta) y links (tinta subrayada,
+    `link-ink`). No hay violeta ni ningún otro color de marca.
+  - **Un solo acento, el resaltador amarillo** (`--mark`, utilidad `mark`): solo como trazo plano
+    detrás de pocas palabras o cifras, siempre con tinta encima (también en oscuro), y como el
+    punto «tocado» (logo, sección actual del menú, último toque de un camino). Nunca relleno de un
+    botón, color de texto ni superficie grande. No se confunde con el aviso ámbar: el aviso es
+    ícono ámbar + regla fina a la izquierda, sin fondo.
+  - **Plano y con reglas.** Radio 6px (botones, campos) y 8px (las pocas tarjetas y diálogos);
+    **sin sombras** salvo menús, diálogos y avisos breves. Las secciones se separan con una regla
+    de tinta arriba (`border-t border-foreground`) y las filas con reglas finas (`border-b`); las
+    listas y cifras son filas y tablas, no tarjetas. Solo es tarjeta lo que es un objeto (un
+    prototipo, la hoja del editor, una diapositiva, un mapa, un diálogo, el teléfono).
+  - **El tablero de puntos como estructura.** Logo (`components/brand/logo.tsx`: cuadrado de tinta,
+    nueve hoyos de papel, uno «tocado»; el mismo dibujo en `favicon.svg`, `docs/img/logo.svg` y la
+    presentación). Puntaje = tablero de 100 puntos (`DotBoard`) o fila de diez (`DotRow`) en el color
+    de su tramo (`components/brand/dot-board.tsx`). El camino de toques de Inicio y los estados
+    vacíos (`brand/art.tsx`). `bg-dots`, muy tenue, solo para enmarcar (zona de subir archivo).
+  El color queda para estados y resultados (verde, rojo, azul «por revisar», ámbar, tramos del
+  puntaje). Los íconos son funcionales (acciones, estado): nada de íconos decorativos en cuadrados.
+  `KindIcon` (`builder/fields.tsx`) es un cuadrado con borde fino y el dibujo del tipo, sin color.
+- **Tipografía (tres voces) y ritmo**: Bricolage Grotesque para el título de la página y las cifras
+  grandes (`font-display`; peso fuerte solo en el h1), IBM Plex Sans para texto e interfaz
+  (`--font-sans`) e IBM Plex Mono para la voz de datos (`num`, `font-mono`, `type-eyebrow`): cifras
+  de tablas, unidades, antetítulos en mayúsculas, rutas, contadores y números de paso (`01`, `02`).
+  Todas servidas por el panel; nunca desde otro sitio. Escala en `@theme` (`text-2xs` 12px solo
+  insignias, contadores y antetítulos, `xs` 13, `sm` 15, `base` 16). Títulos con una sola definición:
+  `type-eyebrow` (antetítulo mono) → `type-page-title` → `type-section` (h2) → `type-subsection`
+  (h3). Nada que informe por debajo de 13px; texto corrido y ayudas a `max-w-[65ch]`;
+  `--muted-foreground` con ≥ 7:1 sobre fondo, tarjeta y `--muted`.
+- **Presentación y participante siguen el mismo lenguaje**: `deck/theme.ts` (tinta, reglas, `MARK`
+  detrás de la cifra clave, tablero de 100 puntos en el resumen; Arial y Courier New en el .pptx) y
+  `recorder/src/study-ui.css` (botón de tinta, esquinas de 8–10px, tipografía del sistema).
 - Las etiquetas de resultados y tipos de bloque salen de `shared` (`OUTCOME_LABELS`,
   `BLOCK_KIND_LABELS`) para que todo el panel diga lo mismo.
 

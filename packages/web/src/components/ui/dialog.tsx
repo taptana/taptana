@@ -11,18 +11,18 @@ const DialogClose = DialogPrimitive.Close;
 function DialogContent({ className, children, hideClose = false, ...props }: React.ComponentProps<typeof DialogPrimitive.Content> & { hideClose?: boolean }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/45" />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          'bg-card fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border p-6 shadow-lg max-h-[calc(100dvh-2rem)] overflow-y-auto outline-none',
+          'bg-card fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-foreground/20 p-6 shadow-lg max-h-[calc(100dvh-2rem)] overflow-y-auto outline-none',
           className,
         )}
         {...props}
       >
         {children}
         {!hideClose && (
-          <DialogPrimitive.Close className="absolute top-3 right-3 grid size-9 place-items-center rounded-md opacity-70 hover:bg-accent hover:opacity-100 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 cursor-pointer" aria-label="Cerrar">
+          <DialogPrimitive.Close className="absolute top-3 right-3 grid size-9 place-items-center rounded-md opacity-70 hover:bg-accent hover:opacity-100 outline-none focus-ink cursor-pointer" aria-label="Cerrar">
             <X className="size-4" />
           </DialogPrimitive.Close>
         )}
@@ -40,7 +40,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
-  return <DialogPrimitive.Title data-slot="dialog-title" className={cn('text-[1.375rem] leading-tight font-bold', className)} {...props} />;
+  return <DialogPrimitive.Title data-slot="dialog-title" className={cn('text-[1.375rem] leading-tight font-semibold', className)} {...props} />;
 }
 
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {

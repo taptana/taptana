@@ -8,7 +8,7 @@
 
 import type { Slide, StudyReport } from '@taptana/shared';
 import { countLines, fitList, fitText, SLIDE_H, SLIDE_W } from './fit.ts';
-import { BAR, BAR_MID, FAINT, G, GOOD, INK, LINE, LOGO_DOT, LOGO_TAP, MUTED, OUTCOME, OUTCOME_DARK_TEXT, PAPER, PROBLEM, SOFT, TONE, VIOLET, VIOLET_SOFT } from './theme.ts';
+import { BAR, BAR_MID, FAINT, G, GOOD, HOLE, INK, LINE, MARK, MUTED, OUTCOME, OUTCOME_DARK_TEXT, PAPER, PROBLEM, SOFT, TONE } from './theme.ts';
 
 /** Qué texto de la diapositiva edita esta figura: el título, la frase o un punto de la lista. */
 export type EditKey = 'title' | 'takeaway' | `item:${number}`;
@@ -35,6 +35,8 @@ export interface TextShape {
   upper?: boolean;
   /** Título: en pantalla y PDF va con la tipografía de marca. */
   display?: boolean;
+  /** Voz de datos (antetítulos, etiquetas, contadores): monoespaciada. */
+  mono?: boolean;
   edit?: EditKey;
 }
 
@@ -86,7 +88,8 @@ type TextOpts = Partial<Omit<TextShape, 'type' | 'x' | 'y' | 'w' | 'h' | 'text' 
 function text(value: string, x: number, y: number, w: number, h: number, max: number, opts: TextOpts = {}): TextShape {
   const lineHeight = opts.lineHeight ?? 1.25;
   // La negrita es un poco más ancha: se mide con una caja algo más angosta.
-  const fit = fitText(opts.upper ? value.toUpperCase() : value, { width: opts.bold ? w * 0.93 : w, height: h }, max, opts.min ?? max, lineHeight);
+  // La monoespaciada, también: cada letra ocupa 0,6 em (más el espaciado de las mayúsculas).
+  const fit = fitText(opts.upper ? value.toUpperCase() : value, { width: opts.mono ? w * (opts.upper ? 0.74 : 0.82) : opts.bold ? w * 0.93 : w, height: h }, max, opts.min ?? max, lineHeight);
   const { min: _min, ...rest } = opts;
   return { type: 'text', x, y, w, h, text: fit.text, full: value, size: fit.size, lines: fit.lines, color: INK, ...rest, lineHeight };
 }
@@ -94,22 +97,69 @@ function text(value: string, x: number, y: number, w: number, h: number, max: nu
 const rect = (x: number, y: number, w: number, h: number, fill: string, extra: Partial<RectShape> = {}): RectShape => ({ type: 'rect', x, y, w, h, fill, ...extra });
 const pct = (x: number): string => `${Math.round(x * 100)} %`;
 
-/** La etiqueta de arriba, en gris neutro. */
+/** La etiqueta de arriba: mono, en mayúsculas, gris. */
 function eyebrow(value: string, w: number = G.w, x: number = G.x): Shape[] {
-  return [text(value, x, G.eyebrowY, w, 22, 14, { color: MUTED, bold: true, upper: true, min: 12 })];
+  return [label(value, x, G.eyebrowY, w)];
 }
 
-/** La marca, dibujada con figuras: el tablero violeta con sus hoyos y dos toques. */
+/** Una etiqueta en la voz de datos (mono, mayúsculas). */
+function label(value: string, x: number, y: number, w: number, opts: TextOpts = {}): TextShape {
+  return text(value, x, y, w, 20, 13, { color: MUTED, mono: true, upper: true, min: 11, ...opts });
+}
+
+/** El trazo de resaltador detrás de una cifra (`value` con letra `size`, en negrita). */
+function mark(value: string, x: number, y: number, size: number): RectShape {
+  return rect(x - size * 0.12, y + size * 0.1, value.length * size * 0.56 + size * 0.24, size * 0.98, MARK, { radius: 3 });
+}
+
+/** Un hoyo vacío del tablero: un aro fino (dos círculos). */
+function hole(cx: number, cy: number, d: number): Shape[] {
+  return [
+    { type: 'circle', x: cx - d / 2, y: cy - d / 2, d, fill: HOLE },
+    { type: 'circle', x: cx - d / 2 + 1.5, y: cy - d / 2 + 1.5, d: d - 3, fill: PAPER },
+  ];
+}
+
+/** El tablero de 100 puntos: tantos llenos como puntos tiene el puntaje, en el color de su tramo. */
+function dotBoard(score: number | null, x: number, y: number, size: number, color: string): Shape[] {
+  const step = size / 10;
+  const d = step * 0.66;
+  const filled = score === null ? 0 : Math.max(0, Math.min(100, Math.round(score)));
+  const out: Shape[] = [];
+  for (let i = 0; i < 100; i++) {
+    const cx = x + step / 2 + (i % 10) * step;
+    const cy = y + step / 2 + Math.floor(i / 10) * step;
+    if (i < filled) out.push({ type: 'circle', x: cx - d / 2, y: cy - d / 2, d, fill: color });
+    else out.push(...hole(cx, cy, d * 0.88));
+  }
+  return out;
+}
+
+/** La fila de diez puntos (uno por cada diez del puntaje), alineada a la derecha en `right`. */
+function dotRow(score: number | null, right: number, y: number, color: string): Shape[] {
+  const d = 10;
+  const step = 15;
+  const filled = score === null ? 0 : Math.max(0, Math.min(10, Math.round(score / 10)));
+  const x0 = right - 9 * step - d;
+  const out: Shape[] = [];
+  for (let i = 0; i < 10; i++) {
+    if (i < filled) out.push({ type: 'circle', x: x0 + i * step, y, d, fill: color });
+    else out.push(...hole(x0 + i * step + d / 2, y + d / 2, d - 1));
+  }
+  return out;
+}
+
+/** La marca, dibujada con figuras: el tablero de tinta con sus nueve hoyos de papel y uno «tocado». */
 function logoMark(x: number, y: number, s: number): Shape[] {
   const u = s / 32;
-  const out: Shape[] = [rect(x, y, s, s, VIOLET, { radius: 9 * u })];
+  const out: Shape[] = [rect(x, y, s, s, INK, { radius: 7 * u })];
   for (let r = 0; r < 3; r++)
     for (let c = 0; c < 3; c++) {
       const cx = x + (9 + c * 7) * u;
       const cy = y + (9 + r * 7) * u;
-      const tap = r === 1 && c === 1 ? LOGO_TAP : r === 0 && c === 2 ? LOGO_DOT : null;
-      const d = (tap ? (r === 1 ? 6.4 : 4.8) : 3.4) * u;
-      out.push({ type: 'circle', x: cx - d / 2, y: cy - d / 2, d, fill: tap ?? 'B3A5EE' });
+      const tap = r === 1 && c === 2;
+      const d = (tap ? 6.2 : 3.8) * u;
+      out.push({ type: 'circle', x: cx - d / 2, y: cy - d / 2, d, fill: tap ? MARK : PAPER });
     }
   return out;
 }
@@ -122,7 +172,7 @@ function footer(ctx: LayoutContext): Shape[] {
   return [
     ...logoMark(G.x, G.footerY - 1, 20),
     text(ctx.deckTitle, G.x + 30, G.footerY, 850, 20, 13, { color: FAINT, min: 11 }),
-    text(`${ctx.index + 1} / ${ctx.total}`, SLIDE_W - G.x - 160, G.footerY, 160, 20, 13, { color: FAINT, align: 'right' }),
+    text(`${String(ctx.index + 1).padStart(2, '0')} / ${String(ctx.total).padStart(2, '0')}`, SLIDE_W - G.x - 160, G.footerY, 160, 20, 13, { color: FAINT, align: 'right', mono: true }),
   ];
 }
 
@@ -171,35 +221,49 @@ const COVER_FIELD = 384;
 
 function cover(slide: Extract<Slide, { kind: 'cover' }>): Shape[] {
   const w = SLIDE_W - COVER_FIELD - G.x - 56;
-  // Un filete violeta a la izquierda: el único acento de la portada.
-  const out: Shape[] = [rect(0, 0, 8, SLIDE_H, VIOLET), ...eyebrow('Resultados del estudio', w)];
+  const out: Shape[] = [...eyebrow('Resultados del estudio', w)];
   if (slide.filter) {
-    const fw = Math.min(w, slide.filter.length * 8.4 + 40);
-    out.push(rect(G.x, 100, fw, 36, SOFT, { radius: 18 }), text(slide.filter, G.x + 18, 108, fw - 36, 22, 15, { color: INK, min: 12, align: 'center' }));
+    const fw = Math.min(w, slide.filter.length * 8.4 + 32);
+    out.push(rect(G.x, 100, fw, 32, PAPER, { radius: 3, line: HOLE }), text(slide.filter, G.x + 14, 106, fw - 28, 22, 15, { color: INK, min: 12 }));
   }
-  out.push(text(slide.title, G.x, 176, w, 220, 76, { bold: true, display: true, min: 40, lineHeight: 1.06, valign: 'bottom', edit: 'title' }));
+  out.push(text(slide.title, G.x, 176, w, 220, 76, { bold: true, display: true, min: 40, lineHeight: 1.04, valign: 'bottom', edit: 'title' }));
   out.push(text(slide.subtitle, G.x, 414, w, 36, 26, { color: MUTED, min: 18 }));
   if (slide.takeaway !== undefined) out.push(text(slide.takeaway, G.x, 462, w, 90, 22, { color: MUTED, min: 15, lineHeight: 1.4, edit: 'takeaway' }));
   const items = slide.items ?? [];
   if (items.length) {
-    out.push(rect(G.x, 582, w, 1, LINE));
+    out.push(rect(G.x, 582, w, 1.5, INK));
     const colW = w / Math.max(3, items.length);
     items.forEach((item, i) => out.push(text(item.text, G.x + i * colW, 598, colW - 24, 56, 18, { min: 13, edit: `item:${i}` })));
   }
   out.push(...logoMark(G.x, G.footerY - 3, 24), text('Hecho con Taptana', G.x + 34, G.footerY, 300, 20, 13, { color: MUTED }));
 
-  // El tablero de puntos, en gris, con un solo toque violeta.
+  // El tablero grande, con el camino de una persona: toques numerados en tinta y el último con resaltador.
   const fx = SLIDE_W - COVER_FIELD;
-  out.push(rect(fx, 0, COVER_FIELD, SLIDE_H, SOFT));
-  for (let r = 0; r < 9; r++)
-    for (let c = 0; c < 5; c++) {
-      const cx = fx + 64 + c * 64;
-      const cy = 104 + r * 64;
-      const tap = c === 2 && r === 3;
-      if (tap) out.push({ type: 'circle', x: cx - 48, y: cy - 48, d: 96, fill: VIOLET_SOFT });
-      const d = tap ? 40 : 10;
-      out.push({ type: 'circle', x: cx - d / 2, y: cy - d / 2, d, fill: tap ? VIOLET : 'D4D4D8' });
-    }
+  out.push(rect(fx, 0, 1, SLIDE_H, LINE));
+  const step = 64;
+  const at = (c: number, r: number): [number, number] => [fx + 64 + c * step, 104 + r * step];
+  const path: Array<[number, number]> = [
+    [0, 1],
+    [3, 1],
+    [3, 3],
+    [1, 3],
+    [1, 6],
+    [4, 6],
+  ];
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 5; c++) out.push({ type: 'circle', x: at(c, r)[0] - 3.5, y: at(c, r)[1] - 3.5, d: 7, fill: HOLE });
+  path.slice(1).forEach(([c, r], i) => {
+    const [x1, y1] = at(...(path[i] as [number, number]));
+    const [x2, y2] = at(c, r);
+    out.push(rect(Math.min(x1, x2) - 0.75, Math.min(y1, y2) - 0.75, Math.abs(x2 - x1) + 1.5, Math.abs(y2 - y1) + 1.5, INK));
+  });
+  path.forEach(([c, r], i) => {
+    const [cx, cy] = at(c, r);
+    const last = i === path.length - 1;
+    const d = last ? 44 : 34;
+    if (last) out.push({ type: 'circle', x: cx - d / 2 - 2, y: cy - d / 2 - 2, d: d + 4, fill: INK });
+    out.push({ type: 'circle', x: cx - d / 2, y: cy - d / 2, d, fill: last ? MARK : INK });
+    out.push(text(String(i + 1), cx - d / 2, cy - d / 2, d, d, last ? 18 : 15, { mono: true, align: 'center', valign: 'middle', color: last ? INK : PAPER, lineHeight: 1 }));
+  });
   return out;
 }
 
@@ -213,28 +277,34 @@ function empty(slide: Extract<Slide, { kind: 'empty' }>): Shape[] {
 function summary(slide: Extract<Slide, { kind: 'summary' }>): Shape[] {
   const tone = scoreTone(slide);
   const out: Shape[] = [...eyebrow('Resumen'), title(slide, { h: 60, max: 44 })];
-  // El puntaje, a la izquierda.
-  out.push(rect(G.x, 196, 420, 404, SOFT, { radius: 20 }));
-  out.push(text('Puntaje de usabilidad', 104, 228, 360, 26, 18, { color: MUTED }));
+  // Arriba: el puntaje en su tablero de 100 puntos, el número y la frase.
+  const top = 192;
+  out.push(...dotBoard(slide.score, G.x, top, 250, tone));
+  const sx = G.x + 250 + 44;
+  out.push(label('Puntaje de usabilidad', sx, top + 4, 300));
   const value = slide.score === null ? '—' : String(slide.score);
-  out.push(text(value, 104, 262, 240, 150, 140, { bold: true, color: tone, lineHeight: 1 }));
-  out.push(text('de 100', 104 + value.length * 80 + 18, 360, 120, 30, 22, { color: MUTED }));
-  out.push(text(slide.scoreLabel, 104, 430, 356, 64, 26, { bold: true, color: tone, min: 18, lineHeight: 1.2 }));
-  out.push(rect(104, 524, 356, 12, LINE, { radius: 6 }));
-  if (slide.score !== null && slide.score > 0) out.push(rect(104, 524, Math.max(12, (356 * slide.score) / 100), 12, tone, { radius: 6 }));
-  // Los números, a la derecha, de a dos.
-  const x0 = 524;
-  const cw = (SLIDE_W - G.x - x0 - 24) / 2;
-  const ch = 190;
-  slide.metrics.slice(0, 4).forEach((m, i) => {
-    const x = x0 + (i % 2) * (cw + 24);
-    const y = 196 + Math.floor(i / 2) * (ch + 24);
-    out.push(rect(x, y, cw, ch, PAPER, { radius: 20, line: LINE }));
-    out.push(text(m.label, x + 28, y + 26, cw - 56, 24, 17, { color: MUTED, min: 13 }));
-    out.push(text(m.value, x + 28, y + 58, cw - 56, 64, 54, { bold: true, min: 30, lineHeight: 1.1 }));
-    if (m.note) out.push(text(m.note, x + 28, y + 132, cw - 56, 40, 15, { color: MUTED, min: 12 }));
+  out.push(text(value, sx, top + 30, 260, 136, 128, { bold: true, display: true, lineHeight: 1 }));
+  out.push(label('de 100', sx + value.length * 74 + 14, top + 126, 100, { upper: false }));
+  out.push({ type: 'circle', x: sx, y: top + 192, d: 14, fill: tone });
+  out.push(text(slide.scoreLabel, sx + 24, top + 180, 300, 60, 24, { bold: true, min: 17, lineHeight: 1.2 }));
+  const tx = 760;
+  if (slide.takeaway) {
+    out.push(rect(tx - 28, top + 4, 1, 242, LINE));
+    out.push(text(slide.takeaway, tx, top, SLIDE_W - G.x - tx, 250, 24, { min: 14, lineHeight: 1.4, valign: 'middle', edit: 'takeaway' }));
+  }
+  // Abajo: los cuatro números en una sola fila con reglas.
+  const y = 478;
+  const metrics = slide.metrics.slice(0, 4);
+  const cw = G.w / Math.max(1, metrics.length);
+  out.push(rect(G.x, y, G.w, 1.5, INK));
+  metrics.forEach((m, i) => {
+    const x = G.x + i * cw + (i === 0 ? 0 : 24);
+    const w = cw - (i === 0 ? 24 : 48);
+    if (i > 0) out.push(rect(G.x + i * cw, y + 20, 1, 152, LINE));
+    out.push(label(m.label, x, y + 22, w));
+    out.push(text(m.value, x, y + 52, w, 62, 52, { bold: true, display: true, min: 28, lineHeight: 1.1 }));
+    if (m.note) out.push(text(m.note, x, y + 124, w, 42, 15, { color: MUTED, min: 12 }));
   });
-  if (slide.takeaway) out.push(text(slide.takeaway, G.x, 622, G.w, 44, 18, { color: MUTED, min: 13, edit: 'takeaway' }));
   return out;
 }
 
@@ -259,52 +329,60 @@ function highlights(slide: Extract<Slide, { kind: 'highlights' }>): Shape[] {
 function task(slide: Extract<Slide, { kind: 'task' }>): Shape[] {
   const tone = scoreTone(slide);
   const out: Shape[] = [...eyebrow(`${slide.label} · ${slide.participants} ${slide.participants === 1 ? 'participante' : 'participantes'}`, 860)];
-  out.push(text(slide.score === null ? '—' : String(slide.score), SLIDE_W - G.x - 200, 46, 200, 66, 60, { bold: true, display: true, color: tone, align: 'right', lineHeight: 1.05 }));
-  out.push(text('puntaje de 100', SLIDE_W - G.x - 200, 114, 200, 20, 14, { color: MUTED, align: 'right' }));
+  const right = SLIDE_W - G.x;
+  out.push(text(slide.score === null ? '—' : String(slide.score), right - 200, 44, 200, 66, 60, { bold: true, display: true, align: 'right', lineHeight: 1.05 }));
+  out.push(...dotRow(slide.score, right, 116, tone));
+  out.push(label('Puntaje de 100', right - 200, 136, 200, { align: 'right' }));
   out.push(title(slide, { w: 880, h: 104, max: 42, min: 24 }));
   if (slide.instruction) {
-    out.push(text('Lo que leyó el participante', G.x, 210, 600, 18, 13, { color: MUTED, bold: true, upper: true }));
-    out.push(text(`«${slide.instruction}»`, G.x, 232, G.w, 58, 22, { italic: true, min: 14, lineHeight: 1.3 }));
+    out.push(label('Lo que leyó el participante', G.x, 210, 600));
+    out.push(text(`«${slide.instruction}»`, G.x, 234, G.w, 58, 22, { italic: true, min: 14, lineHeight: 1.3 }));
   }
   // Barra de resultados.
-  const by = 308;
-  const bh = 48;
-  out.push(rect(G.x, by, G.w, bh, SOFT, { radius: 10 }));
+  const by = 310;
+  const bh = 44;
+  out.push(rect(G.x, by, G.w, bh, SOFT, { radius: 2 }));
   let x = G.x;
   for (const o of slide.outcomes) {
     const w = G.w * o.share;
     if (w <= 0) continue;
     out.push(rect(x, by, w, bh, OUTCOME[o.key]));
-    if (o.share >= 0.08) out.push(text(pct(o.share), x, by + 13, w, 22, 17, { bold: true, align: 'center', color: OUTCOME_DARK_TEXT.has(o.key) ? INK : PAPER, min: 12 }));
+    if (o.share >= 0.08) out.push(text(pct(o.share), x, by + 12, w, 22, 16, { mono: true, align: 'center', color: OUTCOME_DARK_TEXT.has(o.key) ? INK : PAPER, min: 12 }));
     x += w;
   }
   // Leyenda.
   let lx = G.x;
-  let ly = by + bh + 16;
+  let ly = by + bh + 14;
   for (const o of slide.outcomes) {
-    const label = `${o.label}  ${o.count}`;
-    const w = label.length * 8.6 + 44;
+    const text_ = `${o.label}  ${o.count}`;
+    const w = text_.length * 8.6 + 44;
     if (lx + w > G.x + G.w) {
       lx = G.x;
       ly += 26;
     }
-    out.push(rect(lx, ly + 4, 14, 14, OUTCOME[o.key], { radius: 3 }), text(label, lx + 22, ly, w - 22, 22, 16, { color: INK }));
+    out.push(rect(lx, ly + 5, 12, 12, OUTCOME[o.key], { radius: 2 }), text(text_, lx + 22, ly, w - 22, 22, 16, { color: INK }));
     lx += w;
   }
-  // Números.
-  const my = 428;
+  // Números: una fila con reglas; la primera cifra (cuántos lo lograron) lleva el resaltador.
+  const my = 424;
+  const metrics = slide.metrics.slice(0, 3);
   const mw = G.w / 3;
-  slide.metrics.slice(0, 3).forEach((m, i) => {
-    const mx = G.x + i * mw;
-    out.push(text(m.value, mx, my, mw - 24, 52, 44, { bold: true, min: 28, lineHeight: 1.1 }));
-    out.push(text(m.label, mx, my + 56, mw - 24, 22, 16, { color: MUTED }));
-    if (m.note) out.push(text(m.note, mx, my + 80, mw - 24, 20, 14, { color: FAINT, min: 11 }));
+  out.push(rect(G.x, my, G.w, 1.5, INK));
+  metrics.forEach((m, i) => {
+    const mx = G.x + i * mw + (i === 0 ? 0 : 24);
+    const w = mw - (i === 0 ? 24 : 48);
+    if (i > 0) out.push(rect(G.x + i * mw, my + 14, 1, 104, LINE));
+    out.push(label(m.label, mx, my + 16, w));
+    const value = text(m.value, mx, my + 40, w, 50, 42, { bold: true, display: true, min: 28, lineHeight: 1.1 });
+    if (i === 0 && /\d/.test(m.value)) out.push(mark(value.text, mx, my + 40, value.size));
+    out.push(value);
+    if (m.note) out.push(text(m.note, mx, my + 96, w, 20, 14, { color: MUTED, min: 11 }));
   });
-  if (slide.drop) out.push(text(`↓ ${slide.drop}`, G.x, 544, G.w, 26, 17, { color: 'B45309', min: 12 }));
+  if (slide.drop) out.push(text(`↓ ${slide.drop}`, G.x, 552, G.w, 24, 16, { color: 'B45309', min: 12 }));
   if (slide.takeaway) {
     const stripe = slide.takeawayTone === 'good' ? GOOD : PROBLEM;
-    out.push(rect(G.x, 584, G.w, 76, SOFT, { radius: 12 }), rect(G.x, 584, 6, 76, stripe));
-    out.push(text(slide.takeaway, G.x + 30, 594, G.w - 56, 56, 20, { min: 13, lineHeight: 1.35, valign: 'middle', edit: 'takeaway' }));
+    out.push(rect(G.x, 590, 4, 66, stripe));
+    out.push(text(slide.takeaway, G.x + 24, 590, G.w - 24, 66, 20, { min: 13, lineHeight: 1.35, valign: 'middle', edit: 'takeaway' }));
   }
   return out;
 }
@@ -325,16 +403,16 @@ function heatmap(slide: Extract<Slide, { kind: 'heatmap' }>, ctx: LayoutContext)
   ];
   const sw = cw / 3;
   stats.forEach((s, i) => {
-    out.push(text(s.value, x + i * sw, 356, sw - 16, 50, 42, { bold: true, color: i === 2 && slide.misclicks > 0 ? TONE.bad : INK, lineHeight: 1.1 }));
-    out.push(text(s.label, x + i * sw, 410, sw - 16, 22, 16, { color: MUTED }));
+    out.push(text(s.value, x + i * sw, 356, sw - 16, 50, 42, { bold: true, display: true, color: i === 2 && slide.misclicks > 0 ? TONE.bad : INK, lineHeight: 1.1 }));
+    out.push(label(s.label, x + i * sw, 410, sw - 16));
   });
   if (slide.topMisclicks.length) {
-    out.push(text('Lo más tocado sin efecto', x, 466, cw, 20, 13, { color: MUTED, bold: true, upper: true }));
+    out.push(label('Lo más tocado sin efecto', x, 466, cw));
     slide.topMisclicks.forEach((m, i) => {
       const y = 496 + i * 42;
       out.push(rect(x, y + 34, cw, 1, LINE));
       out.push(text(`«${m.label}»`, x, y, cw - 120, 30, 19, { min: 13 }));
-      out.push(text(m.count === 1 ? '1 vez' : `${m.count} veces`, x + cw - 110, y, 110, 30, 19, { align: 'right', color: MUTED }));
+      out.push(text(m.count === 1 ? '1 vez' : `${m.count} veces`, x + cw - 110, y + 2, 110, 28, 16, { align: 'right', color: MUTED, mono: true }));
     });
   }
   out.push(text(slide.firstClick ? 'Verde: acertó · Rojo: tocó en otro lado' : 'Azul: toque con efecto · Rojo: toque sin efecto', x, 636, cw, 20, 14, { color: FAINT }));
@@ -347,8 +425,9 @@ function question(slide: Extract<Slide, { kind: 'question' }>): Shape[] {
   const bottom = 596;
   if (slide.questionKind === 'scale') {
     const avg = slide.average === undefined ? '—' : slide.average.toFixed(1).replace('.', ',');
-    out.push(text(avg, G.x, top + 16, 300, 120, 112, { bold: true, lineHeight: 1 }));
-    out.push(text(`de ${slide.max ?? ''}, en promedio`, G.x, top + 140, 300, 30, 22, { color: MUTED }));
+    if (slide.average !== undefined) out.push(mark(avg, G.x, top + 16, 112));
+    out.push(text(avg, G.x, top + 16, 300, 120, 112, { bold: true, display: true, lineHeight: 1 }));
+    out.push(label(`de ${slide.max ?? ''}, en promedio`, G.x, top + 146, 300, { upper: false }));
     const bars = slide.bars ?? [];
     const cx = 420;
     const cw = SLIDE_W - G.x - cx;
@@ -361,9 +440,9 @@ function question(slide: Extract<Slide, { kind: 'question' }>): Shape[] {
       const bx = cx + i * (colW + gap);
       const h = b.count > 0 ? Math.max(6, (b.count / maxCount) * area) : 4;
       const base = top + 30 + area;
-      out.push(rect(bx + (colW - barW) / 2, base - h, barW, h, b.count === maxCount ? BAR : b.count > 0 ? BAR_MID : LINE, { radius: 6 }));
-      out.push(text(String(b.count), bx, base - h - 28, colW, 24, 18, { bold: true, align: 'center', color: b.count > 0 ? INK : FAINT }));
-      out.push(text(b.label, bx, base + 12, colW, 24, 18, { align: 'center', color: MUTED }));
+      out.push(rect(bx + (colW - barW) / 2, base - h, barW, h, b.count === maxCount ? BAR : b.count > 0 ? BAR_MID : LINE, { radius: 2 }));
+      out.push(text(String(b.count), bx, base - h - 28, colW, 24, 17, { mono: true, align: 'center', color: b.count > 0 ? INK : FAINT }));
+      out.push(text(b.label, bx, base + 12, colW, 24, 17, { mono: true, align: 'center', color: MUTED }));
     });
   } else if (slide.questionKind === 'text') {
     const quotes = slide.quotes ?? [];
@@ -375,9 +454,9 @@ function question(slide: Extract<Slide, { kind: 'question' }>): Shape[] {
     quotes.forEach((q, i) => {
       const qx = G.x + (i % cols) * (cw + gap);
       const qy = top + Math.floor(i / cols) * (ch + gap);
-      out.push(rect(qx, qy, cw, ch, SOFT, { radius: 16 }));
-      out.push(text(`«${q.text}»`, qx + 28, qy + 24, cw - 56, ch - 72, quotes.length === 1 ? 32 : 24, { min: 13, lineHeight: 1.35 }));
-      out.push(text(`— ${q.who}`, qx + 28, qy + ch - 40, cw - 56, 22, 15, { bold: true, color: MUTED }));
+      out.push(rect(qx, qy + 8, 2, ch - 16, INK));
+      out.push(text(`«${q.text}»`, qx + 28, qy + 8, cw - 56, ch - 60, quotes.length === 1 ? 32 : 24, { min: 13, lineHeight: 1.35 }));
+      out.push(label(q.who, qx + 28, qy + ch - 36, cw - 56));
     });
   } else {
     const bars = slide.bars ?? [];
@@ -391,9 +470,9 @@ function question(slide: Extract<Slide, { kind: 'question' }>): Shape[] {
       const y = top + i * rowH;
       const barH = Math.min(30, rowH * 0.55);
       out.push(text(b.label, G.x, y + (rowH - Math.min(rowH, 48)) / 2, labelW, Math.min(rowH, 48), 20, { min: 12, valign: 'middle', lineHeight: 1.2 }));
-      out.push(rect(bx, y + (rowH - barH) / 2, bw, barH, SOFT, { radius: 6 }));
-      if (b.share > 0) out.push(rect(bx, y + (rowH - barH) / 2, Math.max(8, bw * b.share), barH, b.count === topCount ? BAR : BAR_MID, { radius: 6 }));
-      out.push(text(b.value, bx + bw + 16, y + (rowH - 26) / 2, vw, 26, 18, { bold: true, align: 'right' }));
+      out.push(rect(bx, y + (rowH - barH) / 2, bw, barH, SOFT, { radius: 2 }));
+      if (b.share > 0) out.push(rect(bx, y + (rowH - barH) / 2, Math.max(8, bw * b.share), barH, b.count === topCount ? BAR : BAR_MID, { radius: 2 }));
+      out.push(text(b.value, bx + bw + 16, y + (rowH - 24) / 2, vw, 24, 16, { mono: true, align: 'right' }));
     });
   }
   if (slide.takeaway) out.push(text(slide.takeaway, G.x, 614, G.w, 44, 18, { color: MUTED, min: 13, edit: 'takeaway' }));
@@ -407,11 +486,8 @@ function nextSteps(slide: Extract<Slide, { kind: 'next-steps' }>): Shape[] {
       slide.items.map((item, i) => ({
         text: item.text,
         marker: (size: number, y: number): Shape[] => {
-          const d = Math.round(Math.max(30, size * 1.3));
-          return [
-            { type: 'circle', x: G.x, y: y + (size * 1.3 - d) / 2, d, fill: item.tone === 'good' ? GOOD : INK },
-            text(String(i + 1), G.x, y + (size * 1.3 - d) / 2, d, d, Math.round(d * 0.5), { bold: true, align: 'center', valign: 'middle', color: PAPER, lineHeight: 1 }),
-          ];
+          const n = Math.round(Math.max(15, size * 0.72));
+          return [text(String(i + 1).padStart(2, '0'), G.x, y + (size * 1.3 - n * 1.3) / 2 + 1, 48, n * 1.3, n, { mono: true, color: item.tone === 'good' ? GOOD : MUTED, lineHeight: 1.3 })];
         },
       })),
       { x: G.x, y: 200, w: G.w, h: 450 },

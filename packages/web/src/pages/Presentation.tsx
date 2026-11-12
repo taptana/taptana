@@ -253,10 +253,11 @@ export function PresentationPage({ id, filter }: { id: string; filter: ReportFil
               </Link>
             </Button>
           }
+          eyebrow={study.name}
           title="Presentación"
           description={
             <span>
-              {study.name} · {shown.length === slides.length ? `${slides.length} diapositivas` : `${shown.length} de ${slides.length} diapositivas`} · se arma sola con los resultados
+              {shown.length === slides.length ? `${slides.length} diapositivas` : `${shown.length} de ${slides.length} diapositivas`} · se arma sola con los resultados
             </span>
           }
           actions={
@@ -306,13 +307,13 @@ export function PresentationPage({ id, filter }: { id: string; filter: ReportFil
                     aria-current={i === at ? 'true' : undefined}
                     aria-label={`Diapositiva ${i + 1}: ${s.title}${s.hidden ? ' (escondida)' : ''}`}
                     className={cn(
-                      'group flex w-full cursor-pointer items-start gap-2 rounded-lg p-1 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                      i === at ? 'bg-accent' : 'hover:bg-accent/60',
+                      'group flex w-full cursor-pointer items-start gap-2 rounded-sm p-1 text-left outline-none focus-ink',
+                      i === at ? '' : 'opacity-80 hover:opacity-100',
                     )}
                     data-testid="deck-thumb"
                   >
-                    <span className="w-5 shrink-0 pt-1 text-right text-xs tabular-nums text-muted-foreground">{i + 1}</span>
-                    <span className={cn('relative block overflow-hidden rounded-md border bg-white shadow-xs', i === at && 'ring-2 ring-foreground/70', s.hidden && 'opacity-40')}>
+                    <span className={cn('num w-5 shrink-0 pt-1 text-right text-xs', i === at ? 'font-medium text-foreground' : 'text-muted-foreground')}>{String(i + 1).padStart(2, '0')}</span>
+                    <span className={cn('relative block overflow-hidden rounded-xs border bg-white', i === at && 'border-foreground ring-1 ring-foreground', s.hidden && 'opacity-40')}>
                       <ScaledSlide width={168}>
                         <SlideCanvas slide={s} ctx={ctx(s)} report={report} proto={proto} lite />
                       </ScaledSlide>
@@ -335,7 +336,7 @@ export function PresentationPage({ id, filter }: { id: string; filter: ReportFil
                 <Button variant="ghost" size="icon" onClick={() => go(-1)} disabled={at === 0} aria-label="Diapositiva anterior">
                   <ChevronLeft />
                 </Button>
-                <span className="min-w-20 text-center text-sm tabular-nums text-muted-foreground" aria-live="polite" data-testid="deck-position">
+                <span className="num min-w-20 text-center text-sm text-muted-foreground" aria-live="polite" data-testid="deck-position">
                   {at + 1} de {slides.length}
                 </span>
                 <Button variant="ghost" size="icon" onClick={() => go(1)} disabled={at >= slides.length - 1} aria-label="Diapositiva siguiente">
@@ -399,7 +400,7 @@ function CurrentSlide({ slide, ctx, report, proto, onEdit }: { slide: Slide; ctx
   return (
     <div ref={ref} className="w-full">
       {width > 0 && (
-        <ScaledSlide width={width} className={cn('rounded-xl border bg-white shadow-sm', slide.hidden && 'opacity-50')}>
+        <ScaledSlide width={width} className={cn('rounded-sm border border-foreground/25 bg-white', slide.hidden && 'opacity-50')}>
           <div data-testid="deck-slide" data-kind={slide.kind}>
             <SlideCanvas key={slide.id} slide={slide} ctx={ctx} report={report} proto={proto} editable onEdit={onEdit} />
           </div>
@@ -465,17 +466,17 @@ function PresentMode({ slides, start, deckTitle, report, proto, onClose }: { sli
           <SlideCanvas key={slide.id} slide={slide} ctx={{ index: i, total: slides.length, deckTitle }} report={report} proto={proto} />
         </ScaledSlide>
       )}
-      <div className="tt-present-controls absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-zinc-900/85 px-2 py-1 text-white">
-        <button type="button" className="grid size-9 cursor-pointer place-items-center rounded-full hover:bg-white/15" onClick={() => setI((x) => Math.max(0, x - 1))} aria-label="Anterior">
+      <div className="tt-present-controls absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-md bg-zinc-900/85 px-1 py-1 text-white">
+        <button type="button" className="grid size-9 cursor-pointer place-items-center rounded-sm hover:bg-white/15" onClick={() => setI((x) => Math.max(0, x - 1))} aria-label="Anterior">
           <ChevronLeft className="size-5" />
         </button>
-        <span className="min-w-16 text-center text-sm tabular-nums">
+        <span className="num min-w-16 text-center text-sm">
           {i + 1} / {slides.length}
         </span>
-        <button type="button" className="grid size-9 cursor-pointer place-items-center rounded-full hover:bg-white/15" onClick={() => setI((x) => Math.min(slides.length - 1, x + 1))} aria-label="Siguiente">
+        <button type="button" className="grid size-9 cursor-pointer place-items-center rounded-sm hover:bg-white/15" onClick={() => setI((x) => Math.min(slides.length - 1, x + 1))} aria-label="Siguiente">
           <ChevronRight className="size-5" />
         </button>
-        <button type="button" className="grid size-9 cursor-pointer place-items-center rounded-full hover:bg-white/15" onClick={onClose} aria-label="Salir (Esc)">
+        <button type="button" className="grid size-9 cursor-pointer place-items-center rounded-sm hover:bg-white/15" onClick={onClose} aria-label="Salir (Esc)">
           <X className="size-5" />
         </button>
       </div>

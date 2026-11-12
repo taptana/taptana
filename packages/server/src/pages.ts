@@ -11,23 +11,23 @@ function escapeHtml(value: string): string {
 }
 
 const STYLE = `
-:root{color-scheme:light dark;--bg:#f6f6f4;--card:#fff;--text:#1c1c1a;--muted:#62625c;--line:#e4e4df;--accent:#1f6f54;--accent-text:#fff}
-@media (prefers-color-scheme:dark){:root{--bg:#161614;--card:#1f1f1c;--text:#f1f1ec;--muted:#a5a59c;--line:#33332e;--accent:#58c29b;--accent-text:#0d1f18}}
+:root{color-scheme:light dark;--bg:#fbfaf8;--card:#fff;--text:#151411;--muted:#51504b;--line:#dad9d5;--accent:#151411;--accent-text:#fbfaf8}
+@media (prefers-color-scheme:dark){:root{--bg:#11100f;--card:#191816;--text:#f0eeea;--muted:#b9b7b2;--line:#343330;--accent:#f0eeea;--accent-text:#11100f}}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px 16px;
   background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-main{width:100%;max-width:27rem;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px 24px}
-.brand{margin:0 0 20px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+main{width:100%;max-width:27rem;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:28px 24px}
+.brand{margin:0 0 20px;font:500 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
 h1{margin:0 0 12px;font-size:22px;line-height:1.25;font-weight:650}
 p{margin:0 0 12px}
 .muted{color:var(--muted)}
 .aside{margin-top:20px;padding-top:16px;border-top:1px solid var(--line);font-size:15px}
 .aside p:last-child{margin-bottom:0}
-.button{display:inline-block;margin-top:4px;padding:11px 18px;border-radius:10px;background:var(--accent);color:var(--accent-text);
+.button{display:inline-block;margin-top:4px;padding:11px 18px;border-radius:6px;background:var(--accent);color:var(--accent-text);
   font-weight:600;text-decoration:none}
-.button:focus-visible{outline:3px solid var(--text);outline-offset:2px}
-code{font:14px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);padding:1px 5px;border-radius:5px}
-a{color:var(--accent)}
+.button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+code{font:14px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);padding:1px 5px;border-radius:3px}
+a{color:var(--text);text-underline-offset:3px}
 `;
 
 function page(title: string, body: string): string {

@@ -12,7 +12,7 @@ function TooltipContent({ className, sideOffset = 6, ...props }: React.Component
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
         sideOffset={sideOffset}
-        className={cn('bg-foreground text-background z-50 max-w-xs rounded-md px-3 py-1.5 text-xs text-balance shadow-md', className)}
+        className={cn('bg-foreground text-background z-50 max-w-xs rounded-sm px-2.5 py-1.5 text-xs text-balance', className)}
         {...props}
       />
     </TooltipPrimitive.Portal>

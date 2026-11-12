@@ -1,6 +1,5 @@
 import type { BlockKind } from '@taptana/shared';
 import { cn } from '@/lib/utils';
-import { KindIcon } from '@/components/builder/fields';
 import { ScoreChip } from './overview.tsx';
 
 export interface IndexEntry {
@@ -25,29 +24,26 @@ export function BlockPicker({ entries, current, onSelect, label }: { entries: In
   if (entries.length < 2) return null;
   return (
     <nav aria-label={label} data-print="hide">
-      <ul className="flex flex-wrap gap-2">
+      <ul className="grid gap-px border-y bg-border sm:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))]">
         {entries.map((e) => {
           const active = current === e.id;
           return (
-            <li key={e.id} className="min-w-0 max-w-full">
+            <li key={e.id} className="min-w-0 bg-background">
               <button
                 type="button"
                 onClick={() => onSelect(e.id)}
                 aria-current={active ? 'true' : undefined}
                 className={cn(
-                  'flex max-w-full sm:max-w-80 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                  active ? 'border-primary bg-card ring-1 ring-primary shadow-sm' : 'border-border bg-card text-foreground/85 hover:bg-accent/60 hover:text-foreground',
+                  'flex h-full w-full cursor-pointer flex-col gap-1.5 px-4 py-4 text-left text-sm outline-none transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-foreground',
+                  active ? 'shadow-[inset_0_3px_0_var(--foreground)]' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
-                <KindIcon kind={e.kind} size="sm" />
-                <span className="min-w-0 flex-1">
-                  <span className={cn('block truncate font-medium', active && 'text-foreground')}>{e.title}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {e.number}. {e.kindLabel}
-                    {e.hint && ` · ${e.hint}`}
-                  </span>
+                <span className="type-eyebrow truncate">
+                  {String(e.number).padStart(2, '0')} — {e.kindLabel}
+                  {e.hint && ` · ${e.hint}`}
                 </span>
-                {e.score !== undefined && <ScoreChip score={e.score} className="text-sm" />}
+                <span className={cn('block max-w-full truncate text-[15px]', active ? 'font-semibold text-foreground' : 'font-medium')}>{e.title}</span>
+                {e.score !== undefined && <ScoreChip score={e.score} className="mt-0.5 text-sm" />}
               </button>
             </li>
           );

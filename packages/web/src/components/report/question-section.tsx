@@ -14,10 +14,10 @@ function Bars({ items, total, highlight }: { items: Array<{ label: string; count
       {items.map((item) => (
         <li key={item.label} className="grid grid-cols-[minmax(3rem,auto)_minmax(0,1fr)_auto] items-center gap-3 text-sm">
           <span className="max-w-40 sm:max-w-64 break-words">{item.label}</span>
-          <span className="h-6 rounded bg-muted overflow-hidden" aria-hidden="true">
-            <span className={cn('block h-full rounded', highlight && item.count === max && item.count > 0 ? 'bg-primary' : 'bg-primary/50')} style={{ width: `${(item.count / max) * 100}%` }} />
+          <span className="h-5 rounded-xs bg-muted overflow-hidden" aria-hidden="true">
+            <span className={cn('block h-full', highlight && item.count === max && item.count > 0 ? 'bg-foreground' : 'bg-foreground/45')} style={{ width: `${(item.count / max) * 100}%` }} />
           </span>
-          <span className="tabular-nums text-muted-foreground whitespace-nowrap">
+          <span className="num text-muted-foreground whitespace-nowrap">
             <span className="text-foreground font-medium">{item.count}</span> · {total > 0 ? pct(item.count / total) : '0 %'}
           </span>
         </li>
@@ -46,13 +46,13 @@ export function QuestionBody({ question: q }: { question: QuestionReport }) {
     return (
       <div className="space-y-4">
         {counts}
-        <ul className="space-y-3">
+        <ul className="border-t">
           {shown.map((t, i) => (
-            <li key={`${t.sessionId}-${i}`} className="rounded-xl border border-border/70 bg-card p-4 sm:p-5 space-y-2" data-print="keep">
+            <li key={`${t.sessionId}-${i}`} className="border-b py-4 space-y-2" data-print="keep">
               <p className="whitespace-pre-wrap break-words">“{t.text}”</p>
               <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 <span>{t.who ?? ctx.names.get(t.sessionId) ?? 'Participante'}</span>
-                <Link to={recordingRoute(ctx, t.sessionId)} className="inline-flex items-center gap-1 underline decoration-primary/40 underline-offset-4 hover:text-primary hover:decoration-primary" data-print="hide">
+                <Link to={recordingRoute(ctx, t.sessionId)} className="link-ink inline-flex items-center gap-1" data-print="hide">
                   <PlayCircle className="size-3.5" />
                   Ver grabación
                 </Link>
@@ -74,8 +74,8 @@ export function QuestionBody({ question: q }: { question: QuestionReport }) {
     <div className="space-y-4">
       {q.kind === 'scale' && typeof q.average === 'number' && (
         <div className="flex items-baseline gap-2">
-          <span className="text-4xl font-semibold tabular-nums">{q.average.toFixed(1).replace('.', ',')}</span>
-          <span className="text-muted-foreground">de {q.max ?? distribution.length} en promedio</span>
+          <span className="font-display text-[2.75rem] font-bold tabular-nums tracking-[-0.03em] leading-none">{q.average.toFixed(1).replace('.', ',')}</span>
+          <span className="num text-sm text-muted-foreground">de {q.max ?? distribution.length} en promedio</span>
         </div>
       )}
       {counts}

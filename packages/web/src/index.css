@@ -2,16 +2,19 @@
 @import "rrweb-player/dist/style.css";
 
 /*
- * Identidad de Taptana, sobria: la base neutra de shadcn (blancos, grises, tinta casi negra) y un
- * solo acento, el violeta (`--primary`), para la acción principal, los links, el foco, lo
- * seleccionado y el progreso. El color se reserva para estados y resultados (verde, rojo, azul
- * «por revisar», ámbar), que no se definen aquí. La personalidad la ponen el logo, la tipografía
- * de títulos y el motivo de puntos (`bg-dots`, las ilustraciones).
+ * Identidad de Taptana: un instrumento de medición, un cuaderno de campo. Tinta y papel, plano y
+ * con reglas finas. `--primary` es la tinta (botón principal negro, foco, lo seleccionado, links
+ * subrayados). Un solo acento, el amarillo de resaltador (`--mark`): solo como trazo detrás de
+ * unas pocas palabras o cifras (`mark`) y como el punto «tocado» del tablero. Nunca relleno de
+ * botones, color de texto ni superficie grande. Los colores de estado y de resultado (verde,
+ * rojo, azul «por revisar», ámbar) no se definen aquí. Tres voces: Bricolage Grotesque (el
+ * título de la página), IBM Plex Sans (texto e interfaz) e IBM Plex Mono (datos: cifras,
+ * unidades, antetítulos, rutas, contadores).
  */
 /* `dark:` sigue al sistema, igual que los tokens de abajo (no hay interruptor de tema). */
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
-/* Tipografía de títulos, servida por el propio panel (sin pedir nada a otros sitios). */
+/* Tipografías servidas por el propio panel (sin pedir nada a otros sitios). */
 @font-face {
   font-family: 'Bricolage Grotesque Variable';
   font-style: normal;
@@ -30,35 +33,93 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
     U+FEFF, U+FFFD;
 }
+@font-face {
+  font-family: 'IBM Plex Sans Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  src: url('@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Sans Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  src: url('@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-400-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-500-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url('@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
 
 :root {
   /* Relleno de tarjetas: 20px en celular, 28px desde tablet. */
   --card-pad: 1.25rem;
-  --radius: 0.75rem;
-  --background: oklch(0.99 0.002 286);
-  --foreground: oklch(0.2 0.015 286);
+  /* Botones y campos 6px; las pocas tarjetas y diálogos, 8px. */
+  --radius: 0.375rem;
+  /* Papel (apenas cálido) y tinta. */
+  --background: oklch(0.985 0.003 95);
+  --foreground: oklch(0.19 0.006 95);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.015 286);
+  --card-foreground: oklch(0.19 0.006 95);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.015 286);
-  --primary: oklch(0.48 0.19 285);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.965 0.002 286);
-  --secondary-foreground: oklch(0.2 0.015 286);
-  --muted: oklch(0.965 0.002 286);
+  --popover-foreground: oklch(0.19 0.006 95);
+  --primary: oklch(0.19 0.006 95);
+  --primary-foreground: oklch(0.985 0.003 95);
+  --secondary: oklch(0.955 0.004 95);
+  --secondary-foreground: oklch(0.19 0.006 95);
+  --muted: oklch(0.955 0.004 95);
   /* Texto secundario: ≥ 7:1 sobre fondo, tarjeta, menú y `--muted`. */
-  --muted-foreground: oklch(0.44 0.016 286);
-  --accent: oklch(0.955 0.003 286);
-  --accent-foreground: oklch(0.2 0.015 286);
+  --muted-foreground: oklch(0.43 0.008 95);
+  --accent: oklch(0.945 0.005 95);
+  --accent-foreground: oklch(0.19 0.006 95);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.915 0.004 286);
-  --input: oklch(0.87 0.006 286);
-  --ring: oklch(0.58 0.17 285);
-  --sidebar: oklch(0.982 0.002 286);
-  /* Solo para las ilustraciones: el toque (coral) que destaca en el tablero. */
-  --tap: oklch(0.7 0.17 40);
+  /* La regla fina (1px) que separa secciones y filas. */
+  --border: oklch(0.885 0.005 95);
+  --input: oklch(0.66 0.006 95);
+  --ring: oklch(0.19 0.006 95);
+  --sidebar: oklch(0.985 0.003 95);
+  /* El resaltador: trazo detrás de pocas palabras o cifras y el punto «tocado». Texto encima: tinta. */
+  --mark: oklch(0.9 0.17 100);
+  --mark-foreground: oklch(0.19 0.006 95);
 
-  --shadow-tint: 240 6% 10%;
+  --shadow-tint: 60 6% 10%;
 }
 
 @media (min-width: 640px) {
@@ -67,30 +128,31 @@
   }
 }
 
+/* En oscuro el papel pasa a ser tinta y la tinta, papel; el resaltador sigue amarillo con tinta encima. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: oklch(0.16 0.004 286);
-    --foreground: oklch(0.97 0.002 286);
-    --card: oklch(0.205 0.005 286);
-    --card-foreground: oklch(0.97 0.002 286);
-    --popover: oklch(0.225 0.006 286);
-    --popover-foreground: oklch(0.97 0.002 286);
-    /* En oscuro el violeta se aclara y el texto encima es tinta: así también sirve para links. */
-    --primary: oklch(0.76 0.13 288);
-    --primary-foreground: oklch(0.19 0.05 285);
-    --secondary: oklch(0.27 0.006 286);
-    --secondary-foreground: oklch(0.97 0.002 286);
-    --muted: oklch(0.27 0.006 286);
-    --muted-foreground: oklch(0.78 0.012 286);
-    --accent: oklch(0.27 0.006 286);
-    --accent-foreground: oklch(0.97 0.002 286);
+    --background: oklch(0.175 0.004 95);
+    --foreground: oklch(0.95 0.006 95);
+    --card: oklch(0.21 0.004 95);
+    --card-foreground: oklch(0.95 0.006 95);
+    --popover: oklch(0.23 0.005 95);
+    --popover-foreground: oklch(0.95 0.006 95);
+    --primary: oklch(0.95 0.006 95);
+    --primary-foreground: oklch(0.175 0.004 95);
+    --secondary: oklch(0.27 0.005 95);
+    --secondary-foreground: oklch(0.95 0.006 95);
+    --muted: oklch(0.27 0.005 95);
+    --muted-foreground: oklch(0.78 0.008 95);
+    --accent: oklch(0.28 0.005 95);
+    --accent-foreground: oklch(0.95 0.006 95);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(0.3 0.006 286);
-    --input: oklch(0.37 0.008 286);
-    --ring: oklch(0.68 0.15 286);
-    --sidebar: oklch(0.18 0.004 286);
-    --tap: oklch(0.74 0.16 40);
-    --shadow-tint: 240 10% 2%;
+    --border: oklch(0.32 0.005 95);
+    --input: oklch(0.5 0.006 95);
+    --ring: oklch(0.95 0.006 95);
+    --sidebar: oklch(0.175 0.004 95);
+    --mark: oklch(0.88 0.17 100);
+    --mark-foreground: oklch(0.19 0.006 95);
+    --shadow-tint: 60 10% 2%;
   }
 }
 
@@ -111,21 +173,27 @@
   --text-base: 1rem;
   --text-base--line-height: 1.6;
   --font-display: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-tint) / 0.06);
-  --shadow-sm: 0 1px 2px 0 hsl(var(--shadow-tint) / 0.06), 0 2px 6px -1px hsl(var(--shadow-tint) / 0.07);
-  --shadow-md: 0 2px 4px -1px hsl(var(--shadow-tint) / 0.06), 0 8px 18px -4px hsl(var(--shadow-tint) / 0.1);
-  --shadow-lg: 0 4px 8px -2px hsl(var(--shadow-tint) / 0.06), 0 18px 40px -8px hsl(var(--shadow-tint) / 0.16);
+  --font-sans: 'IBM Plex Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  /* Plano: sin sombras. Solo lo que flota (menús, diálogos, avisos breves) lleva una, discreta. */
+  --shadow-2xs: 0 0 #0000;
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+  --shadow-md: 0 0 #0000;
+  --shadow-lg: 0 2px 4px -2px hsl(var(--shadow-tint) / 0.08), 0 12px 28px -10px hsl(var(--shadow-tint) / 0.2);
   --animate-pop: tt-pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
   --animate-ripple: tt-ripple 1.4s ease-out both;
   --animate-rise: tt-rise 0.35s ease-out both;
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-xs: 2px;
+  --radius-sm: calc(var(--radius) - 3px);
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-xl: calc(var(--radius) + 2px);
+  --radius-2xl: calc(var(--radius) + 2px);
+  --radius-3xl: calc(var(--radius) + 4px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -145,7 +213,8 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
-  --color-tap: var(--tap);
+  --color-mark: var(--mark);
+  --color-mark-foreground: var(--mark-foreground);
 }
 
 @keyframes tt-pop {
@@ -179,15 +248,58 @@
   }
 }
 
-/* El motivo: una cuadrícula de puntos, como los hoyos del tablero. */
+/* El motivo: una cuadrícula de puntos, como los hoyos del tablero. Muy tenue y solo para enmarcar. */
 @utility bg-dots {
-  background-image: radial-gradient(circle, color-mix(in oklab, var(--foreground) 13%, transparent) 1.2px, transparent 1.6px);
-  background-size: 20px 20px;
+  background-image: radial-gradient(circle, color-mix(in oklab, var(--foreground) 16%, transparent) 1px, transparent 1.4px);
+  background-size: 16px 16px;
+  background-position: 8px 8px;
+}
+
+/* El resaltador: un trazo plano detrás del texto, siempre con tinta encima (también en oscuro). */
+@utility mark {
+  background-image: linear-gradient(to bottom, transparent 8%, var(--mark) 8%, var(--mark) 94%, transparent 94%);
+  color: var(--mark-foreground);
+  padding: 0.02em 0.18em;
+  margin-inline: -0.06em;
+  border-radius: 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* La voz de datos: cifras, unidades, rutas, contadores. */
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'zero' 0;
+  letter-spacing: -0.01em;
+}
+
+/* Foco: contorno de tinta de 2px. */
+@utility focus-ink {
+  &:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Link de texto: tinta subrayada. */
+@utility link-ink {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  text-decoration-color: color-mix(in oklab, currentColor 45%, transparent);
+  &:hover {
+    color: var(--foreground);
+    text-decoration-color: currentColor;
+  }
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  html {
+    font-family: var(--font-sans);
   }
   body {
     @apply bg-background text-foreground;
@@ -196,15 +308,21 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-  /* Títulos con la tipografía de marca; el texto corrido sigue en la del sistema. */
+  /* El título de página y los de sección van en la tipografía de marca. */
   h1,
   h2,
   [data-slot='dialog-title'] {
     font-family: var(--font-display);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
+  }
+  code,
+  kbd {
+    font-family: var(--font-mono);
+    font-size: 0.94em;
   }
   ::selection {
-    background: color-mix(in oklab, var(--primary) 22%, transparent);
+    background: var(--mark);
+    color: var(--mark-foreground);
   }
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -219,50 +337,57 @@
 
 /*
  * Jerarquía de títulos, una sola definición para todo el panel:
- * página (h1) → sección (h2) → subsección (h3) → antetítulo (eyebrow, con moderación).
+ * antetítulo (mono) → página (h1, el único con peso fuerte) → sección (h2) → subsección (h3).
  */
 @utility type-page-title {
   font-family: var(--font-display);
-  font-size: 1.625rem;
-  line-height: 1.15;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 1.875rem;
+  line-height: 1.05;
+  font-weight: 750;
+  letter-spacing: -0.025em;
   @media (min-width: 640px) {
-    font-size: 2.125rem;
+    font-size: 2.625rem;
   }
 }
 @utility type-section {
   font-family: var(--font-display);
   font-size: 1.375rem;
-  line-height: 1.25;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.015em;
   @media (min-width: 640px) {
     font-size: 1.5rem;
   }
 }
 @utility type-subsection {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-size: 1.0625rem;
   line-height: 1.35;
-  font-weight: 650;
-  letter-spacing: -0.005em;
-  @media (min-width: 640px) {
-    font-size: 1.125rem;
-  }
+  font-weight: 600;
+  letter-spacing: 0;
 }
 @utility type-eyebrow {
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   line-height: 1.4;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   color: var(--muted-foreground);
+}
+
+/* Secciones numeradas (01, 02…) dentro de una tarea del reporte; cuenta solo las que salen. */
+.tt-numbered {
+  counter-reset: tt-sec;
+}
+.tt-numbered [data-sec-no]::before {
+  counter-increment: tt-sec;
+  content: counter(tt-sec, decimal-leading-zero);
 }
 
 /* El reproductor de rrweb dentro de nuestra tarjeta */
 .rr-player {
-  @apply !shadow-none !rounded-lg !bg-muted;
+  @apply !shadow-none !rounded-md !bg-muted;
   max-width: 100%;
 }
 .rr-player__frame {
@@ -271,3 +396,32 @@
 .rr-controller {
   @apply !bg-card !text-foreground;
 }
+/* Sus controles, en tinta: sin el azul que trae de fábrica. */
+.rr-player .rr-progress {
+  background: var(--border) !important;
+  border-color: var(--card) !important;
+  border-radius: 0 !important;
+}
+.rr-player .rr-progress__step {
+  background: color-mix(in oklab, var(--foreground) 35%, transparent) !important;
+}
+.rr-player .rr-progress__handler,
+.rr-player .rr-controller__btns button.active,
+.rr-player .switch input[type='checkbox']:checked + label:before {
+  background: var(--foreground) !important;
+}
+.rr-player .rr-controller__btns button.active {
+  color: var(--background) !important;
+}
+.rr-player .rr-controller__btns button:active {
+  background: var(--accent) !important;
+}
+.rr-player .rr-timeline__time {
+  color: var(--foreground) !important;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.rr-player .rr-progress__slider:focus-visible {
+  outline-color: var(--foreground) !important;
+}
+

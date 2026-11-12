@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import { ChevronDown, CircleAlert, FileArchive, FlaskConical, House, PlayCircle, ShieldCheck } from 'lucide-react';
+import { ChevronDown, CircleAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IS_DEMO } from '@/api/client';
 import { Button } from '@/components/ui/button';
@@ -8,11 +8,11 @@ import { EmptyArt, type EmptyArtKind } from '@/components/brand/art';
 import { LogoMark } from '@/components/brand/logo';
 import { Link, useRouter, type Route, type RouteName } from '@/router';
 
-const NAV: Array<{ to: Route; label: string; icon: typeof FileArchive; match: (r: RouteName) => boolean }> = [
-  { to: { name: 'home' }, label: 'Inicio', icon: House, match: (r) => r === 'home' },
-  { to: { name: 'prototypes' }, label: 'Prototipos', icon: FileArchive, match: (r) => r === 'prototypes' },
-  { to: { name: 'studies' }, label: 'Estudios', icon: FlaskConical, match: (r) => r === 'studies' || r === 'study' || r === 'report' || r === 'presentation' },
-  { to: { name: 'recordings' }, label: 'Sesiones', icon: PlayCircle, match: (r) => r === 'recordings' || r === 'player' },
+const NAV: Array<{ to: Route; label: string; match: (r: RouteName) => boolean }> = [
+  { to: { name: 'home' }, label: 'Inicio', match: (r) => r === 'home' },
+  { to: { name: 'prototypes' }, label: 'Prototipos', match: (r) => r === 'prototypes' },
+  { to: { name: 'studies' }, label: 'Estudios', match: (r) => r === 'studies' || r === 'study' || r === 'report' || r === 'presentation' },
+  { to: { name: 'recordings' }, label: 'Sesiones', match: (r) => r === 'recordings' || r === 'player' },
 ];
 
 const WIDTHS = { default: 'max-w-[1040px]', wide: 'max-w-[1280px]', full: 'max-w-none' } as const;
@@ -26,47 +26,51 @@ export function Layout({ children, wide = false, width }: { children: ReactNode;
   const { route } = useRouter();
   return (
     <div className="min-h-dvh bg-background lg:flex">
-      <a href="#contenido" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-card focus:px-3 focus:py-2 focus:shadow">
+      <a href="#contenido" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-sm focus:border focus:border-foreground focus:bg-card focus:px-3 focus:py-2">
         Saltar al contenido
       </a>
-      <aside className="bg-sidebar border-b lg:border-b-0 lg:border-r lg:w-64 lg:shrink-0 lg:sticky lg:top-0 lg:h-dvh lg:flex lg:flex-col print:hidden">
-        <div className="px-4 lg:px-5 pt-3 pb-1 lg:py-6 flex items-center gap-2.5">
-          <Link to={{ name: 'home' }} className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" aria-label="Taptana, ir al inicio">
-            <LogoMark className="size-7 lg:size-8" />
-            <span className="font-display font-bold tracking-tight text-lg lg:text-[1.35rem] leading-none">Taptana</span>
+      <aside className="bg-sidebar border-b lg:border-b-0 lg:border-r lg:w-60 lg:shrink-0 lg:sticky lg:top-0 lg:h-dvh lg:flex lg:flex-col print:hidden">
+        <div className="px-4 lg:px-6 pt-3 pb-2 lg:pt-7 lg:pb-8 flex items-center gap-2.5">
+          <Link to={{ name: 'home' }} className="flex items-center gap-2.5 rounded-sm outline-none focus-ink" aria-label="Taptana, ir al inicio">
+            <LogoMark className="size-7" />
+            <span className="font-display font-bold tracking-[-0.03em] text-xl lg:text-[1.375rem] leading-none">Taptana</span>
           </Link>
-          {IS_DEMO && <span className="ml-auto lg:ml-1 rounded-full border bg-card px-2 py-0.5 text-2xs font-semibold text-muted-foreground">Demo</span>}
+          {IS_DEMO && <span className="ml-auto lg:ml-1 rounded-sm border px-1.5 py-0.5 font-mono text-2xs font-medium uppercase tracking-[0.05em] text-muted-foreground">Demo</span>}
         </div>
-        <nav aria-label="Secciones" className="grid grid-cols-4 gap-1 px-2 pb-2 lg:flex lg:flex-col lg:px-3 lg:pb-0">
+        <p className="type-eyebrow hidden lg:block px-6 pb-2" aria-hidden>
+          Secciones
+        </p>
+        <nav aria-label="Secciones" className="grid grid-cols-4 px-2 lg:flex lg:flex-col lg:px-3">
           {NAV.map((item) => {
             const active = item.match(route.name);
-            const Icon = item.icon;
             return (
               <Link
                 key={item.label}
                 to={item.to}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'group relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                  'lg:min-h-10 lg:flex-row lg:justify-start lg:gap-3 lg:px-3 lg:py-2 lg:text-[15px]',
-                  active ? 'bg-accent text-foreground font-semibold' : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
+                  'group relative flex min-h-11 items-center justify-center border-b-2 px-1 text-sm transition-colors outline-none focus-ink',
+                  'lg:min-h-10 lg:justify-start lg:gap-3 lg:rounded-sm lg:border-b-0 lg:px-3 lg:text-[15px]',
+                  active ? 'border-foreground text-foreground font-semibold' : 'border-transparent text-muted-foreground hover:text-foreground',
                 )}
               >
-                <Icon className={cn('size-5 shrink-0 lg:size-[18px]', active && 'text-primary')} />
+                {/* Un hoyo del tablero por sección; el de la sección actual está «tocado». */}
+                <span
+                  aria-hidden
+                  className={cn(
+                    'hidden lg:block size-2.5 shrink-0 rounded-full border',
+                    active ? 'border-foreground bg-mark' : 'border-input group-hover:border-foreground',
+                  )}
+                />
                 <span className="whitespace-nowrap">{item.label}</span>
-                {/* La sección actual: una barrita violeta (a la izquierda en el menú, abajo en celular). */}
-                {active && <span aria-hidden className="absolute rounded-full bg-primary bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 lg:bottom-auto lg:left-0 lg:top-1/2 lg:h-5 lg:w-[3px] lg:-translate-x-0 lg:-translate-y-1/2" />}
               </Link>
             );
           })}
         </nav>
-        <div className="hidden lg:block mt-auto m-3 rounded-xl border bg-card p-4 text-sm leading-snug text-muted-foreground space-y-1.5">
-          <p className="flex items-center gap-2 font-semibold text-foreground">
-            <ShieldCheck className="size-4 text-muted-foreground" />
-            {IS_DEMO ? 'Modo demo' : 'Todo local'}
-          </p>
-          <p>{IS_DEMO ? 'Lo que subas o grabes queda solo en este navegador.' : 'Prototipos y sesiones quedan en esta computadora.'}</p>
-        </div>
+        <p className="hidden lg:block mt-auto mx-6 mb-6 border-t pt-4 text-xs leading-relaxed text-muted-foreground">
+          <span className="type-eyebrow mb-1 block">{IS_DEMO ? 'Modo demo' : 'Todo local'}</span>
+          {IS_DEMO ? 'Lo que subas o grabes queda solo en este navegador.' : 'Prototipos y sesiones quedan en esta computadora.'}
+        </p>
       </aside>
       <main id="contenido" className="flex-1 min-w-0">
         <div className={cn('mx-auto px-4 pt-6 pb-16 sm:px-8 sm:pt-10 lg:px-12 lg:pt-12 space-y-10 lg:space-y-14', WIDTHS[width ?? (wide ? 'wide' : 'default')])}>{children}</div>
@@ -79,12 +83,13 @@ export function Layout({ children, wide = false, width }: { children: ReactNode;
  * Encabezado de página: título, una línea de descripción y, a la derecha, como mucho un botón
  * principal (las acciones secundarias van en un menú «⋯»).
  */
-export function PageHeader({ title, description, actions, back }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; back?: ReactNode }) {
+export function PageHeader({ title, description, actions, back, eyebrow }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; back?: ReactNode; eyebrow?: ReactNode }) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
       <div className="flex items-start gap-3 min-w-0">
-        {back}
-        <div className="min-w-0 space-y-2">
+        {back && <div className={cn('shrink-0', eyebrow && 'pt-7')}>{back}</div>}
+        <div className="min-w-0 space-y-2.5">
+          {eyebrow && <p className="type-eyebrow">{eyebrow}</p>}
           <h1 className="type-page-title break-words">{title}</h1>
           {description && <div className="text-muted-foreground max-w-[65ch] leading-relaxed">{description}</div>}
         </div>
@@ -102,6 +107,7 @@ export function Section({
   children,
   className,
   id,
+  eyebrow,
 }: {
   title: ReactNode;
   description?: ReactNode;
@@ -109,11 +115,14 @@ export function Section({
   children: ReactNode;
   className?: string;
   id?: string;
+  /** Antetítulo en mono, por ejemplo «01 — Resultado». */
+  eyebrow?: ReactNode;
 }) {
   return (
-    <section id={id} className={cn('space-y-5 sm:space-y-6', className)}>
+    <section id={id} className={cn('space-y-5 sm:space-y-6 border-t border-foreground pt-5', className)}>
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 space-y-1.5">
+          {eyebrow && <p className="type-eyebrow">{eyebrow}</p>}
           <h2 className="type-section">{title}</h2>
           {description && <p className="text-muted-foreground max-w-[65ch] leading-relaxed">{description}</p>}
         </div>
@@ -124,22 +133,21 @@ export function Section({
   );
 }
 
-/** Pestañas simples (estilo shadcn Tabs) que navegan entre rutas. */
+/** Dos o tres vistas de lo mismo (Diseño / Resultados): texto en fila; la actual lleva el trazo de resaltador. */
 export function RouteTabs({ tabs }: { tabs: Array<{ label: string; to: Route; active: boolean; icon?: ReactNode }> }) {
   return (
-    <nav aria-label="Vistas" className="inline-flex max-w-full overflow-x-auto rounded-lg bg-muted p-1 gap-1 print:hidden">
+    <nav aria-label="Vistas" className="inline-flex max-w-full items-center overflow-x-auto rounded-md border border-input p-0.5 print:hidden">
       {tabs.map((t) => (
         <Link
           key={t.label}
           to={t.to}
           aria-current={t.active ? 'page' : undefined}
           className={cn(
-            'inline-flex min-h-9 shrink-0 items-center gap-2 rounded-md px-4 py-1.5 text-sm font-medium transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-            t.active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            'inline-flex min-h-9 shrink-0 items-center rounded-sm px-3.5 py-1.5 text-sm transition-colors outline-none focus-ink',
+            t.active ? 'font-semibold text-foreground' : 'text-muted-foreground hover:text-foreground',
           )}
         >
-          {t.icon}
-          {t.label}
+          <span className={cn(t.active && 'mark')}>{t.label}</span>
         </Link>
       ))}
     </nav>
@@ -151,11 +159,13 @@ export function RouteTabs({ tabs }: { tabs: Array<{ label: string; to: Route; ac
  */
 export function EmptyState({ icon, art, title, children, action }: { icon?: ReactNode; art?: EmptyArtKind; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-dashed border-input bg-card px-6 py-14 sm:py-16 text-center flex flex-col items-center gap-3">
-      {art ? <EmptyArt kind={art} className="mb-2" /> : <div className="size-12 rounded-xl bg-muted grid place-items-center text-muted-foreground">{icon}</div>}
-      <h2 className="type-section">{title}</h2>
-      {children && <div className="text-muted-foreground max-w-[52ch] leading-relaxed space-y-2">{children}</div>}
-      {action && <div className="pt-2 flex flex-wrap justify-center gap-2">{action}</div>}
+    <div className="border-y border-foreground/90 py-10 sm:py-14 flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-10">
+      {art ? <EmptyArt kind={art} className="shrink-0 sm:w-40" /> : <div className="size-10 shrink-0 grid place-items-center rounded-sm border text-muted-foreground">{icon}</div>}
+      <div className="min-w-0 space-y-3">
+        <h2 className="type-section">{title}</h2>
+        {children && <div className="text-muted-foreground max-w-[56ch] leading-relaxed space-y-2">{children}</div>}
+        {action && <div className="pt-2 flex flex-wrap gap-2">{action}</div>}
+      </div>
     </div>
   );
 }
@@ -175,14 +185,12 @@ export function ErrorState({
   home?: boolean;
 }) {
   return (
-    <div role="alert" className="rounded-xl border border-destructive/30 bg-card px-6 py-12 text-center flex flex-col items-center gap-3">
-      <div className="size-12 rounded-full bg-destructive/10 grid place-items-center text-destructive">
-        <CircleAlert className="size-6" />
-      </div>
+    <div role="alert" className="border-l-2 border-destructive py-2 pl-5 flex flex-col items-start gap-3">
+      <CircleAlert className="size-5 text-destructive" aria-hidden />
       <h2 className="type-section">{title}</h2>
       <div className="text-muted-foreground max-w-[52ch] leading-relaxed">{message}</div>
       {(onRetry || home) && (
-        <div className="pt-2 flex flex-wrap justify-center gap-2">
+        <div className="pt-2 flex flex-wrap gap-2">
           {onRetry && <Button onClick={onRetry}>{retryLabel}</Button>}
           {home && (
             <Button variant="outline" asChild>
@@ -198,7 +206,7 @@ export function ErrorState({
 /** Aviso de error en línea (dentro de una página que sí cargó). */
 export function InlineError({ children, onDismiss }: { children: ReactNode; onDismiss?: () => void }) {
   return (
-    <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+    <div role="alert" className="flex items-start gap-2.5 border-l-2 border-destructive py-1.5 pl-4 text-sm text-destructive">
       <CircleAlert className="size-4 mt-0.5 shrink-0" />
       <div className="flex-1 min-w-0">{children}</div>
       {onDismiss && (
@@ -228,7 +236,7 @@ export function ListSkeleton({ variant = 'rows', count = 4 }: { variant?: 'rows'
     return (
       <div className="grid gap-4 sm:grid-cols-2" aria-busy="true" aria-label="Cargando">
         {Array.from({ length: count }, (_, i) => (
-          <Skeleton key={i} className="h-44 rounded-xl" />
+          <Skeleton key={i} className="h-44" />
         ))}
       </div>
     );
@@ -236,7 +244,7 @@ export function ListSkeleton({ variant = 'rows', count = 4 }: { variant?: 'rows'
   return (
     <div className="space-y-3" aria-busy="true" aria-label="Cargando">
       {Array.from({ length: count }, (_, i) => (
-        <Skeleton key={i} className="h-16 rounded-xl" />
+        <Skeleton key={i} className="h-14" />
       ))}
     </div>
   );
@@ -261,11 +269,11 @@ export function NotFound() {
   );
 }
 
-/* Avisos sobrios: tarjeta blanca, borde fino y un filete del color del estado a la izquierda. */
+/* Avisos: sin fondo; una regla del color del estado a la izquierda y su ícono. */
 const NOTICE_TONES = {
   info: 'border-l-sky-500 [&_[data-slot=notice-icon]]:text-sky-600 dark:[&_[data-slot=notice-icon]]:text-sky-400',
   warning: 'border-l-amber-500 [&_[data-slot=notice-icon]]:text-amber-600 dark:[&_[data-slot=notice-icon]]:text-amber-400',
-  neutral: 'border-l-muted-foreground/40 [&_[data-slot=notice-icon]]:text-muted-foreground',
+  neutral: 'border-l-input [&_[data-slot=notice-icon]]:text-muted-foreground',
 } as const;
 
 /**
@@ -290,7 +298,7 @@ export function Notice({
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
-    <div role="status" className={cn('rounded-xl border border-l-[3px] bg-card text-foreground shadow-xs px-4 py-3 text-sm', NOTICE_TONES[tone], className)}>
+    <div role="status" className={cn('border-l-2 py-1 pl-4 text-sm text-foreground', NOTICE_TONES[tone], className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         {icon && (
           <span data-slot="notice-icon" className="shrink-0 [&_svg]:size-4" aria-hidden>
@@ -305,7 +313,7 @@ export function Notice({
               aria-expanded={open}
               aria-controls={id}
               onClick={() => setOpen((v) => !v)}
-              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1 text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-ink"
             >
               {open ? 'Ocultar' : 'Saber más'}
               <ChevronDown className={cn('size-3.5 transition-transform', open && 'rotate-180')} />

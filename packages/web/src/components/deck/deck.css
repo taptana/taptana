@@ -5,15 +5,15 @@
 
 .tt-editable {
   cursor: text;
-  border-radius: 6px;
+  border-radius: 2px;
   outline: none;
   transition: box-shadow 120ms;
 }
 .tt-editable:hover {
-  box-shadow: 0 0 0 2px rgb(95 62 216 / 0.18);
+  box-shadow: 0 0 0 1px rgb(21 20 17 / 0.3);
 }
 .tt-editable:focus {
-  box-shadow: 0 0 0 3px rgb(95 62 216 / 0.45);
+  box-shadow: 0 0 0 2px rgb(21 20 17 / 0.9);
   -webkit-line-clamp: unset !important;
   overflow: visible !important;
   background: rgb(255 255 255 / 0.9);

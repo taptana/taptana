@@ -31,22 +31,21 @@ import { Switch } from '@/components/ui/switch';
 import { plural } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { commonPath, emptyRule, fieldError, missedScreens, moveItem, rulesFor, samePathList, type DraftStudy, type DraftTask } from './draft';
-import { Field, KIND_INFO, KindIcon, OptionCards, ScreenName, ScreenPicker } from './fields';
+import { Field, KIND_INFO, OptionCards, ScreenName, ScreenPicker } from './fields';
 
 // ── Piezas comunes ───────────────────────────────────────────────────────
 
 export function EditorCard({ icon, kicker, title, children, actions }: { icon?: ReactNode; kicker: string; title: string; children: ReactNode; actions?: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border/80 bg-card shadow-xs">
-      <header className="flex flex-wrap items-center gap-3 border-b border-border/70 px-(--card-pad) py-5">
-        {icon}
+    <section className="rounded-xl border bg-card">
+      <header className="flex flex-wrap items-center gap-3 border-b px-(--card-pad) py-5">
         <div className="min-w-0 flex-1">
           <p className="type-eyebrow">{kicker}</p>
-          <h2 className="type-section mt-0.5 truncate">{title}</h2>
+          <h2 className="type-section mt-1 truncate">{title}</h2>
         </div>
         {actions}
       </header>
-      <div className="divide-y divide-border/70 px-(--card-pad)">{children}</div>
+      <div className="divide-y px-(--card-pad)">{children}</div>
     </section>
   );
 }
@@ -60,7 +59,7 @@ function Step({ n, title, hint, children }: { n?: number; title: string; hint?: 
     <section className="space-y-5 py-10 first:pt-8 last:pb-8">
       <header className="space-y-1.5">
         <h3 className="type-subsection flex items-center gap-2.5">
-          {n !== undefined && <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted font-sans text-sm font-semibold text-foreground/80 tabular-nums">{n}</span>}
+          {n !== undefined && <span className="num w-7 shrink-0 text-sm font-normal text-muted-foreground">{String(n).padStart(2, '0')}</span>}
           {title}
         </h3>
         {hint && <p className={cn('max-w-[65ch] text-[15px] leading-relaxed text-muted-foreground', n !== undefined && 'pl-9.5')}>{hint}</p>}
@@ -74,7 +73,7 @@ function Step({ n, title, hint, children }: { n?: number; title: string; hint?: 
 function AdvancedStep({ children, defaultOpen = false, label = 'Opciones avanzadas' }: { children: ReactNode; defaultOpen?: boolean; label?: string }) {
   return (
     <details className="group py-6" open={defaultOpen || undefined}>
-      <summary className="flex min-h-10 w-fit cursor-pointer list-none items-center gap-2 rounded-md text-[15px] font-medium text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-10 w-fit cursor-pointer list-none items-center gap-2 rounded-md text-[15px] font-medium text-muted-foreground outline-none select-none hover:text-foreground focus-ink [&::-webkit-details-marker]:hidden">
         <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
         {label}
       </summary>
@@ -85,7 +84,7 @@ function AdvancedStep({ children, defaultOpen = false, label = 'Opciones avanzad
 
 function SwitchRow({ label, hint, checked, onChange }: { label: string; hint?: ReactNode; checked: boolean; onChange: (checked: boolean) => void }) {
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl bg-muted/50 px-4 py-3.5">
+    <label className="flex cursor-pointer items-start justify-between gap-4 border-t pt-4">
       <span className="min-w-0">
         <span className="block text-[15px] leading-snug font-medium">{label}</span>
         {hint && <span className="mt-1 block max-w-[65ch] text-xs leading-relaxed text-muted-foreground">{hint}</span>}
@@ -97,8 +96,8 @@ function SwitchRow({ label, hint, checked, onChange }: { label: string; hint?: R
 
 function Advanced({ label = 'Avanzado', children, defaultOpen = false }: { label?: string; children: ReactNode; defaultOpen?: boolean }) {
   return (
-    <details className="group rounded-xl bg-muted/40" open={defaultOpen || undefined}>
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2.5 text-[15px] font-medium outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+    <details className="group border-l-2 border-input" open={defaultOpen || undefined}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm px-3 py-2.5 text-[15px] font-medium outline-none select-none focus-ink [&::-webkit-details-marker]:hidden">
         <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
         {label}
       </summary>
@@ -111,12 +110,12 @@ function Advanced({ label = 'Avanzado', children, defaultOpen = false }: { label
 function Tips({ title, children }: { title: string; children: ReactNode }) {
   return (
     <details className="group text-sm">
-      <summary className="flex w-fit cursor-pointer list-none items-center gap-2 rounded-md text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+      <summary className="flex w-fit cursor-pointer list-none items-center gap-2 rounded-md text-muted-foreground outline-none select-none hover:text-foreground focus-ink [&::-webkit-details-marker]:hidden">
         <Lightbulb className="size-4 shrink-0" />
         {title}
         <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
       </summary>
-      <div className="mt-3 max-w-[65ch] space-y-1.5 rounded-xl bg-muted/60 px-4 py-3 text-sm leading-relaxed text-muted-foreground">{children}</div>
+      <div className="mt-3 max-w-[65ch] space-y-1.5 border-l-2 border-input py-1 pl-4 text-sm leading-relaxed text-muted-foreground">{children}</div>
     </details>
   );
 }
@@ -216,7 +215,7 @@ export function SettingsEditor({
         </p>
         {fieldError(errors, undefined, 'variants') && <p className="text-sm text-destructive">{fieldError(errors, undefined, 'variants')}</p>}
         {variants.map((v, i) => (
-          <div key={v.id} className="space-y-2 rounded-xl bg-muted/50 p-4">
+          <div key={v.id} className="space-y-2 border-l-2 border-input py-1 pl-4">
             <div className="flex items-center gap-2">
               <Input aria-label={`Nombre de la variante ${i + 1}`} value={v.name} maxLength={STUDY_LIMITS.name} placeholder={`Variante ${'ABCDEFGH'[i] ?? i + 1}`} onChange={(e) => setVariants(variants.map((x) => (x.id === v.id ? { ...x, name: e.target.value } : x)))} />
               <Button type="button" variant="ghost" size="icon" aria-label={`Quitar la variante ${v.name || i + 1}`} onClick={() => setVariants(variants.filter((x) => x.id !== v.id))}>
@@ -276,7 +275,7 @@ export function WelcomeEditor({ draft, onChange, errors }: { draft: DraftStudy; 
         {(p) => <Textarea {...p} value={draft.consent ?? ''} maxLength={STUDY_LIMITS.text} placeholder={DEFAULT_CONSENT_TEXT} onChange={(e) => onChange(prune({ ...draft, consent: e.target.value }, ['consent']))} />}
       </Field>
       {!draft.consent && (
-        <div className="rounded-xl bg-muted/50 px-4 py-3.5 text-sm">
+        <div className="border-l-2 border-input py-1 pl-4 text-sm">
           <p className="mb-1.5 text-sm font-medium text-foreground/80">Texto estándar que verá el participante</p>
           <p>{DEFAULT_CONSENT_TEXT}</p>
         </div>
@@ -372,7 +371,7 @@ function MatchNote({ selector, matches }: { selector: string; matches: number | 
 function PickButton({ tools, label = 'Elegir en el prototipo' }: { tools: TaskTools; label?: string }) {
   if (tools.picking) {
     return (
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary bg-primary/5 px-3 py-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 border-l-2 border-foreground py-1 pl-4 text-sm">
         <Crosshair className="size-4 shrink-0" />
         <span className="min-w-0 flex-1">Toca el elemento en el teléfono…</span>
         <Button type="button" variant="outline" size="sm" onClick={tools.onCancelPick}>
@@ -402,16 +401,16 @@ function PathEditor({ path, onChange, tools }: { path: string[]; onChange: (path
           {path.map((screen, i) => (
             <li key={`${screen}-${i}`} className="flex items-center gap-1">
               {i > 0 && <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
-              <span className="inline-flex items-center gap-0.5 rounded-full border bg-card py-0.5 pr-1 pl-3 text-sm">
-                <span className="mr-1 tabular-nums text-xs text-muted-foreground">{i + 1}</span>
+              <span className="inline-flex items-center gap-0.5 rounded-sm border py-0.5 pr-1 pl-2.5 text-sm">
+                <span className="num mr-1.5 text-xs text-muted-foreground">{String(i + 1).padStart(2, '0')}</span>
                 <ScreenName id={screen} screens={tools.screens} className="max-w-36 truncate" />
-                <button type="button" className="ml-1 grid size-6 cursor-pointer place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 disabled:pointer-events-none" aria-label={`Mover ${screen} antes`} disabled={i === 0} onClick={() => onChange(moveItem(path, i, i - 1))}>
+                <button type="button" className="ml-1 grid size-6 cursor-pointer place-items-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 disabled:pointer-events-none" aria-label={`Mover ${screen} antes`} disabled={i === 0} onClick={() => onChange(moveItem(path, i, i - 1))}>
                   <ArrowLeft className="size-3.5" />
                 </button>
-                <button type="button" className="grid size-6 cursor-pointer place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 disabled:pointer-events-none" aria-label={`Mover ${screen} después`} disabled={i === path.length - 1} onClick={() => onChange(moveItem(path, i, i + 1))}>
+                <button type="button" className="grid size-6 cursor-pointer place-items-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 disabled:pointer-events-none" aria-label={`Mover ${screen} después`} disabled={i === path.length - 1} onClick={() => onChange(moveItem(path, i, i + 1))}>
                   <ArrowRight className="size-3.5" />
                 </button>
-                <button type="button" className="grid size-6 cursor-pointer place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Quitar ${screen} del camino`} onClick={() => onChange(path.filter((_, j) => j !== i))}>
+                <button type="button" className="grid size-6 cursor-pointer place-items-center rounded-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Quitar ${screen} del camino`} onClick={() => onChange(path.filter((_, j) => j !== i))}>
                   <X className="size-3.5" />
                 </button>
               </span>
@@ -454,7 +453,7 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
   const canUseCommon = kind === 'task' && common !== null && !samePathList(common, block.expectedPath);
 
   return (
-    <EditorCard icon={<KindIcon kind={kind} size="lg" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.title || info.untitled}>
+    <EditorCard kicker={`Bloque ${index + 1} · ${info.label}`} title={block.title || info.untitled}>
       <div className="flex flex-wrap items-center gap-2 py-6">
         {kind === 'first-click' ? (
           // Primer clic: no hay camino que grabar, solo un lugar que tocar. El toque no navega.
@@ -462,7 +461,7 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
             <Crosshair /> {tools.picking ? 'Esperando tu toque… (cancelar)' : 'Elegir en el prototipo'}
           </Button>
         ) : (
-          <Button type="button" variant="outline" onClick={tools.onRecord} disabled={tools.recording} className="disabled:opacity-100 disabled:border-primary disabled:bg-primary/5">
+          <Button type="button" variant="outline" onClick={tools.onRecord} disabled={tools.recording} className="disabled:opacity-100 disabled:border-foreground">
             <Video className="text-red-600" /> {tools.recording ? 'Grabando el camino…' : 'Grabar el camino correcto'}
           </Button>
         )}
@@ -536,7 +535,7 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
           </Field>
         )}
         {kind === 'task' && rule?.type === 'reached' && rule.path.trim() && tools.autoAdvance && endsOnGoal(block.expectedPath, rule.path) && (
-          <div className="flex max-w-[65ch] gap-3 rounded-xl bg-muted/60 px-4 py-3.5 text-sm leading-relaxed text-muted-foreground" data-testid="auto-advance-hint">
+          <div className="flex max-w-[65ch] gap-3 border-l-2 border-input py-1 pl-4 text-sm leading-relaxed text-muted-foreground" data-testid="auto-advance-hint">
             <Lightbulb className="mt-0.5 size-4 shrink-0" />
             <div className="min-w-0 space-y-2.5">
               <p>Al llegar, la tarea termina sola y el participante pasa al siguiente paso sin detenerse en esa pantalla. Si quieres que la vea, elige «espera a que toque Listo».</p>
@@ -551,9 +550,9 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
         {rule?.type === 'tapped' && (
           <div className="space-y-3">
             {rule.selector ? (
-              <div className="space-y-1.5 rounded-xl bg-muted/50 px-4 py-3.5">
+              <div className="space-y-1.5 border-l-2 border-input py-1 pl-4">
                 <p className="text-sm">
-                  Elemento elegido: <code className="rounded bg-card px-1.5 py-0.5 font-mono text-xs break-all">{rule.selector}</code>
+                  Elemento elegido: <code className="font-mono text-xs break-all text-foreground">{rule.selector}</code>
                 </p>
                 <MatchNote selector={rule.selector} matches={tools.matches} />
               </div>
@@ -590,7 +589,7 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
         )}
 
         {rule?.type === 'manual' && (
-          <p className="rounded-xl bg-muted/50 px-4 py-3.5 text-sm text-muted-foreground">
+          <p className="border-l-2 border-input py-1 pl-4 text-sm text-muted-foreground">
             Taptana no puede saber sola si lo logró. Cuando el participante toque "Listo", el resultado queda <strong className="font-medium text-foreground">por revisar</strong> hasta que lo marques en la grabación.
           </p>
         )}
@@ -660,7 +659,7 @@ function OptionsEditor({ block, onChange, error }: { block: ChoiceBlock; onChang
       <legend className="mb-1.5 text-[15px] font-medium">Opciones</legend>
       {options.map((option, i) => (
         <div key={i} className="flex items-center gap-1">
-          <span className="w-5 shrink-0 text-center text-xs tabular-nums text-muted-foreground">{i + 1}</span>
+          <span className="num w-5 shrink-0 text-center text-xs text-muted-foreground">{i + 1}</span>
           <Input aria-label={`Opción ${i + 1}`} value={option} maxLength={STUDY_LIMITS.option} placeholder={`Opción ${i + 1}`} onChange={(e) => setOptions(options.map((o, j) => (j === i ? e.target.value : o)))} />
           <Button type="button" variant="ghost" size="icon" className="hidden sm:inline-flex" aria-label={`Subir la opción ${i + 1}`} disabled={i === 0} onClick={() => setOptions(moveItem(options, i, i - 1))}>
             <ArrowUp />
@@ -691,7 +690,7 @@ function ScaleEditor({ block, onChange, errors }: { block: ScaleBlock; onChange:
     <>
       <fieldset className="min-w-0 space-y-2">
         <legend className="mb-1.5 text-[15px] font-medium">Tamaño de la escala</legend>
-        <div className="inline-flex gap-1 rounded-lg bg-muted p-1" role="radiogroup" aria-label="Tamaño de la escala">
+        <div className="inline-flex gap-0.5 rounded-md border border-input p-0.5" role="radiogroup" aria-label="Tamaño de la escala">
           {SCALE_SIZES.map((max) => (
             <button
               key={max}
@@ -699,7 +698,7 @@ function ScaleEditor({ block, onChange, errors }: { block: ScaleBlock; onChange:
               role="radio"
               aria-checked={block.max === max}
               onClick={() => onChange({ ...block, max })}
-              className={cn('cursor-pointer rounded-md px-4 py-1.5 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50', block.max === max ? 'bg-card shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+              className={cn('num cursor-pointer rounded-sm px-4 py-1.5 text-sm font-medium outline-none focus-ink', block.max === max ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
             >
               1 a {max}
             </button>
@@ -725,7 +724,7 @@ export function QuestionEditor({ block, index, onChange, errors }: { block: Ques
   const err = (...fields: string[]): string | undefined => fieldError(errors, block.id, ...fields);
   const set = (patch: Partial<QuestionBlock>): void => onChange(prune({ ...block, ...patch } as QuestionBlock, ['description', 'required']));
   return (
-    <EditorCard icon={<KindIcon kind={block.kind} size="lg" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.question || info.untitled}>
+    <EditorCard kicker={`Bloque ${index + 1} · ${info.label}`} title={block.question || info.untitled}>
       <Step n={1} title="Qué preguntas">
       <Field label="Pregunta" error={err('question')} help="Es lo que lee el participante.">
         {(p) => <Textarea {...p} value={block.question} maxLength={STUDY_LIMITS.question} placeholder={QUESTION_PLACEHOLDER[block.kind]} onChange={(e) => set({ question: e.target.value })} />}
@@ -769,7 +768,7 @@ export function QuestionEditor({ block, index, onChange, errors }: { block: Ques
 export function ContextEditor({ block, index, onChange, errors }: { block: ContextBlock; index: number; onChange: (next: ContextBlock) => void; errors: readonly StudyIssue[] }) {
   const info = KIND_INFO.context;
   return (
-    <EditorCard icon={<KindIcon kind="context" size="lg" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.title || info.untitled}>
+    <EditorCard kicker={`Bloque ${index + 1} · ${info.label}`} title={block.title || info.untitled}>
       <Step title="Qué lee el participante" hint='Lo lee y toca "Continuar". No se le pide nada.'>
       <Field label="Título" error={fieldError(errors, block.id, 'title')}>
         {(p) => <Input {...p} value={block.title} maxLength={STUDY_LIMITS.name} placeholder="Antes de seguir" onChange={(e) => onChange({ ...block, title: e.target.value })} />}

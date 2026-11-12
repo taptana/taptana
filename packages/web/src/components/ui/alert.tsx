@@ -3,15 +3,15 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const alertVariants = cva(
-  "relative grid w-full grid-cols-[0_1fr] items-start gap-y-1 rounded-lg border px-4 py-3 text-sm has-[>svg]:grid-cols-[1rem_1fr] has-[>svg]:gap-x-3 [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current",
+  "relative grid w-full grid-cols-[0_1fr] items-start gap-y-1 border-l-2 border-border py-1.5 pl-4 pr-2 text-sm has-[>svg]:grid-cols-[1rem_1fr] has-[>svg]:gap-x-3 [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current",
   {
     variants: {
       variant: {
-        default: 'bg-card text-card-foreground',
-        info: 'bg-card border-l-[3px] border-l-sky-500 [&>svg]:!text-sky-600 dark:[&>svg]:!text-sky-400',
-        warning: 'bg-card border-l-[3px] border-l-amber-500 [&>svg]:!text-amber-600 dark:[&>svg]:!text-amber-400',
-        success: 'bg-card border-l-[3px] border-l-emerald-500 [&>svg]:!text-emerald-600 dark:[&>svg]:!text-emerald-400',
-        destructive: 'bg-card border-l-[3px] border-l-destructive text-destructive [&_[data-slot=alert-description]]:text-destructive/90',
+        default: 'text-foreground',
+        info: 'border-l-sky-500 [&>svg]:!text-sky-600 dark:[&>svg]:!text-sky-400',
+        warning: 'border-l-amber-500 [&>svg]:!text-amber-600 dark:[&>svg]:!text-amber-400',
+        success: 'border-l-emerald-500 [&>svg]:!text-emerald-600 dark:[&>svg]:!text-emerald-400',
+        destructive: 'border-l-destructive text-destructive [&_[data-slot=alert-description]]:text-destructive/90',
       },
     },
     defaultVariants: { variant: 'default' },

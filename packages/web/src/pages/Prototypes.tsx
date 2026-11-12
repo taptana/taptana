@@ -109,6 +109,7 @@ export function PrototypesPage() {
   return (
     <Layout>
       <PageHeader
+        eyebrow={protos && protos.length > 0 ? plural(protos.length, 'prototipo', 'prototipos') : undefined}
         title="Prototipos"
         description={
           IS_DEMO
@@ -129,12 +130,8 @@ export function PrototypesPage() {
       <Section title="Agregar un prototipo">
         <Tabs value={mode} onValueChange={(v) => setMode(v === 'url' ? 'url' : 'file')} className="gap-6">
           <TabsList aria-label="Cómo agregar el prototipo" className="[&_svg]:size-4">
-            <TabsTrigger value="file">
-              <Upload /> Subir archivo
-            </TabsTrigger>
-            <TabsTrigger value="url">
-              <Globe /> Agregar por URL
-            </TabsTrigger>
+            <TabsTrigger value="file">Subir archivo</TabsTrigger>
+            <TabsTrigger value="url">Agregar por URL</TabsTrigger>
           </TabsList>
           <TabsContent value="file">
             {problem ? (
@@ -171,15 +168,14 @@ export function PrototypesPage() {
                     if (f) void upload(f);
                   }}
                   className={cn(
-                    'flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card px-6 py-12 sm:py-14 text-center cursor-pointer transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                    dragging ? 'border-primary bg-accent' : 'hover:border-foreground/30',
+                    'bg-dots flex flex-col items-start justify-center gap-2 rounded-xl border border-dashed border-input px-6 py-12 sm:px-10 sm:py-14 cursor-pointer transition-colors outline-none focus-ink [&>p]:bg-background [&>p]:px-2 [&>p]:-mx-2 [&>p]:py-0.5',
+                    dragging ? 'border-foreground border-solid' : 'hover:border-foreground',
                     busy && 'opacity-60 cursor-wait',
                   )}
                 >
-                  <span className="grid size-12 place-items-center rounded-full bg-muted text-muted-foreground">
-                    <Upload className="size-5" />
-                  </span>
-                  <p className="font-medium">{busy ? 'Subiendo…' : 'Arrastra aquí tu .html o .zip, o haz clic para elegirlo'}</p>
+                  <p className="flex items-center gap-2.5 text-[17px] font-semibold">
+                    <Upload className="size-[18px]" aria-hidden />
+                    {busy ? 'Subiendo…' : 'Arrastra aquí tu .html o .zip, o haz clic para elegirlo'}</p>
                   <p className="text-muted-foreground text-sm leading-relaxed max-w-md">
                     Un zip puede traer varias páginas, estilos, scripts e imágenes. Se abre <code>index.html</code>; si no hay, el primer HTML. Hasta 50 MB.
                   </p>
@@ -394,14 +390,11 @@ function PrototypeRow({
 
   const canDelete = (uploaded || foreign) && !isExample;
   return (
-    <li className="rounded-2xl border border-border/70 bg-card">
+    <li className="rounded-xl border bg-card">
       <div className="flex min-h-16 flex-wrap items-center gap-x-4 gap-y-3 px-(--card-pad) py-4">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground" aria-hidden>
-          {byUrl ? <Globe className="size-5" /> : uploaded ? <FileArchive className="size-5" /> : <FolderOpen className="size-5" />}
-        </span>
         <div className="min-w-0 flex-1 basis-48">
           <h3 className="type-subsection break-words">{proto.name}</h3>
-          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
             <Badge variant="secondary">{isExample ? 'Ejemplo' : foreign ? 'Importado' : byUrl ? 'Por URL' : uploaded ? 'Subido' : 'Carpeta local'}</Badge>
             {proto.root && <Badge variant="outline">En la raíz</Badge>}
             <span>{plural(sessions, 'sesión', 'sesiones', 'Sin sesiones')}</span>
@@ -413,7 +406,7 @@ function PrototypeRow({
           {!foreign && (
             <Button size="sm" asChild>
               <Link to={{ name: 'study', id: null }}>
-                <FlaskConical /> Crear estudio
+                Crear estudio
               </Link>
             </Button>
           )}
@@ -422,7 +415,7 @@ function PrototypeRow({
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="size-8" aria-label={`Más acciones de «${proto.name}»`}>
+              <Button variant="ghost" size="icon" className="size-9" aria-label={`Más acciones de «${proto.name}»`}>
                 <Ellipsis />
               </Button>
             </DropdownMenuTrigger>
@@ -479,7 +472,7 @@ function PrototypeRow({
         </div>
       </div>
       {open && (
-      <div id={`detalles-${proto.id}`} className="space-y-6 border-t border-border/70 px-(--card-pad) py-6">
+      <div id={`detalles-${proto.id}`} className="space-y-6 border-t px-(--card-pad) py-6">
         {foreign ? (
           <p className="text-sm text-muted-foreground">
             Estas sesiones se importaron de otro lugar y su prototipo no está aquí. Puedes ver las grabaciones en Sesiones.
@@ -487,7 +480,7 @@ function PrototypeRow({
         ) : (
           <>
             {byUrl && proto.sourceUrl && (
-              <div className="space-y-1.5 rounded-xl bg-muted/50 p-4 text-sm">
+              <div className="space-y-1.5 border-l-2 border-input py-1 pl-4 text-sm">
                 <p className="font-medium">Siempre muestra lo que está publicado ahora</p>
                 <p className="text-muted-foreground leading-relaxed">
                   Taptana abre{' '}
@@ -516,14 +509,14 @@ function PrototypeRow({
               <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">Quien abra este link usa el prototipo libremente y queda grabado. Para pedir tareas y consentimiento, crea un estudio.</p>
             </div>
             {qr && (
-              <div className="justify-self-center rounded-xl bg-white p-3">
+              <div className="justify-self-center rounded-sm border bg-white p-2">
                 <img src={qr} alt={`Código QR para abrir ${proto.name} en un celular`} width={140} height={140} />
               </div>
             )}
             </div>
 
             {uploaded && canRoot && (
-              <div className={cn('rounded-xl bg-muted/50 p-4 space-y-1.5', proto.absoluteUrls && !proto.root && 'bg-amber-500/10')}>
+              <div className={cn('border-l-2 border-input py-1 pl-4 space-y-1.5', proto.absoluteUrls && !proto.root && 'bg-amber-500/10')}>
                 <div className="flex items-center justify-between gap-3">
                   <Label htmlFor={`root-${proto.id}`} className="mb-0">
                     Abrir en la raíz
@@ -582,7 +575,7 @@ function Screens({ prototypeId }: { prototypeId: string }) {
         aria-expanded={open}
         aria-controls={`screens-${prototypeId}`}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-2 rounded-md py-1 text-sm font-medium cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="flex w-full items-center justify-between gap-2 rounded-md py-1 text-sm font-medium cursor-pointer outline-none focus-ink"
       >
         <span>Pantallas detectadas{screens ? ` (${screens.length})` : ''}</span>
         <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden />
@@ -735,7 +728,7 @@ function UrlForm({ canAdd, onAdded }: { canAdd: boolean; onAdded: (proto: Protot
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {check && (
-        <div role="status" aria-live="polite" className="space-y-4 rounded-2xl border border-border/70 bg-card p-(--card-pad)">
+        <div role="status" aria-live="polite" className="space-y-4 border-y border-foreground py-6">
           <div className="flex items-start gap-3">
             <span className="mt-0.5">
               <IssueIcon level={check.level} />

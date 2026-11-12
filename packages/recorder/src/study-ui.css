@@ -10,18 +10,19 @@
 }
 
 .t {
-  /* Base neutra y un solo acento, el violeta (botón principal, progreso, lo elegido; blanco
-     encima: 6,6:1). Sin tipografía web: la del sistema. */
-  --ink: #18181f;
-  --ink-2: #3f3f48;
-  --muted: #52525c;
-  --line: #e4e4e8;
-  --tint: #f4f4f6;
+  /* Tinta y papel, como el panel: el botón principal, el progreso y lo elegido van en tinta
+     (blanco encima: 18:1). El único amarillo es el punto de la píldora. Sin tipografía web: la
+     del sistema. */
+  --ink: #151411;
+  --ink-2: #3b3a36;
+  --muted: #51504b;
+  --line: #cfcec9;
+  --tint: #f1f0ed;
   --paper: #fff;
   --ok: #1d7a4c;
-  --brand: #5f3ed8;
-  --brand-tint: #efecff;
-  --focus: #7965f0;
+  --brand: #151411;
+  --brand-tint: #f1f0ed;
+  --focus: #151411;
   --rib: 0px;
   font: 16px/1.55 system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   color: var(--ink);
@@ -90,7 +91,7 @@
   max-height: 100%;
   overflow: hidden;
   background: var(--paper);
-  border-radius: 26px 26px 0 0;
+  border-radius: 10px 10px 0 0;
   box-shadow: 0 -12px 44px rgba(13, 17, 23, 0.24);
   outline: none;
   animation: tt-up 0.28s cubic-bezier(0.2, 0.9, 0.25, 1);
@@ -164,7 +165,7 @@
   }
   .sheet {
     max-width: 460px;
-    border-radius: 26px;
+    border-radius: 10px;
     box-shadow: 0 24px 70px rgba(13, 17, 23, 0.3);
     animation-name: tt-pop;
   }
@@ -239,16 +240,14 @@
   color: var(--muted);
 }
 .track {
-  height: 4px;
+  height: 3px;
   margin: 10px 0 18px;
-  border-radius: 4px;
   background: var(--line);
   overflow: hidden;
 }
 .track i {
   display: block;
   height: 100%;
-  border-radius: 4px;
   background: var(--brand);
 }
 .title {
@@ -315,7 +314,7 @@
   min-height: 52px;
   padding: 13px 18px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 8px;
   font-size: 17px;
   font-weight: 650;
   line-height: 1.2;
@@ -330,7 +329,7 @@
   color: #fff;
 }
 .btn.primary[aria-disabled='true'] {
-  background: #c9c9d0;
+  background: #bdbcb8;
   cursor: default;
 }
 /* "Continuar" recién activado: late una vez para que se note. */
@@ -369,7 +368,7 @@
   width: 100%;
   padding: 12px 14px;
   border: 1.5px solid var(--line);
-  border-radius: 12px;
+  border-radius: 8px;
   background: #fff;
   font-size: 16px;
   line-height: 1.45;
@@ -391,8 +390,8 @@
   flex: 0 0 auto;
   width: 24px;
   height: 24px;
-  border: 2px solid #7b8591;
-  border-radius: 7px;
+  border: 2px solid #76746f;
+  border-radius: 4px;
   background: #fff;
   cursor: pointer;
 }
@@ -429,7 +428,7 @@
   gap: 12px;
   padding: 12px 14px;
   border: 1.5px solid transparent;
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--tint);
   cursor: pointer;
 }
@@ -475,7 +474,7 @@
   min-height: 48px;
   padding: 0;
   border: 1.5px solid var(--line);
-  border-radius: 12px;
+  border-radius: 8px;
   background: #fff;
   font-size: 17px;
   font-weight: 650;
@@ -484,7 +483,7 @@
 }
 .yn .num {
   min-height: 60px;
-  border-radius: 14px;
+  border-radius: 8px;
   font-size: 18px;
 }
 .num[aria-checked='true'] {
@@ -516,7 +515,7 @@
   min-height: 52px;
   padding: 12px 14px;
   border: 1.5px solid var(--line);
-  border-radius: 14px;
+  border-radius: 8px;
   background: #fff;
   cursor: pointer;
 }
@@ -545,7 +544,7 @@
   padding: 0 14px 0 12px;
   border: 0;
   border-radius: 999px;
-  background: rgba(24, 24, 31, 0.94);
+  background: rgba(21, 20, 17, 0.95);
   color: #fff;
   font-size: 14px;
   font-weight: 650;
@@ -595,7 +594,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #a08cff;
+  background: #f9e03f;
 }
 .pill .see {
   opacity: 0.72;
@@ -610,7 +609,7 @@
   width: max-content;
   max-width: min(270px, calc(100vw - 32px));
   padding: 9px 13px;
-  border-radius: 12px;
+  border-radius: 8px;
   background: #fff;
   color: var(--ink);
   font-size: 14.5px;
@@ -718,11 +717,11 @@
 @keyframes tt-lit {
   0% {
     transform: scale(0.97);
-    box-shadow: 0 0 0 0 rgba(95, 62, 216, 0.4);
+    box-shadow: 0 0 0 0 rgba(21, 20, 17, 0.35);
   }
   100% {
     transform: none;
-    box-shadow: 0 0 0 10px rgba(95, 62, 216, 0);
+    box-shadow: 0 0 0 10px rgba(21, 20, 17, 0);
   }
 }
 @keyframes tt-drop {

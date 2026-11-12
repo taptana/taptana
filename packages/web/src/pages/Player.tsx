@@ -370,7 +370,7 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
               }
               description="Toca una tarea para ir a su inicio. Si viste otra cosa en la grabación, corrige el resultado."
             >
-              <div className="rounded-2xl border border-border/70 bg-card px-(--card-pad) py-1">
+              <div className="border-y border-foreground">
                 <ol className="divide-y">
                   {studyRows.map((b, i) =>
                     isTaskBlock(b) ? (
@@ -406,7 +406,7 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
                 <span className="break-words">{session.deviceLabel}</span>
               </dd>
               <dt className="text-muted-foreground">Pantalla</dt>
-              <dd className="tabular-nums">
+              <dd className="num">
                 {session.viewport.width}×{session.viewport.height}
               </dd>
               {session.label && session.participant && (
@@ -466,13 +466,13 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
                         onClick={() => goto(e.t)}
                         aria-current={i === activeIndex ? 'step' : undefined}
                         className={cn(
-                          'w-full text-left flex items-start gap-2 rounded-md px-2 py-1.5 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                          'w-full text-left flex items-start gap-2 rounded-md px-2 py-1.5 text-sm outline-none focus-ink',
                           canPlay && 'hover:bg-accent cursor-pointer',
                           i === activeIndex && 'bg-accent',
                           marker && 'font-medium',
                         )}
                       >
-                        <span className="text-muted-foreground tabular-nums w-10 shrink-0 text-xs pt-0.5">{formatDuration(e.t - session.startedAt)}</span>
+                        <span className="num text-muted-foreground w-10 shrink-0 text-xs pt-0.5">{formatDuration(e.t - session.startedAt)}</span>
                         <span className="pt-0.5" aria-hidden>
                           <StepIcon e={e} />
                         </span>
@@ -525,12 +525,12 @@ function TaskRow({
     <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:gap-3">
       <button
         type="button"
-        className="flex-1 text-left min-w-0 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default"
+        className="flex-1 text-left min-w-0 rounded-md outline-none focus-ink enabled:cursor-pointer disabled:cursor-default"
         disabled={started === undefined}
         onClick={() => started !== undefined && onGoto(started)}
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-muted-foreground tabular-nums text-xs w-4">{index + 1}</span>
+          <span className="num text-muted-foreground text-xs w-5">{index + 1}</span>
           <span className="font-medium">{blockTitle(block) || 'Tarea sin título'}</span>
           {firstClick && <Badge variant="secondary">{BLOCK_KIND_LABELS['first-click']}</Badge>}
           <Badge variant="outline" className={badge.className}>
@@ -576,12 +576,12 @@ function AnswerRow({ index, block, answer, onGoto }: { index: number; block: Que
     <li className="py-3">
       <button
         type="button"
-        className="w-full text-left rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 enabled:cursor-pointer disabled:cursor-default"
+        className="w-full text-left rounded-md outline-none focus-ink enabled:cursor-pointer disabled:cursor-default"
         disabled={!answer}
         onClick={() => answer && onGoto(answer.t)}
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-muted-foreground tabular-nums text-xs w-4">{index + 1}</span>
+          <span className="num text-muted-foreground text-xs w-5">{index + 1}</span>
           <span className="font-medium">{block.question || 'Pregunta sin texto'}</span>
           <Badge variant="secondary">{BLOCK_KIND_LABELS[block.kind]}</Badge>
         </div>

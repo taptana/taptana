@@ -6,7 +6,7 @@
  * el borrador es válido. Mientras haya cambios sin guardar, salir pide confirmación.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, BarChart3, CircleAlert, CircleCheck, Copy, Crosshair, Download, Ellipsis, FileArchive, Globe, LayoutList, ListChecks, LoaderCircle, PencilRuler, Play, Plus, Share2, Smartphone, Sparkles, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BarChart3, CircleAlert, CircleCheck, Copy, Crosshair, Download, Ellipsis, FileArchive, Globe, LayoutList, ListChecks, LoaderCircle, PencilRuler, Play, Plus, Share2, Smartphone, ClipboardPaste, TriangleAlert } from 'lucide-react';
 import {
   STUDY_LIMITS,
   sameScreen,
@@ -583,6 +583,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
             </Link>
           </Button>
         }
+        eyebrow={record ? <>Diseño · {plural(draft.blocks.length, 'bloque', 'bloques')}</> : 'Estudio nuevo'}
         title={
           <span className="flex flex-wrap items-center gap-3">
             {draft.name.trim() || (record ? 'Estudio sin nombre' : 'Nuevo estudio')}
@@ -613,7 +614,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => setAiOpen(true)}>
-                  <Sparkles /> Armar con IA
+                  <ClipboardPaste /> Armar con IA
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={exportJson}>
@@ -646,7 +647,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
           icon={<TriangleAlert />}
           title={`Este estudio ya tiene ${plural(sessionCount, 'sesión', 'sesiones')}`}
           action={
-            <Button size="sm" variant="outline" className="bg-card" disabled={busy} onClick={() => void duplicateStudy()}>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => void duplicateStudy()}>
               <Copy /> Duplicar estudio
             </Button>
           }
@@ -672,7 +673,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
             title="Este prototipo parece una app con rutas propias"
             action={
               client.canServeAtRoot ? (
-                <Button size="sm" variant="outline" className="bg-card" disabled={busy} onClick={() => void openAtRoot()}>
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => void openAtRoot()}>
                   Abrir en la raíz
                 </Button>
               ) : undefined
@@ -696,7 +697,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
                 <li key={i}>
                   <button
                     type="button"
-                    className="cursor-pointer rounded text-left underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    className="cursor-pointer rounded text-left underline-offset-4 outline-none hover:text-foreground hover:underline focus-ink"
                     onClick={() => {
                       setShowAllErrors(true);
                       select(issueSelection(issue));
@@ -771,17 +772,17 @@ export function StudyEditorPage({ id }: { id: string | null }) {
               <>
                 <SettingsEditor draft={draft} onChange={update} errors={errors} protos={protos} screens={screens} saved={record !== null} />
                 {draft.blocks.length === 0 && (
-                  <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-card px-6 py-10 text-center">
+                  <div className="flex flex-col items-start gap-3 border-y border-foreground py-8">
                     <h2 className="type-subsection">Ahora agrega el primer bloque</h2>
                     <p className="max-w-md text-sm text-muted-foreground">Un estudio es una lista de bloques: tareas sobre el prototipo y preguntas para el participante. Lo normal es empezar con una tarea.</p>
-                    <div className="flex flex-wrap justify-center gap-2">
+                    <div className="flex flex-wrap gap-2 pt-1">
                       <AddBlockMenu onAdd={addBlock}>
                         <Button>
                           <Plus /> Agregar bloque
                         </Button>
                       </AddBlockMenu>
                       <Button variant="outline" onClick={() => setAiOpen(true)}>
-                        <Sparkles /> Armar con IA
+                        <ClipboardPaste /> Armar con IA
                       </Button>
                     </div>
                   </div>
@@ -812,7 +813,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
               highlight={mode !== null}
               banner={
                 mode?.type === 'pick' ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-primary bg-primary/5 px-3 py-2 text-sm">
+                  <div className="flex items-center gap-2 border-l-2 border-foreground py-1 pl-4 text-sm">
                     <Crosshair className="size-4 shrink-0" />
                     <span className="min-w-0 flex-1">Toca el elemento que el participante tiene que tocar.</span>
                     <Button size="sm" variant="outline" onClick={() => setMode(null)}>
@@ -903,12 +904,14 @@ function SetupSteps({
   return (
     <section aria-labelledby="setup-title" className="mx-auto w-full max-w-xl space-y-8 py-2 sm:py-6">
       <div className="space-y-3">
-        <ol className="flex gap-2" aria-label={`Paso ${step + 1} de 3`}>
+        <ol className="flex gap-1.5" aria-label={`Paso ${step + 1} de 3`}>
           {[0, 1, 2].map((i) => (
-            <li key={i} className={cn('h-1.5 flex-1 rounded-full', i <= step ? 'bg-primary' : 'bg-muted')} />
+            <li key={i} className={cn('h-0.5 flex-1', i <= step ? 'bg-foreground' : 'bg-border')} />
           ))}
         </ol>
-        <p className="text-sm text-muted-foreground">Paso {step + 1} de 3</p>
+        <p className="type-eyebrow pt-2">
+          Paso <span className="mark">{String(step + 1).padStart(2, '0')}</span> de 03
+        </p>
         <h2 id="setup-title" className="type-section">
           {titles[step]}
         </h2>
@@ -916,30 +919,30 @@ function SetupSteps({
 
       {step === 0 &&
         (protos.length === 0 ? (
-          <div className="space-y-4 rounded-2xl border border-dashed bg-card p-(--card-pad)">
+          <div className="space-y-4 border-y py-6">
             <p className="text-muted-foreground">Todavía no hay prototipos. Sube tu archivo .html o .zip, o agrega tu sitio por URL, y vuelve aquí.</p>
             <Button asChild>
               <Link to={{ name: 'prototypes' }}>
-                <FileArchive /> Ir a Prototipos
+                Ir a Prototipos
               </Link>
             </Button>
           </div>
         ) : (
-          <div role="radiogroup" aria-label="Prototipo" className="space-y-3">
+          <div role="radiogroup" aria-label="Prototipo" className="border-t">
             {sorted.map((p) => {
               const checked = p.id === prototypeId;
               return (
                 <label
                   key={p.id}
                   className={cn(
-                    'flex min-h-16 cursor-pointer items-center gap-4 rounded-2xl border bg-card px-5 py-4 transition-colors',
-                    checked ? 'border-primary ring-1 ring-primary' : 'border-border/70 hover:border-foreground/30',
+                    'flex min-h-16 cursor-pointer items-center gap-4 border-b px-1 py-4 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-foreground',
+                    checked ? 'bg-card shadow-[inset_3px_0_0_var(--foreground)] pl-4' : 'hover:bg-accent/50',
                   )}
                 >
                   <input type="radio" name="setup-proto" className="size-4 shrink-0 accent-[var(--primary)]" checked={checked} onChange={() => onPrototype(p.id)} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{p.name}</span>
-                    <span className="block truncate text-sm text-muted-foreground">{p.source === 'url' && p.sourceUrl ? p.sourceUrl : p.url}</span>
+                    <span className={cn('block truncate', checked ? 'font-semibold' : 'font-medium')}>{p.name}</span>
+                    <span className="block truncate font-mono text-xs text-muted-foreground">{p.source === 'url' && p.sourceUrl ? p.sourceUrl : p.url}</span>
                   </span>
                 </label>
               );
@@ -969,9 +972,9 @@ function SetupSteps({
       )}
 
       {step === 2 && (
-        <div className="space-y-3">
+        <div className="border-t">
           <SetupChoice icon={<ListChecks />} title="Con una tarea" hint="Lo más común: le pides algo y ves si lo logra." onClick={onTask} />
-          <SetupChoice icon={<Sparkles />} title="Armar con IA" hint="Pega lo que una IA escribió y se arman los bloques." onClick={onAi} />
+          <SetupChoice icon={<ClipboardPaste />} title="Armar con IA" hint="Pega lo que una IA escribió y se arman los bloques." onClick={onAi} />
           <AddBlockMenu onAdd={onAdd}>
             <SetupChoice icon={<LayoutList />} title="Con otro tipo de bloque" hint="Una pregunta, un primer clic o una pantalla de contexto." />
           </AddBlockMenu>
@@ -999,19 +1002,18 @@ function SetupSteps({
   );
 }
 
-function SetupChoice({ icon, title, hint, ...rest }: { icon: React.ReactNode; title: string; hint: string } & React.ComponentProps<'button'>) {
+function SetupChoice({ title, hint, ...rest }: { icon?: React.ReactNode; title: string; hint: string } & React.ComponentProps<'button'>) {
   return (
     <button
       type="button"
       {...rest}
-      className="flex min-h-16 w-full cursor-pointer items-center gap-4 rounded-2xl border border-border/70 bg-card px-5 py-4 text-left outline-none transition-colors hover:border-foreground/30 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="group flex min-h-16 w-full cursor-pointer items-center gap-4 border-b px-1 py-4 text-left outline-none transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-foreground"
     >
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground [&_svg]:size-5">{icon}</span>
       <span className="min-w-0 flex-1">
-        <span className="block font-medium">{title}</span>
+        <span className="block font-semibold">{title}</span>
         <span className="block text-sm text-muted-foreground">{hint}</span>
       </span>
-      <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+      <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
     </button>
   );
 }

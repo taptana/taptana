@@ -3,7 +3,7 @@
  * Los bloques se reordenan arrastrando, con el menú de cada uno o con Alt + flechas.
  */
 import { useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, Copy, Ellipsis, GripVertical, Hand, PartyPopper, Plus, Settings2, Trash2, type LucideIcon } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, Ellipsis, GripVertical, Plus, Trash2, TriangleAlert } from 'lucide-react';
 import type { BlockKind } from '@taptana/shared';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -14,32 +14,32 @@ import { ADD_ORDER, KIND_INFO, KindIcon } from './fields';
 function Dot({ label }: { label: string }) {
   return (
     <span className="ml-auto flex shrink-0 items-center" title={label}>
-      <span className="size-2 rounded-full bg-amber-500" aria-hidden />
+      <TriangleAlert className="size-4 text-amber-600 dark:text-amber-400" aria-hidden />
       <span className="sr-only">{label}</span>
     </span>
   );
 }
 
 function GroupHeading({ children }: { children: ReactNode }) {
-  return <p className="type-eyebrow px-3 pb-1.5">{children}</p>;
+  return <p className="type-eyebrow border-b border-foreground pb-2">{children}</p>;
 }
 
-function FixedItem({ icon: Icon, label, hint, active, incomplete, onSelect }: { icon: LucideIcon; label: string; hint: string; active: boolean; incomplete: boolean; onSelect: () => void }) {
+/* La fila elegida: papel blanco y una barra de tinta a la izquierda. */
+const ROW_ACTIVE = 'bg-card shadow-[inset_3px_0_0_var(--foreground)]';
+
+function FixedItem({ label, hint, active, incomplete, onSelect }: { label: string; hint: string; active: boolean; incomplete: boolean; onSelect: () => void }) {
   return (
     <button
       type="button"
       aria-current={active ? 'true' : undefined}
       onClick={onSelect}
       className={cn(
-        'flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-left outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
-        active ? 'border-primary bg-card ring-1 ring-primary shadow-sm' : 'border-transparent hover:bg-accent/60',
+        'flex w-full cursor-pointer items-center gap-3 border-b py-3 pl-10 pr-3 text-left sm:pl-14 outline-none transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-foreground',
+        active ? ROW_ACTIVE : 'hover:bg-accent/50',
       )}
     >
-      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-muted text-foreground/75" aria-hidden>
-        <Icon className="size-4" />
-      </span>
       <span className="min-w-0">
-        <span className="block text-[15px] leading-snug font-medium">{label}</span>
+        <span className={cn('block text-[15px] leading-snug', active ? 'font-semibold' : 'font-medium')}>{label}</span>
         <span className="block truncate text-xs text-muted-foreground">{hint}</span>
       </span>
       {incomplete && <Dot label="Le falta algo" />}
@@ -93,16 +93,16 @@ export function BlockList({
   const [over, setOver] = useState<number | null>(null);
 
   return (
-    <nav aria-label="Partes del estudio" className="space-y-8">
-      <div className="space-y-1.5">
+    <nav aria-label="Partes del estudio" className="space-y-9">
+      <div>
       <GroupHeading>Antes</GroupHeading>
-      <FixedItem icon={Settings2} label="Ajustes del estudio" hint="Nombre, prototipo y opciones" active={selection === 'settings'} incomplete={incomplete.has('settings')} onSelect={() => onSelect('settings')} />
-      <FixedItem icon={Hand} label="Bienvenida" hint="Saludo y consentimiento" active={selection === 'welcome'} incomplete={incomplete.has('welcome')} onSelect={() => onSelect('welcome')} />
+      <FixedItem label="Ajustes del estudio" hint="Nombre, prototipo y opciones" active={selection === 'settings'} incomplete={incomplete.has('settings')} onSelect={() => onSelect('settings')} />
+      <FixedItem label="Bienvenida" hint="Saludo y consentimiento" active={selection === 'welcome'} incomplete={incomplete.has('welcome')} onSelect={() => onSelect('welcome')} />
       </div>
 
-      <div className="space-y-2">
+      <div>
       <GroupHeading>Bloques</GroupHeading>
-      <ol className="space-y-2" aria-label="Bloques, en el orden en que los ve el participante">
+      <ol aria-label="Bloques, en el orden en que los ve el participante">
         {blocks.map((block, index) => {
           const kind = blockKind(block as Parameters<typeof blockKind>[0]);
           const info = KIND_INFO[kind];
@@ -134,13 +134,13 @@ export function BlockList({
                 setOver(null);
               }}
               className={cn(
-                'group flex items-stretch rounded-xl border border-border/70 bg-card transition-colors',
-                active ? 'border-primary ring-1 ring-primary shadow-sm' : 'hover:border-primary/40',
+                'group flex items-stretch border-b transition-colors',
+                active ? ROW_ACTIVE : 'hover:bg-accent/50',
                 dragging === index && 'opacity-50',
-                over === index && dragging !== null && dragging !== index && (dragging < index ? 'border-b-primary border-b-2' : 'border-t-primary border-t-2'),
+                over === index && dragging !== null && dragging !== index && (dragging < index ? 'border-b-foreground border-b-2' : 'border-t-foreground border-t-2'),
               )}
             >
-              <span className="hidden cursor-grab items-center pl-1.5 text-muted-foreground/60 sm:flex" aria-hidden title="Arrastra para reordenar">
+              <span className="hidden w-5 cursor-grab items-center justify-end text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100 sm:flex" aria-hidden title="Arrastra para reordenar">
                 <GripVertical className="size-4" />
               </span>
               <button
@@ -158,13 +158,17 @@ export function BlockList({
                     onMove(index, index + 1);
                   }
                 }}
-                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl px-2.5 py-3 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 py-3 pl-1 pr-1 text-left outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-foreground sm:pl-0"
               >
-                <KindIcon kind={kind} size="sm" />
-                <span className="min-w-0">
-                  <span className={cn('line-clamp-2 break-words text-[15px] leading-snug font-medium', !title && 'text-muted-foreground font-normal italic')}>{title || info.untitled}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {index + 1}. {info.label}
+                <span className="num w-6 shrink-0 pt-0.5 text-xs text-muted-foreground" aria-hidden>
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className={cn('line-clamp-2 break-words text-[15px] leading-snug', active ? 'font-semibold' : 'font-medium', !title && 'text-muted-foreground font-normal italic')}>{title || info.untitled}</span>
+                  <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <KindIcon kind={kind} size="sm" className="size-[18px] border-0 [&_svg]:size-3.5" />
+                    <span className="sr-only">{index + 1}. </span>
+                    <span className="truncate">{info.label}</span>
                   </span>
                 </span>
                 {incomplete.has(block.id) && <Dot label="Le falta algo" />}
@@ -197,16 +201,16 @@ export function BlockList({
       </ol>
 
       <AddBlockMenu onAdd={onAdd}>
-        <Button type="button" variant="outline" className="w-full justify-start border-dashed">
+        <Button type="button" variant="ghost" className="mt-2 w-full justify-start pl-10 has-[>svg]:pl-10 sm:pl-14 sm:has-[>svg]:pl-14 [&_svg]:-ml-7 [&_svg]:mr-1">
           <Plus /> Agregar bloque
         </Button>
       </AddBlockMenu>
-      {blocks.length > 1 && <p className="hidden px-1 pt-1 text-xs text-muted-foreground sm:block">Arrastra para reordenar, o usa Alt + ↑ ↓ sobre un bloque.</p>}
+      {blocks.length > 1 && <p className="hidden pl-14 pt-2 text-xs text-muted-foreground sm:block">Arrastra para reordenar, o usa Alt + ↑ ↓ sobre un bloque.</p>}
       </div>
 
-      <div className="space-y-1.5">
+      <div>
       <GroupHeading>Al final</GroupHeading>
-      <FixedItem icon={PartyPopper} label="Gracias" hint="Pantalla final" active={selection === 'thanks'} incomplete={incomplete.has('thanks')} onSelect={() => onSelect('thanks')} />
+      <FixedItem label="Gracias" hint="Pantalla final" active={selection === 'thanks'} incomplete={incomplete.has('thanks')} onSelect={() => onSelect('thanks')} />
       </div>
     </nav>
   );
