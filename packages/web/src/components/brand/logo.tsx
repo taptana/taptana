@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 
 /**
- * La marca: un tablero redondeado con una cuadrícula de hoyos (la taptana) donde dos ya fueron
+ * La marca (la única pieza con varios colores del panel): un tablero redondeado con una cuadrícula de hoyos (la taptana) donde dos ya fueron
  * «tocados»: uno coral, con su onda, y uno maíz. Los colores son fijos (no dependen del tema)
  * para que el logo sea el mismo en el panel, el favicon y la presentación.
  */

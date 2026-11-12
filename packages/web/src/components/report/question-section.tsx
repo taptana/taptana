@@ -50,7 +50,7 @@ export function QuestionBody({ question: q }: { question: QuestionReport }) {
           {shown.map((t, i) => (
             <li key={`${t.sessionId}-${i}`} className="rounded-xl border border-border/70 bg-card p-4 sm:p-5 space-y-2" data-print="keep">
               <p className="whitespace-pre-wrap break-words">“{t.text}”</p>
-              <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 <span>{t.who ?? ctx.names.get(t.sessionId) ?? 'Participante'}</span>
                 <Link to={recordingRoute(ctx, t.sessionId)} className="inline-flex items-center gap-1 underline decoration-primary/40 underline-offset-4 hover:text-primary hover:decoration-primary" data-print="hide">
                   <PlayCircle className="size-3.5" />
@@ -80,7 +80,7 @@ export function QuestionBody({ question: q }: { question: QuestionReport }) {
       )}
       {counts}
       <Bars items={distribution} total={q.responses} highlight={q.kind !== 'scale'} />
-      {q.kind === 'choice' && <p className="text-xs text-muted-foreground">Los porcentajes son sobre quienes respondieron; si se podían elegir varias, suman más de 100 %.</p>}
+      {q.kind === 'choice' && <p className="max-w-[65ch] text-sm text-muted-foreground">Los porcentajes son sobre quienes respondieron; si se podían elegir varias, suman más de 100 %.</p>}
     </div>
   );
 }

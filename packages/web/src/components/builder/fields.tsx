@@ -10,7 +10,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Input } from '@/components/ui/input';
 import { nameScreen } from '@/lib/screens';
 import { cn } from '@/lib/utils';
-import { kindTone, TONE_TILE } from '@/lib/brand';
 
 export const KIND_INFO: Record<BlockKind, { label: string; hint: string; icon: LucideIcon; untitled: string }> = {
   task: { label: 'Tarea', hint: 'Le pides hacer algo en el prototipo y ves si lo logra.', icon: ListChecks, untitled: 'Tarea sin título' },
@@ -22,16 +21,16 @@ export const KIND_INFO: Record<BlockKind, { label: string; hint: string; icon: L
   context: { label: 'Pantalla de contexto', hint: 'Un texto para leer antes de seguir. No pide nada.', icon: FileText, untitled: 'Contexto sin título' },
 };
 
-const KIND_ICON_SIZES = { sm: 'size-7 rounded-lg [&_svg]:size-4', md: 'size-9 rounded-xl [&_svg]:size-[18px]', lg: 'size-11 rounded-2xl [&_svg]:size-5' } as const;
+const KIND_ICON_SIZES = { sm: 'size-7 rounded-md [&_svg]:size-4', md: 'size-9 rounded-lg [&_svg]:size-[18px]', lg: 'size-11 rounded-xl [&_svg]:size-5' } as const;
 
 /**
- * El ícono de un tipo de bloque en su azulejo de color. Es la única forma de dibujar un bloque:
- * así la tarea es violeta y el primer clic coral en el constructor, el reporte y la presentación.
+ * El ícono de un tipo de bloque en un cuadrado gris. Es la única forma de dibujar un bloque: el
+ * dibujo dice el tipo (no el color), igual en el constructor y el reporte.
  */
 export function KindIcon({ kind, size = 'md', className }: { kind: BlockKind; size?: keyof typeof KIND_ICON_SIZES; className?: string }) {
   const Icon = KIND_INFO[kind].icon;
   return (
-    <span className={cn('grid shrink-0 place-items-center', KIND_ICON_SIZES[size], TONE_TILE[kindTone(kind)], className)} aria-hidden>
+    <span className={cn('grid shrink-0 place-items-center', KIND_ICON_SIZES[size], 'bg-muted text-foreground/75', className)} aria-hidden>
       <Icon />
     </span>
   );
@@ -69,7 +68,7 @@ export function Field({
   const describedBy = [help ? `${id}-help` : '', shown ? `${id}-error` : ''].filter(Boolean).join(' ') || undefined;
   return (
     <div className={cn('space-y-2', className)} onBlur={() => setTouched(true)}>
-      <label htmlFor={id} className="flex items-baseline gap-2 text-sm font-medium">
+      <label htmlFor={id} className="flex items-baseline gap-2 text-[15px] leading-snug font-medium">
         {label}
         {optional && <span className="text-xs font-normal text-muted-foreground">opcional</span>}
       </label>
@@ -80,7 +79,7 @@ export function Field({
         </p>
       )}
       {help && (
-        <p id={`${id}-help`} className="max-w-prose text-xs leading-relaxed text-muted-foreground">
+        <p id={`${id}-help`} className="max-w-[65ch] text-xs leading-relaxed text-muted-foreground">
           {help}
         </p>
       )}
@@ -186,14 +185,14 @@ export function OptionCards<T extends string>({
           <label
             key={o.value}
             className={cn(
-              'flex cursor-pointer items-start gap-3 rounded-lg border bg-card p-3 text-sm transition-colors has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50',
+              'flex cursor-pointer items-start gap-3 rounded-lg border bg-card p-4 transition-colors has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50',
               checked ? 'border-primary ring-1 ring-primary' : 'hover:bg-accent/50',
             )}
           >
-            <input type="radio" name={name} className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]" checked={checked} onChange={() => onChange(o.value)} />
+            <input type="radio" name={name} className="mt-1 size-4 shrink-0 accent-[var(--primary)]" checked={checked} onChange={() => onChange(o.value)} />
             <span className="min-w-0">
-              <span className="block font-medium">{o.label}</span>
-              <span className="block text-xs leading-relaxed text-muted-foreground">{o.hint}</span>
+              <span className="block text-[15px] leading-snug font-medium">{o.label}</span>
+              <span className="mt-1 block text-[0.84375rem] leading-normal text-muted-foreground">{o.hint}</span>
             </span>
           </label>
         );

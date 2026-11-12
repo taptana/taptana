@@ -4,42 +4,23 @@
  * el panel esté en modo oscuro. Los colores de resultados son los mismos del reporte.
  */
 
-import type { BrandTone, ScoreTone, TaskOutcomeCounts } from '@taptana/shared';
+import type { ScoreTone, TaskOutcomeCounts } from '@taptana/shared';
 
-/* Tinta índigo, grises cálidos y papel: los mismos de `index.css`, en hexadecimal para PowerPoint. */
-export const INK = '16152C';
-export const MUTED = '616174';
-export const FAINT = '767486';
-export const LINE = 'E7E2DA';
-export const SOFT = 'F5F2EC';
+/* Tinta casi negra, grises neutros y blanco: los mismos de `index.css`, en hexadecimal para PowerPoint. */
+export const INK = '18181F';
+export const MUTED = '52525C';
+export const FAINT = '71717B';
+export const LINE = 'E4E4E8';
+export const SOFT = 'F4F4F6';
 export const PAPER = 'FFFFFF';
 
-/** La marca: violeta de la acción principal y su versión clara (sobre el campo violeta). */
+/** El único acento: el violeta de la acción principal. */
 export const VIOLET = '5F3ED8';
-export const VIOLET_LIGHT = '8571E3';
 export const VIOLET_SOFT = 'EEEBFF';
 
-/** Color pleno de cada tono de marca (puntos y marcas, nunca texto). */
-export const BRAND: Record<BrandTone, string> = {
-  violet: VIOLET,
-  coral: 'FB794A',
-  maize: 'F8D14F',
-  sky: '25C2C2',
-  pink: 'ED458A',
-  indigo: '426BCE',
-  stone: 'A8A096',
-};
-
-/** La tinta de cada tono: texto pequeño sobre blanco con contraste AA. */
-export const BRAND_INK: Record<BrandTone, string> = {
-  violet: '502CBE',
-  coral: 'AA3606',
-  maize: '785300',
-  sky: '00626C',
-  pink: 'B4065F',
-  indigo: '23459D',
-  stone: '6B6459',
-};
+/** Los colores del logo (solo para dibujar la marca). */
+export const LOGO_TAP = 'FB794A';
+export const LOGO_DOT = 'F8D14F';
 
 /** Puntaje (los mismos tonos que el reporte: emerald, lime, amber, red). */
 export const TONE: Record<ScoreTone, string> = {
@@ -65,10 +46,9 @@ export const OUTCOME_DARK_TEXT: ReadonlySet<keyof TaskOutcomeCounts> = new Set([
 
 export const PROBLEM = 'D97706';
 export const GOOD = '059669';
-export const BAR = VIOLET;
-/** Las barras que no son la más alta: el mismo tono, más claro. */
-export const BAR_MID = 'B9AEEF';
-export const BAR_SOFT = 'E7E2DA';
+/** La barra más alta, en tinta; las demás, en gris. */
+export const BAR = INK;
+export const BAR_MID = 'A1A1AA';
 
 /**
  * Fuente: la del sistema en pantalla y Arial en PowerPoint (está en todas las computadoras). Los

@@ -310,7 +310,7 @@ export function SnapshotView({
           )}
           {backdrop === 'none' && (
             <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,#f4f4f5_0,#f4f4f5_12px,#fafafa_12px,#fafafa_24px)]">
-              <p className="sticky top-0 p-4 text-center text-xs text-zinc-500">No hay imagen de esta pantalla. Los toques se muestran en su posición.</p>
+              <p className="sticky top-0 p-4 text-center text-sm text-zinc-600">No hay imagen de esta pantalla. Los toques se muestran en su posición.</p>
             </div>
           )}
           {backdrop === 'loading' && <Skeleton className="absolute inset-0 rounded-none" />}

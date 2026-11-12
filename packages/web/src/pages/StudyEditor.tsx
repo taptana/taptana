@@ -772,7 +772,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
                 <SettingsEditor draft={draft} onChange={update} errors={errors} protos={protos} screens={screens} saved={record !== null} />
                 {draft.blocks.length === 0 && (
                   <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-card px-6 py-10 text-center">
-                    <h2 className="text-base font-semibold">Ahora agrega el primer bloque</h2>
+                    <h2 className="type-subsection">Ahora agrega el primer bloque</h2>
                     <p className="max-w-md text-sm text-muted-foreground">Un estudio es una lista de bloques: tareas sobre el prototipo y preguntas para el participante. Lo normal es empezar con una tarea.</p>
                     <div className="flex flex-wrap justify-center gap-2">
                       <AddBlockMenu onAdd={addBlock}>
@@ -909,7 +909,7 @@ function SetupSteps({
           ))}
         </ol>
         <p className="text-sm text-muted-foreground">Paso {step + 1} de 3</p>
-        <h2 id="setup-title" className="text-2xl font-semibold tracking-tight">
+        <h2 id="setup-title" className="type-section">
           {titles[step]}
         </h2>
       </div>

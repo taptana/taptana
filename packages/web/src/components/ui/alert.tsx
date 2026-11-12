@@ -8,10 +8,10 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: 'bg-card text-card-foreground',
-        info: 'border-sky-500/40 bg-sky-500/5',
-        warning: 'border-amber-500/40 bg-amber-500/5',
-        success: 'border-emerald-500/40 bg-emerald-500/5',
-        destructive: 'border-destructive/40 bg-destructive/5 text-destructive [&_[data-slot=alert-description]]:text-destructive/90',
+        info: 'bg-card border-l-[3px] border-l-sky-500 [&>svg]:!text-sky-600 dark:[&>svg]:!text-sky-400',
+        warning: 'bg-card border-l-[3px] border-l-amber-500 [&>svg]:!text-amber-600 dark:[&>svg]:!text-amber-400',
+        success: 'bg-card border-l-[3px] border-l-emerald-500 [&>svg]:!text-emerald-600 dark:[&>svg]:!text-emerald-400',
+        destructive: 'bg-card border-l-[3px] border-l-destructive text-destructive [&_[data-slot=alert-description]]:text-destructive/90',
       },
     },
     defaultVariants: { variant: 'default' },
@@ -27,7 +27,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 function AlertDescription({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="alert-description" className={cn('text-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm [&_p]:leading-relaxed', className)} {...props} />;
+  return <div data-slot="alert-description" className={cn('text-muted-foreground col-start-2 grid justify-items-start gap-1 text-sm max-w-[65ch] [&_p]:leading-relaxed', className)} {...props} />;
 }
 
 export { Alert, AlertTitle, AlertDescription };

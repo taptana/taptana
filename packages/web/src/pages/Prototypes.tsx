@@ -400,7 +400,7 @@ function PrototypeRow({
           {byUrl ? <Globe className="size-5" /> : uploaded ? <FileArchive className="size-5" /> : <FolderOpen className="size-5" />}
         </span>
         <div className="min-w-0 flex-1 basis-48">
-          <h3 className="font-display text-lg font-bold tracking-tight leading-snug break-words">{proto.name}</h3>
+          <h3 className="type-subsection break-words">{proto.name}</h3>
           <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
             <Badge variant="secondary">{isExample ? 'Ejemplo' : foreign ? 'Importado' : byUrl ? 'Por URL' : uploaded ? 'Subido' : 'Carpeta local'}</Badge>
             {proto.root && <Badge variant="outline">En la raíz</Badge>}
@@ -633,7 +633,7 @@ const LEVEL_TITLE: Record<PrototypeUrlCheck['level'], string> = {
 function IssueIcon({ level }: { level: PrototypeUrlIssue['level'] | PrototypeUrlCheck['level'] }) {
   if (level === 'error') return <CircleAlert className="size-4 shrink-0 text-destructive" aria-hidden />;
   if (level === 'warning') return <TriangleAlert className="size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />;
-  if (level === 'ok') return <CircleCheck className="size-4 shrink-0 text-primary" aria-hidden />;
+  if (level === 'ok') return <CircleCheck className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />;
   return <Info className="size-4 shrink-0 text-muted-foreground" aria-hidden />;
 }
 

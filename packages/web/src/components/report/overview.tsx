@@ -7,8 +7,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { cn } from '@/lib/utils';
 import { pct, plural, seconds } from '@/lib/format';
 import { scoreBand, type ScoreTone } from './logic.ts';
-import { TONE_INK, TONE_WASH } from '@/lib/brand';
-import type { BrandTone } from '@taptana/shared';
 
 export const TONE_TEXT: Record<ScoreTone, string> = {
   good: 'text-emerald-600 dark:text-emerald-400',
@@ -42,7 +40,7 @@ function ScoreRing({ score, tone }: { score: number | null; tone: ScoreTone }) {
   return (
     <div className="relative size-40 shrink-0" role="img" aria-label={score === null ? 'Sin puntaje' : `${score} de 100`}>
       <svg viewBox="0 0 120 120" className="size-full -rotate-90" aria-hidden="true">
-        <circle cx="60" cy="60" r={r} fill="none" strokeWidth="9" className="stroke-brand-stone-soft" />
+        <circle cx="60" cy="60" r={r} fill="none" strokeWidth="9" className="stroke-muted" />
         {score !== null && score > 0 && <circle cx="60" cy="60" r={r} fill="none" strokeWidth="9" strokeLinecap="round" strokeDasharray={`${(score / 100) * len} ${len}`} className={TONE_STROKE[tone]} />}
       </svg>
       <div className="absolute inset-0 grid place-content-center text-center">
@@ -66,17 +64,17 @@ export function ScoreChip({ score, className }: { score: number | null; classNam
   );
 }
 
-function Kpi({ icon, label, value, sub, tone }: { icon: ReactNode; label: string; value: string; sub: ReactNode; tone: BrandTone }) {
+function Kpi({ icon, label, value, sub }: { icon: ReactNode; label: string; value: string; sub: ReactNode }) {
   return (
-    <div className={cn('rounded-2xl p-5 sm:p-6 space-y-2.5 min-w-0', TONE_WASH[tone])} data-print="keep">
-      <div className="flex flex-col items-start gap-2 text-sm font-medium text-muted-foreground sm:flex-row sm:items-center sm:gap-2.5">
-        <span className={cn('grid size-8 shrink-0 place-items-center rounded-xl bg-card shadow-xs [&_svg]:size-4', TONE_INK[tone])} aria-hidden>
+    <div className="rounded-2xl border border-border/80 bg-card shadow-xs p-5 sm:p-6 space-y-3 min-w-0" data-print="keep">
+      <div className="flex items-center gap-2.5 text-sm font-medium text-foreground/80">
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground [&_svg]:size-4" aria-hidden>
           {icon}
         </span>
         <span className="min-w-0 max-w-full truncate">{label}</span>
       </div>
-      <div className="font-display text-3xl sm:text-4xl font-bold tabular-nums tracking-tight">{value}</div>
-      <div className="text-xs text-muted-foreground leading-relaxed">{sub}</div>
+      <div className="font-display text-3xl sm:text-4xl font-bold tabular-nums tracking-tight leading-none">{value}</div>
+      <div className="text-sm text-muted-foreground leading-snug max-w-[40ch]">{sub}</div>
     </div>
   );
 }
@@ -92,8 +90,8 @@ export function Overview({ report }: { report: StudyReport }) {
     <section aria-label="Resumen del estudio" className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
       <Card data-print="keep">
         <CardContent className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-muted-foreground">Puntaje de usabilidad</span>
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <span className="whitespace-nowrap text-sm font-medium text-foreground/80">Puntaje de usabilidad</span>
             <Button variant="ghost" size="sm" className="-mr-2 text-muted-foreground" onClick={() => setHow(true)} data-print="hide">
               <CircleHelp />
               Cómo se calcula
@@ -103,7 +101,7 @@ export function Overview({ report }: { report: StudyReport }) {
             <ScoreRing score={report.score} tone={band.tone} />
             <p className={cn('font-display text-xl font-bold tracking-tight', TONE_TEXT[band.tone])}>{band.label}</p>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground max-w-[45ch]">
             {report.score === null
               ? 'Aparece cuando al menos una tarea tenga resultados decididos.'
               : `Promedio de ${plural(withData, 'tarea', 'tareas')} con resultados. 80 o más: muy bien. Menos de 40: problemas serios.`}
@@ -113,7 +111,6 @@ export function Overview({ report }: { report: StudyReport }) {
 
       <div className="grid gap-4 sm:gap-5 grid-cols-2">
         <Kpi
-          tone="violet"
           icon={<Users />}
           label="Participantes"
           value={String(report.participants)}
@@ -133,14 +130,13 @@ export function Overview({ report }: { report: StudyReport }) {
           }
         />
         <Kpi
-          tone="sky"
           icon={<Target />}
           label="Tareas logradas"
           value={withData ? pct(report.successRate) : '—'}
           sub={withData ? 'De todos los intentos ya decididos' : 'Sin resultados decididos'}
         />
-        <Kpi tone="maize" icon={<Clock />} label="Duración mediana" value={seconds(report.medianDurationMs)} sub="Del estudio completo, por participante" />
-        <Kpi tone="coral" icon={<MousePointerClick />} label="Misclicks" value={pct(report.avgMisclickRate)} sub="De los toques de las tareas cayeron donde no pasa nada" />
+        <Kpi icon={<Clock />} label="Duración mediana" value={seconds(report.medianDurationMs)} sub="Del estudio completo, por participante" />
+        <Kpi icon={<MousePointerClick />} label="Misclicks" value={pct(report.avgMisclickRate)} sub="De los toques de las tareas cayeron donde no pasa nada" />
       </div>
 
       <HowDialog open={how} onOpenChange={setHow} />
@@ -181,20 +177,20 @@ export function InsightsCard({ insights, onJump }: { insights: Insight[]; onJump
   return (
     <Card data-print="keep">
       <CardHeader>
-        <CardTitle className="font-display text-xl font-bold tracking-tight">Lo más importante</CardTitle>
+        <CardTitle className="type-section">Lo más importante</CardTitle>
         <CardDescription>Qué arreglar primero y qué salió bien, según los datos.</CardDescription>
       </CardHeader>
       <CardContent>
-        <ul className="divide-y -my-2">
+        <ul className="divide-y -my-3">
           {insights.map((insight, i) => {
             const style = INSIGHT_STYLE[insight.level];
             const body = (
               <>
-                <span className={cn('mt-0.5 shrink-0 [&_svg]:size-4.5', style.className)} title={style.label}>
+                <span className={cn('mt-[3px] shrink-0 [&_svg]:size-5', style.className)} title={style.label}>
                   {style.icon}
                   <span className="sr-only">{style.label}: </span>
                 </span>
-                <span className="flex-1 min-w-0 text-sm sm:text-base">{insight.text}</span>
+                <span className="flex-1 min-w-0 text-base leading-relaxed max-w-[70ch]">{insight.text}</span>
               </>
             );
             return (
@@ -203,15 +199,15 @@ export function InsightsCard({ insights, onJump }: { insights: Insight[]; onJump
                   <button
                     type="button"
                     onClick={() => onJump(insight.blockId as string, insight.screen)}
-                    className="group flex w-full items-start gap-3 py-3 text-left cursor-pointer rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    className="group flex w-full items-start gap-3 py-4 sm:py-5 text-left cursor-pointer rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   >
                     {body}
-                    <span className="mt-0.5 shrink-0 inline-flex items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground" data-print="hide">
+                    <span className="ml-auto mt-0.5 shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground group-hover:text-primary" data-print="hide">
                       Ver <ArrowRight className="size-3.5" />
                     </span>
                   </button>
                 ) : (
-                  <div className="flex items-start gap-3 py-3">{body}</div>
+                  <div className="flex items-start gap-3 py-4 sm:py-5">{body}</div>
                 )}
               </li>
             );
@@ -229,7 +225,7 @@ export function VariantsCard({ report }: { report: StudyReport }) {
   return (
     <Card data-print="keep">
       <CardHeader>
-        <CardTitle className="font-display text-xl font-bold tracking-tight">Comparación A/B</CardTitle>
+        <CardTitle className="type-section">Comparación A/B</CardTitle>
         <CardDescription>Cada participante vio una sola variante, elegida al azar. Con pocos participantes, las diferencias chicas no dicen mucho.</CardDescription>
       </CardHeader>
       <CardContent>
@@ -238,7 +234,7 @@ export function VariantsCard({ report }: { report: StudyReport }) {
             <div key={v.id} className="rounded-lg border p-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium truncate">{v.name}</span>
-                {v.score !== null && v.score === best && report.variants.length > 1 && <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium shrink-0">Mejor puntaje</span>}
+                {v.score !== null && v.score === best && report.variants.length > 1 && <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium shrink-0">Mejor puntaje</span>}
               </div>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <Stat label="Puntaje" value={<ScoreChip score={v.score} />} />
@@ -258,8 +254,8 @@ export function VariantsCard({ report }: { report: StudyReport }) {
 export function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="font-medium tabular-nums">{value}</dd>
+      <dt className="text-sm text-foreground/75">{label}</dt>
+      <dd className="font-semibold tabular-nums">{value}</dd>
     </div>
   );
 }

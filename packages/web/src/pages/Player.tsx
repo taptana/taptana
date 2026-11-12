@@ -127,13 +127,13 @@ function describe(e: StepEvent, blocks: Map<string, Block>, screenName: ScreenNa
 }
 
 function StepIcon({ e }: { e: StepEvent }) {
-  const cls = 'size-3.5';
-  if (e.type === 'tap') return <Hand className={cls} style={{ color: TAGS['tap'] }} />;
-  if (e.type === 'swipe') return <MoveHorizontal className={cls} style={{ color: TAGS['swipe'] }} />;
-  if (e.type === 'answer') return <MessageSquare className={cls} style={{ color: TAGS['answer'] }} />;
+  const cls = 'size-4 text-muted-foreground';
+  if (e.type === 'tap') return <Hand className={cls} />;
+  if (e.type === 'swipe') return <MoveHorizontal className={cls} />;
+  if (e.type === 'answer') return <MessageSquare className={cls} />;
   if (e.type === 'task' && e.action === 'goal') return <Target className={cls} style={{ color: TAGS['goal'] }} />;
-  if (e.type === 'task' || e.type === 'study') return <Flag className={cls} style={{ color: TAGS['task'] }} />;
-  return <Navigation className={cls} style={{ color: TAGS['navigation'] }} />;
+  if (e.type === 'task' || e.type === 'study') return <Flag className={cls} />;
+  return <Navigation className={cls} />;
 }
 
 export function PlayerPage({ id, t }: { id: string; t?: number }) {
@@ -396,7 +396,7 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
 
         <aside className="space-y-10 min-w-0 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100dvh-3rem)] lg:flex lg:flex-col">
           <section className="space-y-4" aria-labelledby="participante">
-            <h2 id="participante" className="text-lg font-semibold tracking-tight">
+            <h2 id="participante" className="type-subsection">
               Participante
             </h2>
             <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
@@ -444,7 +444,7 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
 
           <section className="space-y-4 min-h-0 lg:flex lg:flex-col" aria-labelledby="pasos-sesion">
             <div className="space-y-1">
-              <h2 id="pasos-sesion" className="text-lg font-semibold tracking-tight">
+              <h2 id="pasos-sesion" className="type-subsection">
                 Pasos
               </h2>
               <p className="text-sm text-muted-foreground">
@@ -628,7 +628,7 @@ function NotesCard({ notes, onSave }: { notes: string; onSave: (notes: string) =
   return (
     <section className="space-y-4" aria-labelledby="notas-titulo">
       <div className="space-y-1">
-        <h2 id="notas-titulo" className="text-lg font-semibold tracking-tight flex items-center gap-2">
+        <h2 id="notas-titulo" className="type-subsection flex items-center gap-2">
           <NotebookPen className="size-4.5 text-muted-foreground" /> <label htmlFor="notas">Notas</label>
         </h2>
         <p className="text-sm text-muted-foreground">Lo que observaste o lo que la persona dijo en voz alta. Solo las ves tú.</p>

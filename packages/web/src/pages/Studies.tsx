@@ -167,7 +167,7 @@ export function StudiesPage() {
                 <div className="flex flex-col gap-5 md:flex-row md:items-center md:gap-8">
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                      <Link to={{ name: 'study', id: s.id }} className="font-display text-xl font-bold tracking-tight leading-snug break-words hover:text-primary">
+                      <Link to={{ name: 'study', id: s.id }} className="font-display text-xl font-bold tracking-[-0.01em] leading-snug break-words hover:text-primary">
                         {s.name}
                       </Link>
                       {s.closed ? (
@@ -179,7 +179,7 @@ export function StudiesPage() {
                       )}
                       {s.variants?.length ? <Badge variant="outline">A/B</Badge> : null}
                     </div>
-                    {s.description && <p className="line-clamp-1 max-w-prose text-sm text-muted-foreground">{s.description}</p>}
+                    {s.description && <p className="line-clamp-1 max-w-[65ch] text-[15px] text-foreground/80">{s.description}</p>}
                     <p className="text-sm text-muted-foreground">
                       {contents(s)} ·{' '}
                       {proto ? (
@@ -190,21 +190,21 @@ export function StudiesPage() {
                         <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400">
                           <TriangleAlert className="size-3.5" /> Su prototipo ya no está: elige otro en Diseño
                         </span>
-                      )}{' '}
-                      · Actualizado {formatRelative(s.updatedAt)}
+                      )}
                     </p>
+                    <p className="text-xs text-muted-foreground">Actualizado {formatRelative(s.updatedAt)}</p>
                   </div>
                   <dl className="flex shrink-0 gap-8">
                     <div>
-                      <dd className="text-2xl font-semibold tabular-nums">{participants}</dd>
-                      <dt className="text-xs text-muted-foreground">{participants === 1 ? 'participante' : 'participantes'}</dt>
+                      <dd className="font-display text-2xl font-bold tabular-nums">{participants}</dd>
+                      <dt className="text-sm text-muted-foreground">{participants === 1 ? 'participante' : 'participantes'}</dt>
                     </div>
                     <div>
-                      <dd className={`text-2xl font-semibold tabular-nums ${score === null ? '' : scoreTone(score)}`}>
+                      <dd className={`font-display text-2xl font-bold tabular-nums ${score === null ? '' : scoreTone(score)}`}>
                         {score === null ? '—' : score}
-                        {score !== null && <span className="text-sm font-normal text-muted-foreground"> / 100</span>}
+                        {score !== null && <span className="font-sans text-sm font-normal text-muted-foreground">&thinsp;/&thinsp;100</span>}
                       </dd>
-                      <dt className="text-xs text-muted-foreground">{score === null && participants > 0 ? 'puntaje: faltan resultados' : 'puntaje'}</dt>
+                      <dt className="text-sm text-muted-foreground">{score === null && participants > 0 ? 'puntaje: faltan resultados' : 'puntaje'}</dt>
                     </div>
                   </dl>
                   <div className="flex shrink-0 items-center gap-2">

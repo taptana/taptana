@@ -41,8 +41,8 @@ export function EditorCard({ icon, kicker, title, children, actions }: { icon?: 
       <header className="flex flex-wrap items-center gap-3 border-b border-border/70 px-(--card-pad) py-5">
         {icon}
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{kicker}</p>
-          <h2 className="truncate text-xl font-bold tracking-tight">{title}</h2>
+          <p className="type-eyebrow">{kicker}</p>
+          <h2 className="type-section mt-0.5 truncate">{title}</h2>
         </div>
         {actions}
       </header>
@@ -57,15 +57,15 @@ export function EditorCard({ icon, kicker, title, children, actions }: { icon?: 
  */
 function Step({ n, title, hint, children }: { n?: number; title: string; hint?: ReactNode; children: ReactNode }) {
   return (
-    <section className="space-y-5 py-8 first:pt-7 last:pb-7">
-      <header className="space-y-1">
-        <h3 className="flex items-center gap-2.5 text-base font-semibold">
-          {n !== undefined && <span className="grid size-6 shrink-0 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground tabular-nums">{n}</span>}
+    <section className="space-y-5 py-10 first:pt-8 last:pb-8">
+      <header className="space-y-1.5">
+        <h3 className="type-subsection flex items-center gap-2.5">
+          {n !== undefined && <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted font-sans text-sm font-semibold text-foreground/80 tabular-nums">{n}</span>}
           {title}
         </h3>
-        {hint && <p className={cn('max-w-prose text-sm leading-relaxed text-muted-foreground', n !== undefined && 'pl-8.5')}>{hint}</p>}
+        {hint && <p className={cn('max-w-[65ch] text-[15px] leading-relaxed text-muted-foreground', n !== undefined && 'pl-9.5')}>{hint}</p>}
       </header>
-      <div className={cn('space-y-6', n !== undefined && 'sm:pl-8.5')}>{children}</div>
+      <div className={cn('space-y-7', n !== undefined && 'sm:pl-9.5')}>{children}</div>
     </section>
   );
 }
@@ -74,7 +74,7 @@ function Step({ n, title, hint, children }: { n?: number; title: string; hint?: 
 function AdvancedStep({ children, defaultOpen = false, label = 'Opciones avanzadas' }: { children: ReactNode; defaultOpen?: boolean; label?: string }) {
   return (
     <details className="group py-6" open={defaultOpen || undefined}>
-      <summary className="flex w-fit cursor-pointer list-none items-center gap-2 rounded-md text-sm font-medium text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-10 w-fit cursor-pointer list-none items-center gap-2 rounded-md text-[15px] font-medium text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
         <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
         {label}
       </summary>
@@ -86,9 +86,9 @@ function AdvancedStep({ children, defaultOpen = false, label = 'Opciones avanzad
 function SwitchRow({ label, hint, checked, onChange }: { label: string; hint?: ReactNode; checked: boolean; onChange: (checked: boolean) => void }) {
   return (
     <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl bg-muted/50 px-4 py-3.5">
-      <span className="min-w-0 text-sm">
-        <span className="block font-medium">{label}</span>
-        {hint && <span className="block text-xs leading-relaxed text-muted-foreground">{hint}</span>}
+      <span className="min-w-0">
+        <span className="block text-[15px] leading-snug font-medium">{label}</span>
+        {hint && <span className="mt-1 block max-w-[65ch] text-xs leading-relaxed text-muted-foreground">{hint}</span>}
       </span>
       <Switch checked={checked} onCheckedChange={onChange} className="mt-0.5" />
     </label>
@@ -98,7 +98,7 @@ function SwitchRow({ label, hint, checked, onChange }: { label: string; hint?: R
 function Advanced({ label = 'Avanzado', children, defaultOpen = false }: { label?: string; children: ReactNode; defaultOpen?: boolean }) {
   return (
     <details className="group rounded-xl bg-muted/40" open={defaultOpen || undefined}>
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2.5 text-[15px] font-medium outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
         <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
         {label}
       </summary>
@@ -116,7 +116,7 @@ function Tips({ title, children }: { title: string; children: ReactNode }) {
         {title}
         <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
       </summary>
-      <div className="mt-3 max-w-prose space-y-1.5 rounded-xl bg-muted/50 px-4 py-3 text-xs leading-relaxed text-muted-foreground">{children}</div>
+      <div className="mt-3 max-w-[65ch] space-y-1.5 rounded-xl bg-muted/60 px-4 py-3 text-sm leading-relaxed text-muted-foreground">{children}</div>
     </details>
   );
 }
@@ -187,8 +187,8 @@ export function SettingsEditor({
       </Step>
 
       <Step n={2} title="Cómo avanza">
-      <fieldset className="space-y-2">
-        <legend className="mb-1.5 text-sm font-medium">Avance al cumplir la tarea</legend>
+      <fieldset className="min-w-0 space-y-2">
+        <legend className="mb-1.5 text-[15px] font-medium">Avance al cumplir la tarea</legend>
         <OptionCards
           name="Avance al cumplir la tarea"
           value={draft.settings?.advance ?? 'auto'}
@@ -277,7 +277,7 @@ export function WelcomeEditor({ draft, onChange, errors }: { draft: DraftStudy; 
       </Field>
       {!draft.consent && (
         <div className="rounded-xl bg-muted/50 px-4 py-3.5 text-sm">
-          <p className="mb-1 text-xs font-medium text-muted-foreground">Texto estándar que verá el participante</p>
+          <p className="mb-1.5 text-sm font-medium text-foreground/80">Texto estándar que verá el participante</p>
           <p>{DEFAULT_CONSENT_TEXT}</p>
         </div>
       )}
@@ -469,7 +469,7 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
         <Button type="button" variant="ghost" onClick={tools.onTryout}>
           <Play /> {kind === 'first-click' ? 'Probar este primer clic' : 'Probar esta tarea'}
         </Button>
-        <p className="w-full max-w-prose text-xs leading-relaxed text-muted-foreground">
+        <p className="w-full max-w-[65ch] text-xs leading-relaxed text-muted-foreground">
           {kind === 'first-click'
             ? tools.picking
               ? 'Toca en el teléfono el lugar correcto. Tu toque no cambia de pantalla.'
@@ -525,8 +525,8 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
       </Step>
 
       <Step n={3} title={kind === 'first-click' ? 'Cuál es el toque correcto' : 'Cuándo se logra'}>
-      <fieldset className="space-y-4">
-        <legend className="mb-1.5 text-sm font-medium">{kind === 'first-click' ? '¿Cuál es el toque correcto?' : '¿Cómo se sabe que lo logró?'}</legend>
+      <fieldset className="min-w-0 space-y-4">
+        <legend className="mb-1.5 text-[15px] font-medium">{kind === 'first-click' ? '¿Cuál es el toque correcto?' : '¿Cómo se sabe que lo logró?'}</legend>
         <OptionCards name={`Regla de éxito de ${block.title || 'la tarea'}`} value={rule?.type} options={ruleOptions} onChange={(type) => type !== rule?.type && set({ success: emptyRule(type) })} />
         {!rule && ruleError && <p className="text-sm text-destructive">{ruleError}</p>}
 
@@ -536,11 +536,11 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
           </Field>
         )}
         {kind === 'task' && rule?.type === 'reached' && rule.path.trim() && tools.autoAdvance && endsOnGoal(block.expectedPath, rule.path) && (
-          <div className="flex gap-3 rounded-xl bg-muted/50 px-4 py-3.5 text-xs leading-relaxed text-muted-foreground" data-testid="auto-advance-hint">
+          <div className="flex max-w-[65ch] gap-3 rounded-xl bg-muted/60 px-4 py-3.5 text-sm leading-relaxed text-muted-foreground" data-testid="auto-advance-hint">
             <Lightbulb className="mt-0.5 size-4 shrink-0" />
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2.5">
               <p>Al llegar, la tarea termina sola y el participante pasa al siguiente paso sin detenerse en esa pantalla. Si quieres que la vea, elige «espera a que toque Listo».</p>
-              <Button type="button" size="sm" variant="outline" onClick={tools.onManualAdvance}>
+              <Button type="button" size="sm" variant="outline" className="h-auto min-h-10 whitespace-normal py-2 text-left sm:min-h-9" onClick={tools.onManualAdvance}>
                 Cambiar a «espera a que toque Listo»
               </Button>
               <p>Este ajuste vale para todo el estudio (está en «Ajustes del estudio»).</p>
@@ -599,11 +599,11 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
 
       {kind === 'task' && (
         <AdvancedStep defaultOpen={(block.expectedPath?.length ?? 0) > 0 || missed.length > 0 || Boolean(err('expectedPath'))}>
-        <fieldset className="space-y-3">
-          <legend className="mb-1.5 flex items-center gap-2 text-sm font-medium">
+        <fieldset className="min-w-0 space-y-3">
+          <legend className="mb-1.5 flex items-center gap-2 text-[15px] font-medium">
             <RouteIcon className="size-4 text-muted-foreground" /> Camino esperado <span className="text-xs font-normal text-muted-foreground">opcional</span>
           </legend>
-          <p className="max-w-prose text-xs leading-relaxed text-muted-foreground">
+          <p className="max-w-[65ch] text-xs leading-relaxed text-muted-foreground">
             Las pantallas del camino ideal, en orden. Seguirlo tal cual cuenta como <strong className="font-medium text-foreground">éxito directo</strong>; vacío, se usa el más común.
           </p>
           {err('expectedPath') && <p className="text-sm text-destructive">{err('expectedPath')}</p>}
@@ -656,8 +656,8 @@ function OptionsEditor({ block, onChange, error }: { block: ChoiceBlock; onChang
   const options = block.options;
   const setOptions = (next: string[]): void => onChange({ ...block, options: next });
   return (
-    <fieldset className="space-y-2">
-      <legend className="mb-1.5 text-sm font-medium">Opciones</legend>
+    <fieldset className="min-w-0 space-y-2">
+      <legend className="mb-1.5 text-[15px] font-medium">Opciones</legend>
       {options.map((option, i) => (
         <div key={i} className="flex items-center gap-1">
           <span className="w-5 shrink-0 text-center text-xs tabular-nums text-muted-foreground">{i + 1}</span>
@@ -689,8 +689,8 @@ function OptionsEditor({ block, onChange, error }: { block: ChoiceBlock; onChang
 function ScaleEditor({ block, onChange, errors }: { block: ScaleBlock; onChange: (next: ScaleBlock) => void; errors: readonly StudyIssue[] }) {
   return (
     <>
-      <fieldset className="space-y-2">
-        <legend className="mb-1.5 text-sm font-medium">Tamaño de la escala</legend>
+      <fieldset className="min-w-0 space-y-2">
+        <legend className="mb-1.5 text-[15px] font-medium">Tamaño de la escala</legend>
         <div className="inline-flex gap-1 rounded-lg bg-muted p-1" role="radiogroup" aria-label="Tamaño de la escala">
           {SCALE_SIZES.map((max) => (
             <button

@@ -258,23 +258,6 @@ export const BLOCK_KIND_LABELS: Record<BlockKind, string> = {
   text: 'Pregunta abierta',
 };
 
-/**
- * Un color de marca por tipo de bloque, como nombre neutro: cada superficie (panel, presentación,
- * PowerPoint) lo traduce a sus propios valores. Así un bloque se ve igual en todas partes.
- * Ninguno es verde ni rojo: esos colores son de los resultados.
- */
-export type BrandTone = 'violet' | 'coral' | 'maize' | 'sky' | 'pink' | 'indigo' | 'stone';
-
-export const BLOCK_KIND_TONES: Record<BlockKind, BrandTone> = {
-  context: 'stone',
-  task: 'violet',
-  'first-click': 'coral',
-  scale: 'maize',
-  choice: 'sky',
-  yesno: 'pink',
-  text: 'indigo',
-};
-
 /** Tipo del bloque, con el valor por defecto aplicado ('task'). */
 export function blockKind(block: Block): BlockKind {
   return block.kind ?? 'task';

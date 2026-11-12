@@ -33,7 +33,7 @@ function OutcomeChip({ task, number }: { task: ParticipantTask; number: number }
     <span
       title={label}
       className={cn(
-        'grid size-7 shrink-0 place-items-center rounded-md text-[11px] font-semibold tabular-nums',
+        'grid size-7 shrink-0 place-items-center rounded-md text-2xs font-semibold tabular-nums',
         task.outcome === 'not-started' ? 'border border-dashed border-border text-muted-foreground' : OUTCOME_COLOR[task.outcome],
         (task.outcome === 'direct' || task.outcome === 'failed') && 'text-white',
         (task.outcome === 'indirect' || task.outcome === 'review' || task.outcome === 'reported' || task.outcome === 'incomplete') && 'text-zinc-900/80',
@@ -68,8 +68,8 @@ function PersonRow({ person, maxOf }: { person: ParticipantReport; maxOf: (block
   const meta = [person.deviceLabel ?? 'Dispositivo desconocido', formatShortDate(person.startedAt), person.variantName].filter(Boolean).join(' · ');
 
   return (
-    <li className="rounded-xl border border-border/70 bg-card" data-testid="participant">
-      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-6 sm:px-5">
+    <li className="rounded-xl border bg-card" data-testid="participant">
+      <div className="flex min-h-[4.5rem] flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-6 sm:px-5">
         <button
           type="button"
           aria-expanded={open}
@@ -78,10 +78,10 @@ function PersonRow({ person, maxOf }: { person: ParticipantReport; maxOf: (block
           className="-m-2 flex min-w-0 flex-1 flex-col gap-3 rounded-lg p-2 text-left outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:gap-6"
         >
           <span className="flex min-w-0 items-start gap-3 sm:w-64 sm:shrink-0">
-            <ChevronDown className={cn('mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden="true" />
+            <ChevronDown className={cn('mt-1 size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden="true" />
             <span className="min-w-0">
-              <span className="block truncate font-medium">{name}</span>
-              <span className="block truncate text-xs text-muted-foreground">{meta}</span>
+              <span className="block truncate font-semibold">{name}</span>
+              <span className="block truncate text-sm text-muted-foreground">{meta}</span>
             </span>
           </span>
           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-2 pl-7 sm:pl-0">
@@ -92,8 +92,8 @@ function PersonRow({ person, maxOf }: { person: ParticipantReport; maxOf: (block
                 ))}
               </span>
             )}
-            <span className="text-sm text-muted-foreground tabular-nums">
-              {tasks.length > 0 && <span className="text-foreground font-medium">{person.achieved} de {tasks.length}</span>}
+            <span className="text-[15px] text-muted-foreground tabular-nums">
+              {tasks.length > 0 && <span className="text-foreground font-semibold">{person.achieved} de {tasks.length}</span>}
               {tasks.length > 0 && ' logradas · '}
               {seconds(person.durationMs)}
               {!person.finished && ' · no terminó'}
@@ -108,16 +108,16 @@ function PersonRow({ person, maxOf }: { person: ParticipantReport; maxOf: (block
         </Button>
       </div>
       {open && (
-        <div id={panelId} className="border-t border-border/70 px-4 py-5 sm:px-5">
-          <ol className="space-y-5">
+        <div id={panelId} className="border-t px-4 py-6 sm:px-5 sm:pl-12">
+          <ol className="max-w-3xl space-y-6">
             {items.map(({ block, number }) => (
               <li key={block.blockId} className="flex gap-3">
-                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold tabular-nums">{number}</span>
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-sm font-semibold tabular-nums">{number}</span>
                 {block.type === 'task' ? (
                   <TaskDetail task={block} sessionId={person.sessionId} name={name} />
                 ) : (
                   <div className="min-w-0 flex-1 space-y-1">
-                    <p className="text-sm text-muted-foreground break-words">{block.question}</p>
+                    <p className="text-[15px] text-muted-foreground break-words">{block.question}</p>
                     <p className={cn('break-words', block.status === 'answered' ? 'font-medium' : 'text-sm text-muted-foreground italic', block.kind === 'text' && block.status === 'answered' && 'whitespace-pre-line font-normal')}>
                       {block.kind === 'text' && block.status === 'answered' ? `«${answerText(block, undefined)}»` : answerText(block, maxOf(block.blockId))}
                     </p>
@@ -282,7 +282,7 @@ export function ParticipantsPrint({ report }: { report: StudyReport }) {
   const tasks = (people[0] as ParticipantReport).blocks.flatMap((b, i) => (b.type === 'task' ? [{ id: b.blockId, number: i + 1, title: b.title }] : []));
   return (
     <section className="rounded-xl border bg-card p-4 sm:p-6 space-y-4" aria-labelledby="titulo-participantes" data-report-block>
-      <h2 id="titulo-participantes" className="text-xl font-semibold tracking-tight" data-print="heading">
+      <h2 id="titulo-participantes" className="type-section" data-print="heading">
         Participantes
       </h2>
       <Table className="text-xs">

@@ -21,7 +21,7 @@ function Dot({ label }: { label: string }) {
 }
 
 function GroupHeading({ children }: { children: ReactNode }) {
-  return <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{children}</p>;
+  return <p className="type-eyebrow px-3 pb-1.5">{children}</p>;
 }
 
 function FixedItem({ icon: Icon, label, hint, active, incomplete, onSelect }: { icon: LucideIcon; label: string; hint: string; active: boolean; incomplete: boolean; onSelect: () => void }) {
@@ -31,15 +31,15 @@ function FixedItem({ icon: Icon, label, hint, active, incomplete, onSelect }: { 
       aria-current={active ? 'true' : undefined}
       onClick={onSelect}
       className={cn(
-        'flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        'flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-left outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
         active ? 'border-primary bg-card ring-1 ring-primary shadow-sm' : 'border-transparent hover:bg-accent/60',
       )}
     >
-      <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-brand-stone-soft text-brand-stone-ink" aria-hidden>
+      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-muted text-foreground/75" aria-hidden>
         <Icon className="size-4" />
       </span>
       <span className="min-w-0">
-        <span className="block font-medium">{label}</span>
+        <span className="block text-[15px] leading-snug font-medium">{label}</span>
         <span className="block truncate text-xs text-muted-foreground">{hint}</span>
       </span>
       {incomplete && <Dot label="Le falta algo" />}
@@ -158,11 +158,11 @@ export function BlockList({
                     onMove(index, index + 1);
                   }
                 }}
-                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl px-2.5 py-3 text-left text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl px-2.5 py-3 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
                 <KindIcon kind={kind} size="sm" />
                 <span className="min-w-0">
-                  <span className={cn('block truncate font-medium', !title && 'text-muted-foreground font-normal italic')}>{title || info.untitled}</span>
+                  <span className={cn('line-clamp-2 break-words text-[15px] leading-snug font-medium', !title && 'text-muted-foreground font-normal italic')}>{title || info.untitled}</span>
                   <span className="block truncate text-xs text-muted-foreground">
                     {index + 1}. {info.label}
                   </span>
@@ -201,7 +201,7 @@ export function BlockList({
           <Plus /> Agregar bloque
         </Button>
       </AddBlockMenu>
-      {blocks.length > 1 && <p className="hidden px-1 text-xs text-muted-foreground sm:block">Arrastra para reordenar, o usa Alt + ↑ ↓ sobre un bloque.</p>}
+      {blocks.length > 1 && <p className="hidden px-1 pt-1 text-xs text-muted-foreground sm:block">Arrastra para reordenar, o usa Alt + ↑ ↓ sobre un bloque.</p>}
       </div>
 
       <div className="space-y-1.5">

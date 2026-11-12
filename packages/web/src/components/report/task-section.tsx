@@ -60,7 +60,7 @@ function OutcomeBar({ task }: { task: TaskReport }) {
         {present.map((k) => (
           <div
             key={k}
-            className={cn('grid place-items-center text-xs font-medium text-white/95 min-w-1', OUTCOME_COLOR[k], (k === 'indirect' || k === 'incomplete' || k === 'reported' || k === 'review') && 'text-zinc-900/80')}
+            className={cn('grid place-items-center text-xs font-semibold tabular-nums text-white min-w-1', OUTCOME_COLOR[k], (k === 'indirect' || k === 'incomplete' || k === 'reported' || k === 'review') && 'text-zinc-900/80')}
             style={{ width: `${(task.outcomes[k] / total) * 100}%` }}
             title={`${outcomeLabel(k, firstClick)}: ${task.outcomes[k]}`}
           >
@@ -68,7 +68,7 @@ function OutcomeBar({ task }: { task: TaskReport }) {
           </div>
         ))}
       </div>
-      <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+      <ul className="flex flex-wrap gap-x-6 gap-y-2 text-[15px]">
         {present.map((k) => (
           <li key={k} className="flex items-center gap-2" title={OUTCOME_HELP[k]}>
             <span className={cn('size-3 rounded-sm shrink-0', OUTCOME_COLOR[k])} aria-hidden="true" />
@@ -97,20 +97,20 @@ function Funnel({ task }: { task: TaskReport }) {
       }
       keep
     >
-      <ol className="space-y-2">
+      <ol className="space-y-2.5">
         {steps.map((step, i) => (
           <li key={`${step.path}-${i}`}>
             {step.note && (
-              <p className={cn('ml-9 mb-1.5 text-xs', i === worst ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground')}>
+              <p className={cn('ml-10 mb-2 text-sm', i === worst ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground')}>
                 ↓ {step.note}
                 {i === worst && steps.filter((s) => s.lost > 0).length > 1 && ' (la caída más grande)'}
               </p>
             )}
             <div className="flex items-center gap-3">
-              <span className="size-6 shrink-0 rounded-full bg-muted grid place-items-center text-xs font-medium tabular-nums">{i + 1}</span>
-              <div className="relative flex-1 min-w-0 h-9 rounded-md bg-muted overflow-hidden">
+              <span className="size-7 shrink-0 rounded-full bg-muted grid place-items-center text-sm font-semibold tabular-nums">{i + 1}</span>
+              <div className="relative flex-1 min-w-0 h-11 rounded-lg bg-muted overflow-hidden">
                 <div className="absolute inset-y-0 left-0 bg-emerald-500/30 dark:bg-emerald-500/40" style={{ width: `${step.rate * 100}%` }} />
-                <div className="relative h-full flex items-center justify-between gap-3 px-3 text-sm">
+                <div className="relative h-full flex items-center justify-between gap-3 px-4 text-[15px]">
                   <span className="truncate">{screenName(step.path)}</span>
                   <span className="tabular-nums whitespace-nowrap">
                     <span className="font-medium">{step.reached}</span> de {task.participants} · {pct(step.rate)}
@@ -131,10 +131,10 @@ function VariantTable({ task }: { task: TaskReport }) {
   const name = (id: string): string => study.variants?.find((v) => v.id === id)?.name ?? id;
   return (
     <div className="space-y-3" data-print="keep">
-      <h3 className="font-display text-lg font-bold tracking-tight" data-print="heading">Por variante (A/B)</h3>
+      <h3 className="type-subsection" data-print="heading">Por variante (A/B)</h3>
       <div className="grid gap-3 sm:grid-cols-2">
         {task.byVariant.map((v) => (
-          <div key={v.variantId} className="rounded-lg border p-3 space-y-2">
+          <div key={v.variantId} className="rounded-lg border p-4 space-y-3">
             <div className="font-medium text-sm truncate">{name(v.variantId)}</div>
             <dl className="grid grid-cols-3 gap-x-3 gap-y-2 text-sm">
               <Stat label="Puntaje" value={<ScoreChip score={v.score} />} />
@@ -176,7 +176,7 @@ function ScreenCard({ screen, task, mode, anchor, highlighted }: { screen: Scree
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const wanted = wide ? 460 : 260;
+  const wanted = wide ? 520 : 340;
   const displayWidth = available > 0 ? Math.max(120, Math.min(wanted, available)) : wanted;
   const estimated = useMemo(() => fallbackHeight(screen.taps, vw), [screen.taps, vw]);
   const left = useMemo(() => placePoints(screen.taps, vw, estimated).left, [screen.taps, vw, estimated]);
@@ -186,12 +186,12 @@ function ScreenCard({ screen, task, mode, anchor, highlighted }: { screen: Scree
   const drawn = screen.taps.length - left;
 
   return (
-    <article id={anchor} className={cn('rounded-xl border bg-card p-4 space-y-4 scroll-mt-20 min-w-0', wide && 'col-span-full', highlighted && 'ring-2 ring-primary/60')} data-print="keep">
+    <article id={anchor} className={cn('rounded-xl border bg-card p-5 sm:p-6 space-y-5 scroll-mt-20 min-w-0', wide && 'col-span-full', highlighted && 'ring-2 ring-primary/60')} data-print="keep">
       <header className="space-y-1">
-        <h5 className="font-medium break-words">{name}</h5>
-        <p className="text-xs text-muted-foreground break-all">{screen.path}</p>
+        <h5 className="text-[17px] font-semibold leading-snug break-words">{name}</h5>
+        <p className="font-mono text-xs text-muted-foreground break-all">{screen.path}</p>
       </header>
-      <dl className="grid grid-cols-3 gap-2 text-sm">
+      <dl className="grid grid-cols-3 gap-x-4 gap-y-3 border-y py-4">
         <Stat label="Visitas" value={screen.visitors} />
         <Stat label="Tiempo promedio" value={seconds(screen.avgTimeMs)} />
         <Stat label="Misclicks" value={screen.misclicks} />
@@ -214,25 +214,25 @@ function ScreenCard({ screen, task, mode, anchor, highlighted }: { screen: Scree
           }}
         </SnapshotView>
       </div>
-      <div className="space-y-1 text-xs text-muted-foreground">
+      <div className="space-y-1.5 max-w-[60ch]">
+        <p className="text-sm font-medium text-foreground/85">
+          {plural(drawn, 'toque dibujado', 'toques dibujados', 'Sin toques en esta pantalla')}
+          {left > 0 && `. ${plural(left, 'toque quedó fuera', 'toques quedaron fuera')} por venir de pantallas de otro tamaño`}.
+        </p>
         {backdrop === 'snapshot' && screen.sample && (
-          <p>
+          <p className="text-xs text-muted-foreground">
             Fondo: lo que vio {ctx.names.get(screen.sample.sessionId) ?? 'un participante'} ({vw} px de ancho).{' '}
             <Link to={recordingRoute(ctx, screen.sample.sessionId, screen.sample.t)} className="underline decoration-primary/40 underline-offset-4 hover:text-primary hover:decoration-primary" data-print="hide">
               Ver ese momento
             </Link>
           </p>
         )}
-        {backdrop === 'live' && <p>Fondo: el prototipo como está ahora (no hay foto de la grabación). Si la pantalla cambia según lo que se haga, los toques pueden no calzar.</p>}
-        <p>
-          {plural(drawn, 'toque dibujado', 'toques dibujados', 'Sin toques en esta pantalla')}
-          {left > 0 && `. ${plural(left, 'toque quedó fuera', 'toques quedaron fuera')} por venir de pantallas de otro tamaño`}.
-        </p>
+        {backdrop === 'live' && <p className="text-xs text-muted-foreground">Fondo: el prototipo como está ahora (no hay foto de la grabación). Si la pantalla cambia según lo que se haga, los toques pueden no calzar.</p>}
       </div>
       {screen.topMisclicks.length > 0 && (
-        <div className="space-y-1.5">
-          <h6 className="text-sm font-medium">Elementos más tocados sin efecto</h6>
-          <ul className="space-y-1 text-sm">
+        <div className="space-y-2 border-t pt-4">
+          <h6 className="text-[15px] font-semibold">Elementos más tocados sin efecto</h6>
+          <ul className="space-y-1.5 text-sm">
             {screen.topMisclicks.map((m) => (
               <li key={m.label} className="flex items-baseline justify-between gap-3">
                 <span className="min-w-0 break-words">{m.label}</span>
@@ -272,10 +272,10 @@ function ScreensPanel({ task, focusScreen, limit }: { task: TaskReport; focusScr
   if (task.screens.length === 0) return <p className="text-sm text-muted-foreground">Todavía no hay pantallas visitadas en esta tarea.</p>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {firstClick ? (
         <div className="space-y-1">
-          <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <p className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[15px]">
             <span className="inline-flex items-center gap-1.5">
               <span className="size-3 rounded-full bg-emerald-600" aria-hidden="true" /> Acertó ({task.outcomes.direct + task.outcomes.indirect})
             </span>
@@ -295,7 +295,7 @@ function ScreensPanel({ task, focusScreen, limit }: { task: TaskReport; focusScr
                 aria-checked={mode === m.id}
                 onClick={() => setMode(m.id)}
                 className={cn(
-                  'shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                  'min-h-9 shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
                   mode === m.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -303,21 +303,21 @@ function ScreensPanel({ task, focusScreen, limit }: { task: TaskReport; focusScr
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {mode === 'heat' && 'Rojo intenso = muchos toques en el mismo lugar.'}
             {mode === 'dots' && 'Azul: toque con efecto. Rojo: misclick (toque sin efecto).'}
             {mode === 'misclicks' && 'Solo los toques que cayeron donde no pasa nada.'}
           </p>
         </div>
       )}
-      <div className="tt-screens grid gap-5 grid-cols-[repeat(auto-fill,minmax(min(18.5rem,100%),1fr))]">
+      <div className="tt-screens grid gap-5 lg:gap-6 grid-cols-1 md:grid-cols-2">
         {visible.map((s) => (
           <ScreenCard key={s.path} screen={s} task={task} mode={firstClick ? 'first-click' : mode} anchor={anchor(task.screens.indexOf(s))} highlighted={focusScreen === s.path} />
         ))}
       </div>
       {!limit && <ShowAll total={shown.length} open={all} onToggle={() => setAll((v) => !v)} noun="pantallas" />}
       {shown.length < task.screens.length && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Se muestran las {shown.length} pantallas con más toques, de {task.screens.length}. El resto está en el reporte en pantalla.
         </p>
       )}
@@ -341,11 +341,11 @@ function ShowAll({ total, open, onToggle, noun }: { total: number; open: boolean
 /** Una sección dentro de una tarea: título, una línea de ayuda opcional y su contenido. */
 export function TaskSection({ title, description, aside, keep, children }: { title: ReactNode; description?: ReactNode; aside?: ReactNode; keep?: boolean; children: ReactNode }) {
   return (
-    <section className="space-y-4 min-w-0" {...(keep ? { 'data-print': 'keep' } : {})}>
+    <section className="space-y-5 min-w-0" {...(keep ? { 'data-print': 'keep' } : {})}>
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2" data-print="heading">
         <div className="min-w-0 space-y-1">
-          <h3 className="font-display text-lg font-bold tracking-tight">{title}</h3>
-          {description && <p className="max-w-prose text-sm text-muted-foreground leading-relaxed">{description}</p>}
+          <h3 className="type-subsection">{title}</h3>
+          {description && <p className="max-w-[65ch] text-[15px] text-muted-foreground leading-relaxed">{description}</p>}
         </div>
         {aside}
       </div>
@@ -359,16 +359,16 @@ export function TaskSection({ title, description, aside, keep, children }: { tit
 function PathChips({ pages }: { pages: string[] }) {
   const { screenName } = useReport();
   return (
-    <span className="flex flex-wrap items-center gap-1.5">
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-2">
       {pages.map((p, i) => (
-        <span key={`${p}-${i}`} className="inline-flex items-center gap-1.5">
-          {i > 0 && <ArrowRight className="size-3 text-muted-foreground" aria-label="luego" />}
-          <span className="rounded-md bg-muted px-2 py-0.5 text-xs" title={p}>
+        <span key={`${p}-${i}`} className="inline-flex items-center gap-2">
+          {i > 0 && <ArrowRight className="size-3.5 text-muted-foreground" aria-label="luego" />}
+          <span className="rounded-md border bg-card px-2.5 py-1 text-[13.5px] leading-tight" title={p}>
             {screenName(p)}
           </span>
         </span>
       ))}
-      {pages.length === 0 && <span className="text-xs text-muted-foreground">No se movió de la pantalla inicial</span>}
+      {pages.length === 0 && <span className="text-sm text-muted-foreground">No se movió de la pantalla inicial</span>}
     </span>
   );
 }
@@ -402,20 +402,20 @@ function PathsPanel({ task, limit }: { task: TaskReport; limit?: number }) {
   return (
     <div className="space-y-3">
       {task.expectedPath.length > 0 && (
-        <div className="rounded-xl bg-muted/60 p-4 space-y-2" data-print="keep">
-          <p className="text-sm font-medium">
+        <div className="rounded-xl bg-muted p-5 space-y-3" data-print="keep">
+          <p className="text-[15px] font-semibold">
             Camino esperado{' '}
             {task.expectedPathInferred && <span className="font-normal text-muted-foreground">(deducido: el más común de quienes lo lograron)</span>}
           </p>
           <PathChips pages={task.expectedPath} />
         </div>
       )}
-      <ul className="space-y-2">
+      <ul className="space-y-3">
         {paths.map((p, i) => {
           const isExpected = samePages(p.pages, task.expectedPath);
           return (
-            <li key={i} className="rounded-xl border border-border/70 bg-card p-4 space-y-2.5" data-print="keep">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <li key={i} className="rounded-xl border bg-card p-5 space-y-3.5" data-print="keep">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-[15px]">
                 <span>
                   <span className="font-medium">{plural(p.count, 'persona', 'personas')}</span>
                   <span className="text-muted-foreground">
@@ -439,7 +439,7 @@ function PathsPanel({ task, limit }: { task: TaskReport; limit?: number }) {
       </ul>
       {!limit && <ShowAll total={task.paths.length} open={all} onToggle={() => setAll((v) => !v)} noun="caminos" />}
       {limit !== undefined && paths.length < task.paths.length && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Se muestran los {paths.length} caminos más comunes, de {task.paths.length}.
         </p>
       )}
@@ -474,20 +474,20 @@ function ParticipantsPanel({ task }: { task: TaskReport }) {
 
   return (
     <div className="space-y-3">
-    <ul className="divide-y rounded-xl border border-border/70 bg-card">
+    <ul className="divide-y rounded-xl border bg-card">
       {rows.map((r) => {
         const session = ctx.sessions.get(r.sessionId);
         const variant = variantName(r.variantId);
         return (
-          <li key={r.sessionId} className="grid min-h-16 gap-x-4 gap-y-2 px-4 py-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] sm:items-center" data-print="keep">
-            <div className="min-w-0">
-              <div className="font-medium truncate">{who(r)}</div>
-              <div className="text-xs text-muted-foreground truncate">
+          <li key={r.sessionId} className="grid min-h-[4.5rem] gap-x-6 gap-y-2 px-5 py-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_auto] sm:items-center" data-print="keep">
+            <div className="min-w-0 space-y-0.5">
+              <div className="font-semibold truncate">{who(r)}</div>
+              <div className="text-sm text-muted-foreground truncate">
                 {session?.deviceLabel ?? 'Dispositivo desconocido'}
                 {variant && ` · ${variant}`}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[15px]">
               <Badge variant="outline" className={OUTCOME_BADGE[r.outcome]} title={OUTCOME_HELP[r.outcome]}>
                 {outcomeLabel(r.outcome, firstClick)}
               </Badge>
@@ -568,23 +568,23 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
   if (task.participants === 0) {
     return (
       <div className="space-y-2">
-        {block?.instruction && <p className="text-muted-foreground">“{block.instruction}”</p>}
+        {block?.instruction && <p className="text-lg max-w-[65ch] text-foreground/85">“{block.instruction}”</p>}
         <p className="text-sm text-muted-foreground">Nadie empezó esta tarea todavía.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12 lg:space-y-14">
       {(block?.instruction || block?.success) && (
-        <div className="space-y-1">
-          {block.instruction && <p className="text-muted-foreground">“{block.instruction}”</p>}
-          <p className="text-xs text-muted-foreground" data-testid="rule-text">
+        <div className="space-y-2">
+          {block.instruction && <p className="text-lg leading-relaxed max-w-[65ch] text-foreground/85">“{block.instruction}”</p>}
+          <p className="text-sm text-muted-foreground max-w-[65ch]" data-testid="rule-text">
             <span title={selector ? `Selector: ${selector}` : undefined}>{ruleText(block.success, screenName, elementText)}</span>
             {selector && !elementText && (
               <>
                 {' '}
-                <span className="font-mono text-[0.6875rem] opacity-70 break-all" data-print="hide">
+                <span className="font-mono text-xs break-all" data-print="hide">
                   ({selector})
                 </span>
               </>
@@ -594,32 +594,32 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
       )}
 
       <TaskSection title="Resultado" keep>
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl bg-muted/60 p-4 space-y-1">
-          <dt className="text-xs text-muted-foreground">Puntaje</dt>
-          <dd className="text-2xl">
+      <dl className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-1.5">
+          <dt className="text-sm font-medium text-foreground/80">Puntaje</dt>
+          <dd className="text-[1.75rem] leading-tight font-display">
             <ScoreChip score={task.score} />
           </dd>
         </div>
-        <div className="rounded-xl bg-muted/60 p-4 space-y-1">
-          <dt className="text-xs text-muted-foreground">{firstClick ? 'Acertaron' : 'Lo lograron'}</dt>
-          <dd className="font-display text-2xl font-bold tabular-nums">{task.decided ? pct(task.successRate) : '—'}</dd>
-          <dd className="text-xs text-muted-foreground">
+        <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-1.5">
+          <dt className="text-sm font-medium text-foreground/80">{firstClick ? 'Acertaron' : 'Lo lograron'}</dt>
+          <dd className="font-display text-[1.75rem] leading-tight font-bold tabular-nums">{task.decided ? pct(task.successRate) : '—'}</dd>
+          <dd className="text-sm leading-snug text-muted-foreground">
             {task.decided
               ? `${task.outcomes.direct + task.outcomes.indirect} de ${task.decided}${task.outcomes.review > 0 ? ' ya decididos' : ''}`
               : 'Sin resultados decididos'}
             {task.outcomes.review > 0 && ` · ${task.outcomes.review} por revisar`}
           </dd>
         </div>
-        <div className="rounded-xl bg-muted/60 p-4 space-y-1">
-          <dt className="text-xs text-muted-foreground">Tiempo mediano</dt>
-          <dd className="font-display text-2xl font-bold tabular-nums">{seconds(task.medianTimeMs)}</dd>
-          <dd className="text-xs text-muted-foreground">{firstClick ? 'Hasta el primer toque, de quienes acertaron' : 'De quienes lo lograron'}</dd>
+        <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-1.5">
+          <dt className="text-sm font-medium text-foreground/80">Tiempo mediano</dt>
+          <dd className="font-display text-[1.75rem] leading-tight font-bold tabular-nums">{seconds(task.medianTimeMs)}</dd>
+          <dd className="text-sm leading-snug text-muted-foreground">{firstClick ? 'Hasta el primer toque, de quienes acertaron' : 'De quienes lo lograron'}</dd>
         </div>
-        <div className="rounded-xl bg-muted/60 p-4 space-y-1">
-          <dt className="text-xs text-muted-foreground">Misclicks</dt>
-          <dd className="font-display text-2xl font-bold tabular-nums">{task.tapCount > 0 ? pct(task.misclickRate) : '—'}</dd>
-          <dd className="text-xs text-muted-foreground">
+        <div className="rounded-xl border bg-card p-4 sm:p-5 space-y-1.5">
+          <dt className="text-sm font-medium text-foreground/80">Misclicks</dt>
+          <dd className="font-display text-[1.75rem] leading-tight font-bold tabular-nums">{task.tapCount > 0 ? pct(task.misclickRate) : '—'}</dd>
+          <dd className="text-sm leading-snug text-muted-foreground">
             {task.tapCount > 0 ? `de ${plural(task.tapCount, 'toque', 'toques')} · ${task.avgMisclicks.toFixed(1).replace('.', ',')} por persona` : 'Sin toques'}
           </dd>
         </div>

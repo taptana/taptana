@@ -8,11 +8,11 @@ import { EmptyArt, type EmptyArtKind } from '@/components/brand/art';
 import { LogoMark } from '@/components/brand/logo';
 import { Link, useRouter, type Route, type RouteName } from '@/router';
 
-const NAV: Array<{ to: Route; label: string; hint: string; icon: typeof FileArchive; match: (r: RouteName) => boolean }> = [
-  { to: { name: 'home' }, label: 'Inicio', hint: 'Empieza aquí', icon: House, match: (r) => r === 'home' },
-  { to: { name: 'prototypes' }, label: 'Prototipos', hint: 'Sube tu HTML', icon: FileArchive, match: (r) => r === 'prototypes' },
-  { to: { name: 'studies' }, label: 'Estudios', hint: 'Tareas', icon: FlaskConical, match: (r) => r === 'studies' || r === 'study' || r === 'report' || r === 'presentation' },
-  { to: { name: 'recordings' }, label: 'Sesiones', hint: 'Paso a paso', icon: PlayCircle, match: (r) => r === 'recordings' || r === 'player' },
+const NAV: Array<{ to: Route; label: string; icon: typeof FileArchive; match: (r: RouteName) => boolean }> = [
+  { to: { name: 'home' }, label: 'Inicio', icon: House, match: (r) => r === 'home' },
+  { to: { name: 'prototypes' }, label: 'Prototipos', icon: FileArchive, match: (r) => r === 'prototypes' },
+  { to: { name: 'studies' }, label: 'Estudios', icon: FlaskConical, match: (r) => r === 'studies' || r === 'study' || r === 'report' || r === 'presentation' },
+  { to: { name: 'recordings' }, label: 'Sesiones', icon: PlayCircle, match: (r) => r === 'recordings' || r === 'player' },
 ];
 
 const WIDTHS = { default: 'max-w-[1040px]', wide: 'max-w-[1280px]', full: 'max-w-none' } as const;
@@ -35,7 +35,7 @@ export function Layout({ children, wide = false, width }: { children: ReactNode;
             <LogoMark className="size-7 lg:size-8" />
             <span className="font-display font-bold tracking-tight text-lg lg:text-[1.35rem] leading-none">Taptana</span>
           </Link>
-          {IS_DEMO && <span className="ml-auto lg:ml-1 rounded-full bg-brand-maize-soft px-2 py-0.5 text-[11px] font-semibold text-brand-maize-ink">Demo</span>}
+          {IS_DEMO && <span className="ml-auto lg:ml-1 rounded-full border bg-card px-2 py-0.5 text-2xs font-semibold text-muted-foreground">Demo</span>}
         </div>
         <nav aria-label="Secciones" className="grid grid-cols-4 gap-1 px-2 pb-2 lg:flex lg:flex-col lg:px-3 lg:pb-0">
           {NAV.map((item) => {
@@ -47,34 +47,29 @@ export function Layout({ children, wide = false, width }: { children: ReactNode;
                 to={item.to}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'group relative flex flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-xs transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                  'lg:flex-row lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm',
-                  active ? 'bg-accent text-accent-foreground font-semibold' : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                  'group relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                  'lg:min-h-10 lg:flex-row lg:justify-start lg:gap-3 lg:px-3 lg:py-2 lg:text-[15px]',
+                  active ? 'bg-accent text-foreground font-semibold' : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
                 )}
               >
-                <Icon className="size-4.5 shrink-0" />
+                <Icon className={cn('size-5 shrink-0 lg:size-[18px]', active && 'text-primary')} />
                 <span className="whitespace-nowrap">{item.label}</span>
-                {/* La pista de cada paso; en la sección actual, el punto del tablero. */}
-                {active ? (
-                  <span aria-hidden className="hidden lg:block ml-auto size-2 rounded-full bg-brand-coral ring-4 ring-brand-coral/20" />
-                ) : (
-                  <span className="hidden xl:inline ml-auto min-w-0 truncate whitespace-nowrap pl-2 text-xs text-muted-foreground/80 font-normal">{item.hint}</span>
-                )}
-                {active && <span aria-hidden className="lg:hidden absolute -bottom-0.5 size-1.5 rounded-full bg-brand-coral" />}
+                {/* La sección actual: una barrita violeta (a la izquierda en el menú, abajo en celular). */}
+                {active && <span aria-hidden className="absolute rounded-full bg-primary bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 lg:bottom-auto lg:left-0 lg:top-1/2 lg:h-5 lg:w-[3px] lg:-translate-x-0 lg:-translate-y-1/2" />}
               </Link>
             );
           })}
         </nav>
-        <div className="hidden lg:block mt-auto m-3 rounded-2xl bg-card/70 p-4 text-xs text-muted-foreground space-y-1.5">
-          <p className="flex items-center gap-1.5 font-semibold text-foreground">
-            <ShieldCheck className="size-4 text-primary" />
+        <div className="hidden lg:block mt-auto m-3 rounded-xl border bg-card p-4 text-sm leading-snug text-muted-foreground space-y-1.5">
+          <p className="flex items-center gap-2 font-semibold text-foreground">
+            <ShieldCheck className="size-4 text-muted-foreground" />
             {IS_DEMO ? 'Modo demo' : 'Todo local'}
           </p>
           <p>{IS_DEMO ? 'Lo que subas o grabes queda solo en este navegador.' : 'Prototipos y sesiones quedan en esta computadora.'}</p>
         </div>
       </aside>
       <main id="contenido" className="flex-1 min-w-0">
-        <div className={cn('mx-auto px-4 pt-6 pb-16 sm:px-8 sm:pt-10 lg:px-12 lg:pt-12 space-y-10 sm:space-y-12', WIDTHS[width ?? (wide ? 'wide' : 'default')])}>{children}</div>
+        <div className={cn('mx-auto px-4 pt-6 pb-16 sm:px-8 sm:pt-10 lg:px-12 lg:pt-12 space-y-10 lg:space-y-14', WIDTHS[width ?? (wide ? 'wide' : 'default')])}>{children}</div>
       </main>
     </div>
   );
@@ -90,8 +85,8 @@ export function PageHeader({ title, description, actions, back }: { title: React
       <div className="flex items-start gap-3 min-w-0">
         {back}
         <div className="min-w-0 space-y-2">
-          <h1 className="text-[1.7rem] sm:text-4xl font-bold tracking-tight leading-[1.1] break-words">{title}</h1>
-          {description && <div className="text-muted-foreground max-w-prose leading-relaxed">{description}</div>}
+          <h1 className="type-page-title break-words">{title}</h1>
+          {description && <div className="text-muted-foreground max-w-[65ch] leading-relaxed">{description}</div>}
         </div>
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>}
@@ -117,10 +112,10 @@ export function Section({
 }) {
   return (
     <section id={id} className={cn('space-y-5 sm:space-y-6', className)}>
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <div className="min-w-0 space-y-1">
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">{title}</h2>
-          {description && <p className="text-sm text-muted-foreground max-w-prose leading-relaxed">{description}</p>}
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0 space-y-1.5">
+          <h2 className="type-section">{title}</h2>
+          {description && <p className="text-muted-foreground max-w-[65ch] leading-relaxed">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>}
       </div>
@@ -132,15 +127,15 @@ export function Section({
 /** Pestañas simples (estilo shadcn Tabs) que navegan entre rutas. */
 export function RouteTabs({ tabs }: { tabs: Array<{ label: string; to: Route; active: boolean; icon?: ReactNode }> }) {
   return (
-    <nav aria-label="Vistas" className="inline-flex max-w-full overflow-x-auto rounded-xl bg-brand-stone-soft p-1 gap-1 print:hidden">
+    <nav aria-label="Vistas" className="inline-flex max-w-full overflow-x-auto rounded-lg bg-muted p-1 gap-1 print:hidden">
       {tabs.map((t) => (
         <Link
           key={t.label}
           to={t.to}
           aria-current={t.active ? 'page' : undefined}
           className={cn(
-            'inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-1.5 text-sm font-medium transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-            t.active ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            'inline-flex min-h-9 shrink-0 items-center gap-2 rounded-md px-4 py-1.5 text-sm font-medium transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+            t.active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
           )}
         >
           {t.icon}
@@ -156,10 +151,10 @@ export function RouteTabs({ tabs }: { tabs: Array<{ label: string; to: Route; ac
  */
 export function EmptyState({ icon, art, title, children, action }: { icon?: ReactNode; art?: EmptyArtKind; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="rounded-3xl border border-dashed border-input bg-card/60 px-6 py-14 sm:py-16 text-center flex flex-col items-center gap-3">
-      {art ? <EmptyArt kind={art} className="mb-1" /> : <div className="size-12 rounded-2xl bg-brand-violet-soft grid place-items-center text-brand-violet-ink">{icon}</div>}
-      <h2 className="text-xl font-bold tracking-tight">{title}</h2>
-      {children && <div className="text-muted-foreground max-w-md text-sm space-y-2">{children}</div>}
+    <div className="rounded-2xl border border-dashed border-input bg-card px-6 py-14 sm:py-16 text-center flex flex-col items-center gap-3">
+      {art ? <EmptyArt kind={art} className="mb-2" /> : <div className="size-12 rounded-xl bg-muted grid place-items-center text-muted-foreground">{icon}</div>}
+      <h2 className="type-section">{title}</h2>
+      {children && <div className="text-muted-foreground max-w-[52ch] leading-relaxed space-y-2">{children}</div>}
       {action && <div className="pt-2 flex flex-wrap justify-center gap-2">{action}</div>}
     </div>
   );
@@ -184,8 +179,8 @@ export function ErrorState({
       <div className="size-12 rounded-full bg-destructive/10 grid place-items-center text-destructive">
         <CircleAlert className="size-6" />
       </div>
-      <h2 className="text-lg font-bold">{title}</h2>
-      <div className="text-muted-foreground max-w-md text-sm">{message}</div>
+      <h2 className="type-section">{title}</h2>
+      <div className="text-muted-foreground max-w-[52ch] leading-relaxed">{message}</div>
       {(onRetry || home) && (
         <div className="pt-2 flex flex-wrap justify-center gap-2">
           {onRetry && <Button onClick={onRetry}>{retryLabel}</Button>}
@@ -266,10 +261,11 @@ export function NotFound() {
   );
 }
 
+/* Avisos sobrios: tarjeta blanca, borde fino y un filete del color del estado a la izquierda. */
 const NOTICE_TONES = {
-  info: 'bg-sky-500/[0.09] text-foreground [&_[data-slot=notice-icon]]:text-sky-600 dark:[&_[data-slot=notice-icon]]:text-sky-400',
-  warning: 'bg-amber-500/[0.11] text-foreground [&_[data-slot=notice-icon]]:text-amber-600 dark:[&_[data-slot=notice-icon]]:text-amber-400',
-  neutral: 'bg-brand-stone-soft text-foreground [&_[data-slot=notice-icon]]:text-muted-foreground',
+  info: 'border-l-sky-500 [&_[data-slot=notice-icon]]:text-sky-600 dark:[&_[data-slot=notice-icon]]:text-sky-400',
+  warning: 'border-l-amber-500 [&_[data-slot=notice-icon]]:text-amber-600 dark:[&_[data-slot=notice-icon]]:text-amber-400',
+  neutral: 'border-l-muted-foreground/40 [&_[data-slot=notice-icon]]:text-muted-foreground',
 } as const;
 
 /**
@@ -294,7 +290,7 @@ export function Notice({
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
-    <div role="status" className={cn('rounded-xl px-4 py-3 text-sm', NOTICE_TONES[tone], className)}>
+    <div role="status" className={cn('rounded-xl border border-l-[3px] bg-card text-foreground shadow-xs px-4 py-3 text-sm', NOTICE_TONES[tone], className)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         {icon && (
           <span data-slot="notice-icon" className="shrink-0 [&_svg]:size-4" aria-hidden>
@@ -309,7 +305,7 @@ export function Notice({
               aria-expanded={open}
               aria-controls={id}
               onClick={() => setOpen((v) => !v)}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
               {open ? 'Ocultar' : 'Saber más'}
               <ChevronDown className={cn('size-3.5 transition-transform', open && 'rotate-180')} />
@@ -319,7 +315,7 @@ export function Notice({
         </div>
       </div>
       {children && open && (
-        <div id={id} className={cn('mt-2 max-w-prose space-y-2 leading-relaxed text-muted-foreground', icon && 'sm:pl-7')}>
+        <div id={id} className={cn('mt-2 max-w-[65ch] space-y-2 leading-relaxed text-muted-foreground', icon && 'sm:pl-7')}>
           {children}
         </div>
       )}

@@ -30,7 +30,6 @@ import { ReviewDialog } from '@/components/report/review-dialog';
 import { clearSnapshotCache, whenSnapshotsReady } from '@/components/report/snapshot-view';
 import { StudyTabs } from '@/components/report/study-tabs';
 import { KindIcon } from '@/components/builder/fields';
-import { kindTone, TONE_INK } from '@/lib/brand';
 import { TaskBody } from '@/components/report/task-section';
 import { copyText, downloadText } from '@/lib/download';
 import { friendlyError } from '@/lib/errors';
@@ -365,17 +364,17 @@ export function ReportPage({ id }: { id: string }) {
         <header className="flex items-start gap-4" data-print="heading">
           <KindIcon kind={entry.kind} size="lg" />
           <div className="min-w-0 flex-1 space-y-1">
-            <p className={cn('text-xs font-semibold uppercase tracking-wider', TONE_INK[kindTone(entry.kind)])}>
+            <p className="type-eyebrow">
               {entry.number}. {entry.kindLabel}
             </p>
-            <h2 id={`titulo-${entry.id}`} className="text-2xl sm:text-[1.75rem] font-bold tracking-tight leading-tight break-words">
+            <h2 id={`titulo-${entry.id}`} className="type-section break-words">
               {entry.title}
             </h2>
           </div>
           {task && task.participants > 0 && (
             <div className="text-right shrink-0">
               <ScoreChip score={task.score} className="text-2xl" />
-              <p className="text-xs text-muted-foreground">{plural(task.participants, 'participante', 'participantes')}</p>
+              <p className="text-sm text-muted-foreground tabular-nums">{plural(task.participants, 'participante', 'participantes')}</p>
             </div>
           )}
         </header>
@@ -407,10 +406,10 @@ export function ReportPage({ id }: { id: string }) {
       <VariantsCard report={report} />
       <section aria-labelledby="titulo-presentacion" className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6" data-print="hide">
         <div className="space-y-1">
-          <h2 id="titulo-presentacion" className="text-base font-semibold">
+          <h2 id="titulo-presentacion" className="type-subsection font-sans">
             Presentación lista para compartir
           </h2>
-          <p className="text-sm text-muted-foreground">Las diapositivas con lo más importante, armadas solas con estos resultados. Preséntalas o descárgalas en PowerPoint o PDF.</p>
+          <p className="text-sm text-muted-foreground max-w-[65ch]">Las diapositivas con lo más importante, armadas solas con estos resultados. Preséntalas o descárgalas en PowerPoint o PDF.</p>
         </div>
         <Button asChild className="shrink-0">
           <Link to={presentation}>
@@ -507,7 +506,10 @@ export function ReportPage({ id }: { id: string }) {
             ) : (
               <Tabs value={activeTab} onValueChange={(v) => setTab(v as ReportTab)} className="gap-10">
                 <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 border-b">
-                  <TabsList aria-label="Partes del reporte" className="h-auto -mb-px flex-wrap gap-x-3 gap-y-0 overflow-visible rounded-none bg-transparent p-0 sm:gap-x-6">
+                  <TabsList
+                    aria-label="Partes del reporte"
+                    className="h-auto -mb-px w-full sm:w-fit flex-nowrap gap-x-5 overflow-x-auto overflow-y-hidden rounded-none bg-transparent p-0 sm:gap-x-7 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:[mask-image:linear-gradient(to_right,#000_85%,transparent)] max-sm:pr-6"
+                  >
                     {(
                       [
                         { id: 'resumen', label: 'Resumen', count: null },
@@ -519,22 +521,22 @@ export function ReportPage({ id }: { id: string }) {
                       <TabsTrigger
                         key={t.id}
                         value={t.id}
-                        className="rounded-none border-b-2 border-transparent px-0.5 pt-1 pb-3 text-[15px] font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:font-semibold data-[state=active]:shadow-none"
+                        className="min-h-11 rounded-none border-b-2 border-transparent px-0.5 pt-1 pb-3 text-[15px] font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:font-semibold data-[state=active]:shadow-none"
                       >
                         {t.label}
-                        {t.count !== null && <span className="rounded-full bg-brand-stone-soft px-1.5 text-xs font-medium text-muted-foreground tabular-nums">{t.count}</span>}
+                        {t.count !== null && <span className="rounded-full bg-muted px-1.5 text-2xs font-semibold text-muted-foreground tabular-nums">{t.count}</span>}
                       </TabsTrigger>
                     ))}
                   </TabsList>
                   <div className="order-first w-full pb-1 lg:order-none lg:w-auto lg:pb-3">{toolbar}</div>
                 </div>
 
-                <TabsContent value="resumen" className="space-y-10 sm:space-y-12">
+                <TabsContent value="resumen" className="space-y-10 lg:space-y-14">
                   {summary}
                   {sessionsLink}
                 </TabsContent>
 
-                <TabsContent value="tareas" className="space-y-10">
+                <TabsContent value="tareas" className="space-y-10 lg:space-y-12">
                   <BlockPicker entries={taskEntries} current={selectedTask?.id} onSelect={(blockId) => setTaskId(blockId)} label="Tareas del estudio" />
                   {selectedTask ? renderBlock(selectedTask) : entries.length === 0 ? noBlocks : <p className="text-muted-foreground">Este estudio no tiene tareas, solo preguntas.</p>}
                   {sessionsLink}
@@ -605,9 +607,9 @@ function NoParticipants({ base, excluded }: { base: Base; excluded: number }) {
       ) : link ? (
         <>
           <p>Comparte este link con tus participantes (o muéstrales el código QR). Cuando alguien termine, los resultados aparecen aquí solos.</p>
-          <p className="rounded-md border bg-muted/50 px-3 py-2 font-mono text-xs break-all select-all text-foreground">{link}</p>
+          <p className="rounded-md border bg-muted/50 px-3 py-2 font-mono text-sm break-all select-all text-foreground">{link}</p>
           {qr && <img src={qr} alt="Código QR del link del estudio" className="mx-auto size-40 rounded-lg border bg-white p-2" />}
-          <p className="text-xs">{IS_DEMO ? 'En esta demo el link solo funciona en este mismo navegador.' : 'El celular del participante tiene que estar en la misma red Wi-Fi que esta computadora.'}</p>
+          <p className="text-sm">{IS_DEMO ? 'En esta demo el link solo funciona en este mismo navegador.' : 'El celular del participante tiene que estar en la misma red Wi-Fi que esta computadora.'}</p>
         </>
       ) : (
         <p>Este estudio no tiene un prototipo disponible aquí. Elige uno en Diseño para obtener el link que se comparte.</p>

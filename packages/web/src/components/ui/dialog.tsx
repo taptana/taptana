@@ -11,7 +11,7 @@ const DialogClose = DialogPrimitive.Close;
 function DialogContent({ className, children, hideClose = false, ...props }: React.ComponentProps<typeof DialogPrimitive.Content> & { hideClose?: boolean }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[oklch(0.21_0.045_285)]/45 backdrop-blur-[2px]" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
@@ -22,7 +22,7 @@ function DialogContent({ className, children, hideClose = false, ...props }: Rea
       >
         {children}
         {!hideClose && (
-          <DialogPrimitive.Close className="absolute top-4 right-4 rounded-sm opacity-70 hover:opacity-100 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 cursor-pointer" aria-label="Cerrar">
+          <DialogPrimitive.Close className="absolute top-3 right-3 grid size-9 place-items-center rounded-md opacity-70 hover:bg-accent hover:opacity-100 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 cursor-pointer" aria-label="Cerrar">
             <X className="size-4" />
           </DialogPrimitive.Close>
         )}
@@ -40,11 +40,11 @@ function DialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
-  return <DialogPrimitive.Title data-slot="dialog-title" className={cn('text-xl leading-snug font-bold', className)} {...props} />;
+  return <DialogPrimitive.Title data-slot="dialog-title" className={cn('text-[1.375rem] leading-tight font-bold', className)} {...props} />;
 }
 
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
-  return <DialogPrimitive.Description data-slot="dialog-description" className={cn('text-muted-foreground text-sm', className)} {...props} />;
+  return <DialogPrimitive.Description data-slot="dialog-description" className={cn('text-muted-foreground text-sm leading-relaxed', className)} {...props} />;
 }
 
 /**

@@ -35,8 +35,8 @@ export function BlockPicker({ entries, current, onSelect, label }: { entries: In
                 onClick={() => onSelect(e.id)}
                 aria-current={active ? 'true' : undefined}
                 className={cn(
-                  'flex max-w-full sm:max-w-72 cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                  active ? 'border-primary bg-card ring-1 ring-primary shadow-sm' : 'border-border/80 bg-card/70 text-muted-foreground hover:border-primary/40 hover:bg-card hover:text-foreground',
+                  'flex max-w-full sm:max-w-80 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                  active ? 'border-primary bg-card ring-1 ring-primary shadow-sm' : 'border-border bg-card text-foreground/85 hover:bg-accent/60 hover:text-foreground',
                 )}
               >
                 <KindIcon kind={e.kind} size="sm" />

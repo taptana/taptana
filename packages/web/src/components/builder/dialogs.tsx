@@ -681,7 +681,7 @@ export function RecordPanel({
       )}
 
       {result && result.reached && result.tapped && (
-        <fieldset className="space-y-1.5 border-t pt-3 text-sm">
+        <fieldset className="min-w-0 space-y-1.5 border-t pt-3 text-sm">
           <legend className="sr-only">¿Cuándo se cumple la tarea?</legend>
           <p className="text-xs font-medium text-muted-foreground">La tarea se cumple cuando el participante…</p>
           <label className="flex cursor-pointer items-start gap-2">

@@ -226,13 +226,20 @@ La sesión vive en `sessionStorage` (una pestaña). Cada carga de página es un 
 - **Nunca accede a datos directamente**: siempre por `api/client.ts`, con `http.ts` (API real)
   y `static.ts` (demo). Cada método existe en los dos.
 - Componentes de shadcn copiados a `src/components/ui/`, no instalados. Sin `window.confirm`.
-- **Identidad visual** («un tablero de puntos donde caen los toques»): los colores son tokens en
-  `src/index.css` (papel cálido, tinta índigo, violeta para la acción principal y acentos coral,
-  maíz, turquesa y rosa, cada uno con `-soft` e `-ink`). La marca no tiene verde ni rojo: esos son
-  de los resultados. Un color por tipo de bloque: `BLOCK_KIND_TONES` (`shared`) → clases en
-  `lib/brand.ts` → `KindIcon` (`builder/fields.tsx`); la presentación usa los mismos tonos en
-  `deck/theme.ts`. Logo e ilustraciones: `components/brand/`. Títulos en Bricolage Grotesque
-  (`@fontsource-variable/bricolage-grotesque`, servida por el panel; nunca desde otro sitio).
+- **Identidad visual** (sobria: «una herramienta profesional con un toque de carácter»): base
+  neutra de shadcn en `src/index.css` (blancos, grises, tinta casi negra) y **un solo acento, el
+  violeta** (`--primary`): acción principal, links, foco, lo seleccionado y el progreso. El color
+  se reserva para estados y resultados (verde, rojo, azul «por revisar», ámbar, puntaje); los
+  avisos son tarjeta blanca con ícono y filete del color del estado. Los tipos de bloque no tienen
+  color: `KindIcon` (`builder/fields.tsx`) es un cuadrado gris y el dibujo dice el tipo. La
+  personalidad la ponen el logo (`components/brand/logo.tsx`, el único con varios colores), la
+  tipografía de títulos y el motivo de puntos (`bg-dots`, ilustraciones casi monocromas con un
+  toque coral, `--tap`). Títulos en Bricolage Grotesque (`@fontsource-variable/bricolage-grotesque`,
+  servida por el panel; nunca desde otro sitio).
+- **Tipografía y ritmo**: escala en `@theme` (`text-2xs` 12px solo insignias y contadores, `xs` 13,
+  `sm` 15, `base` 16). Títulos con una sola definición: `type-page-title`, `type-section` (h2),
+  `type-subsection` (h3) y `type-eyebrow`. Nada que informe por debajo de 13px; texto corrido y
+  ayudas a `max-w-[65ch]`; `--muted-foreground` con ≥ 7:1 sobre fondo, tarjeta y `--muted`.
 - Las etiquetas de resultados y tipos de bloque salen de `shared` (`OUTCOME_LABELS`,
   `BLOCK_KIND_LABELS`) para que todo el panel diga lo mismo.
 
