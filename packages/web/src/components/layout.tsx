@@ -86,8 +86,8 @@ export function Layout({ children, wide = false, width }: { children: ReactNode;
 export function PageHeader({ title, description, actions, back, eyebrow }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; back?: ReactNode; eyebrow?: ReactNode }) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-      <div className="flex items-start gap-3 min-w-0">
-        {back && <div className={cn('shrink-0', eyebrow && 'pt-7')}>{back}</div>}
+      <div className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:gap-3">
+        {back && <div className={cn('-ml-2 shrink-0 sm:ml-0', eyebrow && 'sm:pt-7')}>{back}</div>}
         <div className="min-w-0 space-y-2.5">
           {eyebrow && <p className="type-eyebrow">{eyebrow}</p>}
           <h1 className="type-page-title break-words">{title}</h1>
@@ -143,7 +143,7 @@ export function RouteTabs({ tabs }: { tabs: Array<{ label: string; to: Route; ac
           to={t.to}
           aria-current={t.active ? 'page' : undefined}
           className={cn(
-            'inline-flex min-h-9 shrink-0 items-center rounded-sm px-3.5 py-1.5 text-sm transition-colors outline-none focus-ink',
+            'inline-flex min-h-9 shrink-0 items-center rounded-sm px-3.5 py-1.5 text-sm transition-colors outline-none focus-ink focus-visible:-outline-offset-2',
             t.active ? 'font-semibold text-foreground' : 'text-muted-foreground hover:text-foreground',
           )}
         >
@@ -299,14 +299,15 @@ export function Notice({
   const id = useId();
   return (
     <div role="status" className={cn('border-l-2 py-1 pl-4 text-sm text-foreground', NOTICE_TONES[tone], className)}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <div className="flex items-start gap-3">
         {icon && (
-          <span data-slot="notice-icon" className="shrink-0 [&_svg]:size-4" aria-hidden>
+          <span data-slot="notice-icon" className="flex h-9 shrink-0 items-center [&_svg]:size-4" aria-hidden>
             {icon}
           </span>
         )}
-        <p className="min-w-[min(100%,14rem)] flex-1 font-medium leading-snug">{title}</p>
-        <div className="flex shrink-0 flex-wrap items-center gap-2 print:hidden">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+        <p className="min-w-[min(100%,14rem)] flex-1 py-1.5 font-medium leading-snug">{title}</p>
+        <div className="-ml-2 flex shrink-0 flex-wrap items-center gap-2 sm:ml-0 print:hidden">
           {children && (
             <button
               type="button"
@@ -320,6 +321,7 @@ export function Notice({
             </button>
           )}
           {action}
+        </div>
         </div>
       </div>
       {children && open && (

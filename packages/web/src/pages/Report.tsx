@@ -302,13 +302,14 @@ export function ReportPage({ id }: { id: string }) {
           </NativeSelect>
         </div>
       )}
-      <div className="flex items-center gap-2">
-        <Label htmlFor="filtro-dispositivo" className="mb-0 text-muted-foreground font-normal">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+        <Label htmlFor="filtro-dispositivo" className="mb-0 text-muted-foreground font-normal max-sm:sr-only">
           Dispositivo
         </Label>
         <NativeSelect
           id="filtro-dispositivo"
-          className="w-48"
+          aria-label="Dispositivo"
+          className="w-full min-w-0 sm:w-48"
           value={filter.device ?? ''}
           onChange={(e) => {
             const device = e.target.value as '' | 'touch' | 'desktop';
