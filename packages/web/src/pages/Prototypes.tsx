@@ -171,7 +171,7 @@ export function PrototypesPage() {
                     if (f) void upload(f);
                   }}
                   className={cn(
-                    'flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-background px-6 py-12 sm:py-14 text-center cursor-pointer transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                    'flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card px-6 py-12 sm:py-14 text-center cursor-pointer transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
                     dragging ? 'border-primary bg-accent' : 'hover:border-foreground/30',
                     busy && 'opacity-60 cursor-wait',
                   )}
@@ -222,7 +222,7 @@ export function PrototypesPage() {
       ) : protos === null || !info ? (
         <ListSkeleton count={2} />
       ) : protos.length === 0 ? (
-        <EmptyState icon={<FileArchive className="size-6" />} title="Todavía no hay prototipos">
+        <EmptyState art="prototypes" title="Todavía no hay prototipos">
           <p>Sube el tuyo arriba. Si quieres ver primero cómo se ve todo con datos, en Inicio hay un ejemplo listo.</p>
         </EmptyState>
       ) : (
@@ -400,7 +400,7 @@ function PrototypeRow({
           {byUrl ? <Globe className="size-5" /> : uploaded ? <FileArchive className="size-5" /> : <FolderOpen className="size-5" />}
         </span>
         <div className="min-w-0 flex-1 basis-48">
-          <h3 className="font-semibold leading-snug break-words">{proto.name}</h3>
+          <h3 className="font-display text-lg font-bold tracking-tight leading-snug break-words">{proto.name}</h3>
           <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
             <Badge variant="secondary">{isExample ? 'Ejemplo' : foreign ? 'Importado' : byUrl ? 'Por URL' : uploaded ? 'Subido' : 'Carpeta local'}</Badge>
             {proto.root && <Badge variant="outline">En la raíz</Badge>}
@@ -735,7 +735,7 @@ function UrlForm({ canAdd, onAdded }: { canAdd: boolean; onAdded: (proto: Protot
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {check && (
-        <div role="status" aria-live="polite" className="space-y-4 rounded-2xl border border-border/70 bg-background p-(--card-pad)">
+        <div role="status" aria-live="polite" className="space-y-4 rounded-2xl border border-border/70 bg-card p-(--card-pad)">
           <div className="flex items-start gap-3">
             <span className="mt-0.5">
               <IssueIcon level={check.level} />

@@ -13,7 +13,7 @@ function DropdownMenuContent({ className, sideOffset = 4, ...props }: React.Comp
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          'bg-popover text-popover-foreground z-50 min-w-40 max-w-[calc(100vw-1rem)] max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto rounded-md border p-1 shadow-md',
+          'bg-popover text-popover-foreground z-50 min-w-40 max-w-[calc(100vw-1rem)] max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto rounded-xl border p-1.5 shadow-lg',
           className,
         )}
         {...props}
@@ -27,7 +27,7 @@ function DropdownMenuItem({ className, destructive = false, ...props }: React.Co
     <Menu.Item
       data-slot="dropdown-menu-item"
       className={cn(
-        "relative flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none select-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
+        "relative flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none select-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
         destructive && 'text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive',
         className,
       )}

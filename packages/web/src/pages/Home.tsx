@@ -9,6 +9,9 @@ import { ErrorState, Layout, Notice } from '@/components/layout';
 import { friendlyError } from '@/lib/errors';
 import { plural } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { TONE_TILE } from '@/lib/brand';
+import { HeroArt } from '@/components/brand/art';
+import type { BrandTone } from '@taptana/shared';
 import { Link, useRouter, type Route } from '@/router';
 
 interface HomeData {
@@ -129,10 +132,22 @@ export function HomePage() {
 
   return (
     <Layout>
-      <section className="pt-2 sm:pt-6 pb-2">
-        <p className="text-sm font-medium text-muted-foreground">Pruebas de usabilidad para prototipos HTML</p>
-        <h1 className="mt-3 max-w-3xl text-3xl sm:text-5xl font-semibold tracking-tight text-balance leading-tight">Prueba tu prototipo con personas reales</h1>
-        <p className="mt-5 max-w-prose text-muted-foreground text-base sm:text-lg leading-relaxed">
+      <section className="relative pt-2 sm:pt-4 pb-2 md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-10">
+        <div className="min-w-0">
+        <p className="inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1 text-[13px] font-medium text-accent-foreground">
+          <span aria-hidden className="size-1.5 rounded-full bg-brand-coral" />
+          Pruebas de usabilidad para prototipos HTML
+        </p>
+        <h1 className="mt-5 max-w-3xl text-[2.5rem] sm:text-6xl font-bold tracking-tight text-balance leading-[1.02]">
+          Prueba tu prototipo con{' '}
+          <span className="relative whitespace-nowrap">
+            personas reales
+            <svg aria-hidden viewBox="0 0 300 14" preserveAspectRatio="none" className="absolute left-0 -bottom-[0.14em] h-[0.2em] w-full text-brand-maize">
+              <path d="M3 9 C 60 2, 110 12, 160 6 S 250 3, 297 8" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
+            </svg>
+          </span>
+        </h1>
+        <p className="mt-6 max-w-prose text-muted-foreground text-base sm:text-lg leading-relaxed">
           Sube tu prototipo, arma las tareas, comparte un link y mira qué pasó: quién lo logró, dónde se trabó y la grabación de cada sesión.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
@@ -156,6 +171,8 @@ export function HomePage() {
         <p className="mt-4 max-w-prose text-sm text-muted-foreground leading-relaxed">
           El ejemplo es una tienda con un estudio ya hecho y varios participantes, para que veas un reporte completo antes de armar el tuyo.
         </p>
+        </div>
+        <HeroArt className="hidden md:block w-[300px] lg:w-[340px] shrink-0" />
       </section>
 
       {IS_DEMO && (
@@ -170,10 +187,19 @@ export function HomePage() {
 
       <section aria-labelledby="pasos" className="space-y-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="pasos" className="text-xl font-semibold tracking-tight">
+          <h2 id="pasos" className="text-xl sm:text-2xl font-bold tracking-tight">
             Tu primera prueba, en 4 pasos
           </h2>
-          {steps && <p className="text-sm text-muted-foreground">{steps.filter((s) => s.done).length} de 4 listos</p>}
+          {steps && (
+            <p className="flex items-center gap-2.5 text-sm text-muted-foreground">
+              <span aria-hidden className="flex gap-1">
+                {steps.map((s) => (
+                  <span key={s.title} className={cn('size-2 rounded-full', s.done ? 'bg-emerald-500' : 'bg-input')} />
+                ))}
+              </span>
+              {steps.filter((s) => s.done).length} de 4 listos
+            </p>
+          )}
         </div>
         {error ? (
           <ErrorState message={error} onRetry={() => void load()} />
@@ -193,17 +219,17 @@ export function HomePage() {
       </section>
 
       <section aria-labelledby="que-es" className="space-y-6">
-        <h2 id="que-es" className="text-xl font-semibold tracking-tight">
+        <h2 id="que-es" className="text-xl sm:text-2xl font-bold tracking-tight">
           Qué es Taptana
         </h2>
         <div className="grid gap-4 sm:gap-6 sm:grid-cols-3">
-          <Fact icon={<Code2 className="size-5" />} title="Funciona con tu HTML">
+          <Fact tone="violet" icon={<Code2 className="size-5" />} title="Funciona con tu HTML">
             Prototipos hechos con IA o a mano: varias páginas, una sola página o un solo archivo. Se suben tal cual.
           </Fact>
-          <Fact icon={<Smartphone className="size-5" />} title="En celulares reales">
+          <Fact tone="coral" icon={<Smartphone className="size-5" />} title="En celulares reales">
             Cada persona usa el prototipo en su propio celular. Se graba lo que toca y por dónde navega, sin video.
           </Fact>
-          <Fact icon={<Lock className="size-5" />} title="Tus datos son tuyos">
+          <Fact tone="sky" icon={<Lock className="size-5" />} title="Tus datos son tuyos">
             {IS_DEMO
               ? 'Es de código abierto y se instala donde quieras. Lo que alguien escribe en el prototipo nunca se guarda.'
               : 'Todo queda en esta computadora. Lo que alguien escribe en el prototipo nunca se guarda.'}
@@ -223,11 +249,12 @@ function StepItem({ step, index, current, last }: { step: Step; index: number; c
   const future = !step.done && !current;
   return (
     <li className="relative flex gap-4 sm:gap-5">
-      {!last && <span aria-hidden className="absolute left-[17px] top-10 bottom-0 w-px bg-border" />}
+      {!last && <span aria-hidden className="absolute left-[17px] top-10 bottom-0 w-0.5 -translate-x-px rounded-full bg-[radial-gradient(circle,var(--input)_1.5px,transparent_1.6px)] bg-[length:4px_8px]" />}
       <div
         className={cn(
           'relative z-10 size-9 shrink-0 rounded-full grid place-items-center text-sm font-semibold',
-          step.done ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : current ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+          'font-display text-[15px] font-bold',
+          step.done ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : current ? 'bg-primary text-primary-foreground ring-4 ring-primary/15' : TONE_TILE[STEP_TONES[index] ?? 'stone'],
         )}
         aria-hidden
       >
@@ -235,15 +262,15 @@ function StepItem({ step, index, current, last }: { step: Step; index: number; c
       </div>
       <div className={cn('min-w-0 flex-1', last ? 'pb-0' : current ? 'pb-8' : 'pb-6')}>
         {current ? (
-          <div className="rounded-2xl border bg-background p-(--card-pad) space-y-4 -mt-1">
+          <div className="rounded-2xl border bg-card shadow-sm p-(--card-pad) space-y-4 -mt-1">
             <div className="space-y-2">
               <h3 className="text-lg font-semibold flex flex-wrap items-center gap-2">
-                <Icon className="size-4.5 text-muted-foreground" aria-hidden />
+                <Icon className="size-4.5 text-primary" aria-hidden />
                 <span>
                   <span className="sr-only">Paso {index + 1}: </span>
                   {step.title}
                 </span>
-                <span className="text-xs font-medium text-muted-foreground">Sigue aquí</span>
+                <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground">Sigue aquí</span>
               </h3>
               <p className="max-w-prose text-muted-foreground leading-relaxed">{step.text}</p>
             </div>
@@ -266,7 +293,7 @@ function StepItem({ step, index, current, last }: { step: Step; index: number; c
                 <span className="sr-only">Listo.</span>
                 <span className="min-w-0 truncate text-sm text-muted-foreground">{step.text}</span>
                 {step.action && (
-                  <Link to={step.action.to} className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
+                  <Link to={step.action.to} className="text-sm text-muted-foreground underline decoration-primary/40 underline-offset-4 hover:text-primary hover:decoration-primary">
                     {step.action.label}
                   </Link>
                 )}
@@ -279,11 +306,14 @@ function StepItem({ step, index, current, last }: { step: Step; index: number; c
   );
 }
 
-function Fact({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+/** El color del número de cada paso (el actual va en violeta lleno; el hecho, con su marca verde). */
+const STEP_TONES: BrandTone[] = ['violet', 'coral', 'maize', 'sky'];
+
+function Fact({ icon, title, tone, children }: { icon: ReactNode; title: string; tone: BrandTone; children: ReactNode }) {
   return (
-    <div className="rounded-2xl bg-muted/60 p-(--card-pad) space-y-3">
-      <div className="size-10 rounded-xl bg-background grid place-items-center text-muted-foreground">{icon}</div>
-      <h3 className="font-semibold">{title}</h3>
+    <div className="rounded-2xl border border-border/80 bg-card p-(--card-pad) space-y-3">
+      <div className={cn('size-11 rounded-2xl grid place-items-center', TONE_TILE[tone])}>{icon}</div>
+      <h3 className="font-display text-lg font-bold tracking-tight">{title}</h3>
       <p className="text-sm text-muted-foreground leading-relaxed">{children}</p>
     </div>
   );

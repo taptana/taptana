@@ -183,7 +183,7 @@ export function PresentationPage({ id, filter }: { id: string; filter: ReportFil
       return (
         <Layout>
           <EmptyState
-            icon={<Presentation className="size-5" />}
+            art="lost"
             title="Este estudio no existe"
             action={
               <Button asChild>

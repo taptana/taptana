@@ -137,7 +137,7 @@ export function StudiesPage() {
         <ListSkeleton />
       ) : studies.length === 0 ? (
         <EmptyState
-          icon={<FlaskConical className="size-6" />}
+          art="studies"
           title="Crea tu primer estudio"
           action={
             <>
@@ -163,11 +163,11 @@ export function StudiesPage() {
             const participants = report?.participants ?? sessions.filter((x) => x.studyId === s.id).length;
             const score = report?.score ?? null;
             return (
-              <li key={s.id} className="min-w-0 rounded-2xl border border-border/70 bg-card px-(--card-pad) py-5 transition-colors hover:border-foreground/20">
+              <li key={s.id} className="min-w-0 rounded-2xl border border-border/80 bg-card shadow-xs px-(--card-pad) py-5 transition-[border-color,box-shadow] hover:border-primary/30 hover:shadow-sm">
                 <div className="flex flex-col gap-5 md:flex-row md:items-center md:gap-8">
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                      <Link to={{ name: 'study', id: s.id }} className="text-lg font-semibold leading-snug break-words hover:underline underline-offset-4">
+                      <Link to={{ name: 'study', id: s.id }} className="font-display text-xl font-bold tracking-tight leading-snug break-words hover:text-primary">
                         {s.name}
                       </Link>
                       {s.closed ? (

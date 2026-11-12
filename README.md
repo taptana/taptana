@@ -1,3 +1,5 @@
+<p><img src="docs/img/logo.svg" alt="Taptana" width="196" height="48"></p>
+
 # Taptana
 
 Pruebas de usabilidad para prototipos HTML, en celulares reales. Subes tu prototipo, armas las

@@ -6,9 +6,9 @@
  * Sin React ni navegador, con pruebas.
  */
 
-import type { Slide, StudyReport } from '@taptana/shared';
+import { BLOCK_KIND_TONES, type BrandTone, type Slide, type StudyReport } from '@taptana/shared';
 import { countLines, fitList, fitText, SLIDE_H, SLIDE_W } from './fit.ts';
-import { BAR, BAR_MID, FAINT, G, GOOD, INK, LINE, MUTED, OUTCOME, OUTCOME_DARK_TEXT, PAPER, PROBLEM, SOFT, TONE } from './theme.ts';
+import { BAR, BAR_MID, BRAND, BRAND_INK, FAINT, G, GOOD, INK, LINE, MUTED, OUTCOME, OUTCOME_DARK_TEXT, PAPER, PROBLEM, SOFT, TONE, VIOLET, VIOLET_LIGHT } from './theme.ts';
 
 /** Qué texto de la diapositiva edita esta figura: el título, la frase o un punto de la lista. */
 export type EditKey = 'title' | 'takeaway' | `item:${number}`;
@@ -33,6 +33,8 @@ export interface TextShape {
   /** Líneas que caben (para recortar en pantalla). */
   lines: number;
   upper?: boolean;
+  /** Título: en pantalla y PDF va con la tipografía de marca. */
+  display?: boolean;
   edit?: EditKey;
 }
 
@@ -92,17 +94,34 @@ function text(value: string, x: number, y: number, w: number, h: number, max: nu
 const rect = (x: number, y: number, w: number, h: number, fill: string, extra: Partial<RectShape> = {}): RectShape => ({ type: 'rect', x, y, w, h, fill, ...extra });
 const pct = (x: number): string => `${Math.round(x * 100)} %`;
 
-function eyebrow(value: string, w: number = G.w, x: number = G.x): TextShape {
-  return text(value, x, G.eyebrowY, w, 22, 14, { color: MUTED, bold: true, upper: true, min: 11 });
+/** La etiqueta de arriba, con el punto y la tinta del color que le toca a ese tipo de diapositiva. */
+function eyebrow(value: string, w: number = G.w, x: number = G.x, tone: BrandTone = 'violet'): Shape[] {
+  return [{ type: 'circle', x, y: G.eyebrowY + 4, d: 12, fill: BRAND[tone] }, text(value, x + 22, G.eyebrowY, w - 22, 22, 14, { color: BRAND_INK[tone], bold: true, upper: true, min: 11 })];
+}
+
+/** La marca, dibujada con figuras: el tablero violeta con sus hoyos y dos toques. */
+function logoMark(x: number, y: number, s: number): Shape[] {
+  const u = s / 32;
+  const out: Shape[] = [rect(x, y, s, s, VIOLET, { radius: 9 * u })];
+  for (let r = 0; r < 3; r++)
+    for (let c = 0; c < 3; c++) {
+      const cx = x + (9 + c * 7) * u;
+      const cy = y + (9 + r * 7) * u;
+      const tap = r === 1 && c === 1 ? BRAND.coral : r === 0 && c === 2 ? BRAND.maize : null;
+      const d = (tap ? (r === 1 ? 6.4 : 4.8) : 3.4) * u;
+      out.push({ type: 'circle', x: cx - d / 2, y: cy - d / 2, d, fill: tap ?? 'B3A5EE' });
+    }
+  return out;
 }
 
 function title(slide: Slide, opts: { x?: number; w?: number; h?: number; max?: number; min?: number } = {}): TextShape {
-  return text(slide.title, opts.x ?? G.x, G.titleY, opts.w ?? G.w, opts.h ?? G.titleH, opts.max ?? 44, { bold: true, min: opts.min ?? 26, lineHeight: 1.15, edit: 'title' });
+  return text(slide.title, opts.x ?? G.x, G.titleY, opts.w ?? G.w, opts.h ?? G.titleH, opts.max ?? 44, { bold: true, display: true, min: opts.min ?? 26, lineHeight: 1.15, edit: 'title' });
 }
 
 function footer(ctx: LayoutContext): Shape[] {
   return [
-    text(ctx.deckTitle, G.x, G.footerY, 880, 20, 13, { color: FAINT, min: 11 }),
+    ...logoMark(G.x, G.footerY - 1, 20),
+    text(ctx.deckTitle, G.x + 30, G.footerY, 850, 20, 13, { color: FAINT, min: 11 }),
     text(`${ctx.index + 1} / ${ctx.total}`, SLIDE_W - G.x - 160, G.footerY, 160, 20, 13, { color: FAINT, align: 'right' }),
   ];
 }
@@ -147,22 +166,44 @@ function scoreTone(slide: { tone: keyof typeof TONE }): string {
 
 // ── Cada tipo de diapositiva ──
 
+/** Ancho del campo violeta de la portada, a la derecha. */
+const COVER_FIELD = 384;
+
 function cover(slide: Extract<Slide, { kind: 'cover' }>): Shape[] {
-  const out: Shape[] = [eyebrow('Resultados del estudio', 700)];
+  const w = SLIDE_W - COVER_FIELD - G.x - 56;
+  const out: Shape[] = [...eyebrow('Resultados del estudio', w)];
   if (slide.filter) {
-    const w = Math.min(520, slide.filter.length * 8.4 + 40);
-    out.push(rect(SLIDE_W - G.x - w, 52, w, 36, SOFT, { radius: 18 }), text(slide.filter, SLIDE_W - G.x - w + 18, 60, w - 36, 22, 15, { color: INK, min: 11, align: 'center' }));
+    const fw = Math.min(w, slide.filter.length * 8.4 + 40);
+    out.push(rect(G.x, 100, fw, 36, SOFT, { radius: 18 }), text(slide.filter, G.x + 18, 108, fw - 36, 22, 15, { color: INK, min: 11, align: 'center' }));
   }
-  out.push(text(slide.title, G.x, 196, G.w, 200, 76, { bold: true, min: 40, lineHeight: 1.08, valign: 'bottom', edit: 'title' }));
-  out.push(text(slide.subtitle, G.x, 414, G.w, 36, 26, { color: MUTED, min: 18 }));
-  if (slide.takeaway !== undefined) out.push(text(slide.takeaway, G.x, 462, 980, 90, 22, { color: MUTED, min: 15, lineHeight: 1.4, edit: 'takeaway' }));
+  out.push(text(slide.title, G.x, 176, w, 220, 76, { bold: true, display: true, min: 40, lineHeight: 1.06, valign: 'bottom', edit: 'title' }));
+  out.push(text(slide.subtitle, G.x, 414, w, 36, 26, { color: MUTED, min: 18 }));
+  if (slide.takeaway !== undefined) out.push(text(slide.takeaway, G.x, 462, w, 90, 22, { color: MUTED, min: 15, lineHeight: 1.4, edit: 'takeaway' }));
   const items = slide.items ?? [];
   if (items.length) {
-    out.push(rect(G.x, 594, G.w, 1, LINE));
-    const colW = G.w / Math.max(3, items.length);
-    items.forEach((item, i) => out.push(text(item.text, G.x + i * colW, 616, colW - 24, 52, 20, { min: 14, edit: `item:${i}` })));
+    out.push(rect(G.x, 582, w, 1, LINE));
+    const colW = w / Math.max(3, items.length);
+    items.forEach((item, i) => out.push(text(item.text, G.x + i * colW, 598, colW - 24, 56, 18, { min: 13, edit: `item:${i}` })));
   }
-  out.push(text('Hecho con Taptana', SLIDE_W - G.x - 240, G.footerY, 240, 20, 13, { color: FAINT, align: 'right' }));
+  out.push(...logoMark(G.x, G.footerY - 3, 24), text('Hecho con Taptana', G.x + 34, G.footerY, 300, 20, 13, { color: MUTED }));
+
+  // El campo de color: el tablero de puntos con tres toques.
+  const fx = SLIDE_W - COVER_FIELD;
+  out.push(rect(fx, 0, COVER_FIELD, SLIDE_H, VIOLET));
+  const taps: Record<string, { fill: string; d: number; halo?: number }> = {
+    '2,3': { fill: BRAND.coral, d: 46, halo: 96 },
+    '3,6': { fill: BRAND.maize, d: 34 },
+    '1,5': { fill: BRAND.pink, d: 26 },
+  };
+  for (let r = 0; r < 9; r++)
+    for (let c = 0; c < 5; c++) {
+      const cx = fx + 64 + c * 64;
+      const cy = 104 + r * 64;
+      const tap = taps[`${c},${r}`];
+      if (tap?.halo) out.push({ type: 'circle', x: cx - tap.halo / 2, y: cy - tap.halo / 2, d: tap.halo, fill: '7350DE' });
+      const d = tap?.d ?? 12;
+      out.push({ type: 'circle', x: cx - d / 2, y: cy - d / 2, d, fill: tap?.fill ?? VIOLET_LIGHT });
+    }
   return out;
 }
 
@@ -175,7 +216,7 @@ function empty(slide: Extract<Slide, { kind: 'empty' }>): Shape[] {
 
 function summary(slide: Extract<Slide, { kind: 'summary' }>): Shape[] {
   const tone = scoreTone(slide);
-  const out: Shape[] = [eyebrow('Resumen'), title(slide, { h: 60, max: 44 })];
+  const out: Shape[] = [...eyebrow('Resumen'), title(slide, { h: 60, max: 44 })];
   // El puntaje, a la izquierda.
   out.push(rect(G.x, 196, 420, 404, SOFT, { radius: 20 }));
   out.push(text('Puntaje de usabilidad', 104, 228, 360, 26, 18, { color: MUTED }));
@@ -212,7 +253,7 @@ function highlights(slide: Extract<Slide, { kind: 'highlights' }>): Shape[] {
   const problems = slide.items.filter((i) => i.tone !== 'good').length;
   const goods = slide.items.length - problems;
   const parts = [problems && `${problems} por mejorar`, goods && `${goods} ${goods === 1 ? 'buena noticia' : 'buenas noticias'}`].filter(Boolean).join(' · ');
-  const out: Shape[] = [eyebrow(parts || 'Hallazgos'), title(slide, { h: 60 })];
+  const out: Shape[] = [...eyebrow(parts || 'Hallazgos'), title(slide, { h: 60 })];
   out.push(...list(slide.items.map((i) => ({ text: i.text, marker: dot(i.tone === 'good' ? GOOD : PROBLEM, G.x) })), { x: G.x, y: 196, w: G.w, h: 430 }, 30, 15, 40));
   out.push({ type: 'circle', x: G.x, y: 643, d: 12, fill: PROBLEM }, text('Por mejorar', G.x + 20, 638, 160, 22, 14, { color: MUTED }));
   out.push({ type: 'circle', x: G.x + 160, y: 643, d: 12, fill: GOOD }, text('Buena noticia', G.x + 180, 638, 180, 22, 14, { color: MUTED }));
@@ -221,8 +262,8 @@ function highlights(slide: Extract<Slide, { kind: 'highlights' }>): Shape[] {
 
 function task(slide: Extract<Slide, { kind: 'task' }>): Shape[] {
   const tone = scoreTone(slide);
-  const out: Shape[] = [eyebrow(`${slide.label} · ${slide.participants} ${slide.participants === 1 ? 'participante' : 'participantes'}`, 860)];
-  out.push(text(slide.score === null ? '—' : String(slide.score), SLIDE_W - G.x - 200, 46, 200, 66, 60, { bold: true, color: tone, align: 'right', lineHeight: 1.05 }));
+  const out: Shape[] = [...eyebrow(`${slide.label} · ${slide.participants} ${slide.participants === 1 ? 'participante' : 'participantes'}`, 860, G.x, BLOCK_KIND_TONES[slide.blockKind ?? 'task'])];
+  out.push(text(slide.score === null ? '—' : String(slide.score), SLIDE_W - G.x - 200, 46, 200, 66, 60, { bold: true, display: true, color: tone, align: 'right', lineHeight: 1.05 }));
   out.push(text('puntaje de 100', SLIDE_W - G.x - 200, 114, 200, 20, 14, { color: MUTED, align: 'right' }));
   out.push(title(slide, { w: 880, h: 104, max: 42, min: 24 }));
   if (slide.instruction) {
@@ -278,7 +319,7 @@ function heatmap(slide: Extract<Slide, { kind: 'heatmap' }>, ctx: LayoutContext)
   const out: Shape[] = [{ type: 'heatmap', x: G.x, y: 48, w, h: 612, blockId: slide.blockId, screen: slide.screen, firstClick: slide.firstClick, screenName: slide.screenName }];
   const x = G.x + w + 56;
   const cw = SLIDE_W - G.x - x;
-  out.push(eyebrow(slide.firstClick ? 'Primer clic · mapa de toques' : 'Mapa de calor', cw, x));
+  out.push(...eyebrow(slide.firstClick ? 'Primer clic · mapa de toques' : 'Mapa de calor', cw, x, BLOCK_KIND_TONES[slide.firstClick ? 'first-click' : 'task']));
   out.push(title(slide, { x, w: cw, h: 110, max: 38, min: 22 }));
   if (slide.takeaway) out.push(text(slide.takeaway, x, 214, cw, 120, 22, { color: MUTED, min: 14, lineHeight: 1.4, edit: 'takeaway' }));
   const stats = [
@@ -305,7 +346,7 @@ function heatmap(slide: Extract<Slide, { kind: 'heatmap' }>, ctx: LayoutContext)
 }
 
 function question(slide: Extract<Slide, { kind: 'question' }>): Shape[] {
-  const out: Shape[] = [eyebrow(`Pregunta · ${slide.label} · ${slide.responses} ${slide.responses === 1 ? 'respuesta' : 'respuestas'}`), title(slide, { h: 120, max: 40, min: 22 })];
+  const out: Shape[] = [...eyebrow(`Pregunta · ${slide.label} · ${slide.responses} ${slide.responses === 1 ? 'respuesta' : 'respuestas'}`, G.w, G.x, BLOCK_KIND_TONES[slide.questionKind]), title(slide, { h: 120, max: 40, min: 22 })];
   const top = 240;
   const bottom = 596;
   if (slide.questionKind === 'scale') {
@@ -364,7 +405,7 @@ function question(slide: Extract<Slide, { kind: 'question' }>): Shape[] {
 }
 
 function nextSteps(slide: Extract<Slide, { kind: 'next-steps' }>): Shape[] {
-  const out: Shape[] = [eyebrow('Próximos pasos, en orden'), title(slide, { h: 60 })];
+  const out: Shape[] = [...eyebrow('Próximos pasos, en orden', G.w, G.x, 'coral'), title(slide, { h: 60 })];
   out.push(
     ...list(
       slide.items.map((item, i) => ({
@@ -387,7 +428,7 @@ function nextSteps(slide: Extract<Slide, { kind: 'next-steps' }>): Shape[] {
 }
 
 function method(slide: Extract<Slide, { kind: 'method' }>): Shape[] {
-  const out: Shape[] = [eyebrow('Para leer los números'), title(slide, { h: 60 })];
+  const out: Shape[] = [...eyebrow('Para leer los números', G.w, G.x, 'stone'), title(slide, { h: 60 })];
   out.push(...list(slide.items.map((i) => ({ text: i.text, marker: dot(FAINT, G.x + 4) })), { x: G.x, y: 196, w: G.w, h: 460 }, 22, 12, 32));
   return out;
 }

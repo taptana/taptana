@@ -285,7 +285,7 @@ export function PlayerPage({ id, t }: { id: string; t?: number }) {
     return (
       <Layout>
         <EmptyState
-          icon={<PlayCircle className="size-6" />}
+          art="lost"
           title="No encontramos esta sesión"
           action={
             <Button asChild>
@@ -639,7 +639,7 @@ function NotesCard({ notes, onSave }: { notes: string; onSave: (notes: string) =
           value={value}
           maxLength={SESSION_LIMITS.notes}
           placeholder="Por ejemplo: dudó entre «Carrito» y «Mis pedidos»; dijo que esperaba ver el costo de envío antes."
-          className="min-h-28 bg-background"
+          className="min-h-28 bg-card"
           onChange={(e) => {
             latest.current = e.target.value;
             setValue(e.target.value);

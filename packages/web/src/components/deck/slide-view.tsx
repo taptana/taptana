@@ -6,7 +6,7 @@ import { SnapshotView } from '@/components/report/snapshot-view';
 import { prototypeFrameUrl } from '@/lib/links';
 import { SLIDE_H, SLIDE_W } from './fit.ts';
 import { heatmapViewport, layoutSlide, type EditKey, type HeatmapShape, type LayoutContext, type TextShape } from './layout.ts';
-import { FAINT, FONT_STACK, hex, MUTED, PAPER, SOFT } from './theme.ts';
+import { DISPLAY_STACK, FAINT, FONT_STACK, hex, MUTED, PAPER, SOFT } from './theme.ts';
 
 export type EditHandler = (key: EditKey, value: string) => void;
 
@@ -55,10 +55,11 @@ function TextBox({ shape, editable, onEdit }: { shape: TextShape; editable: bool
     fontSize: shape.size,
     lineHeight: shape.lineHeight,
     color: hex(shape.color),
-    fontWeight: shape.bold ? 650 : 400,
+    fontWeight: shape.display ? 700 : shape.bold ? 650 : 400,
+    ...(shape.display ? { fontFamily: DISPLAY_STACK } : {}),
     fontStyle: shape.italic ? 'italic' : 'normal',
     textAlign: shape.align ?? 'left',
-    letterSpacing: shape.upper ? '0.06em' : shape.bold && shape.size >= 36 ? '-0.015em' : undefined,
+    letterSpacing: shape.upper ? '0.06em' : shape.display ? '-0.02em' : shape.bold && shape.size >= 36 ? '-0.015em' : undefined,
     display: '-webkit-box',
     WebkitBoxOrient: 'vertical',
     WebkitLineClamp: shape.lines,

@@ -68,7 +68,7 @@ function PersonRow({ person, maxOf }: { person: ParticipantReport; maxOf: (block
   const meta = [person.deviceLabel ?? 'Dispositivo desconocido', formatShortDate(person.startedAt), person.variantName].filter(Boolean).join(' · ');
 
   return (
-    <li className="rounded-xl border border-border/70 bg-background" data-testid="participant">
+    <li className="rounded-xl border border-border/70 bg-card" data-testid="participant">
       <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-6 sm:px-5">
         <button
           type="button"
@@ -210,7 +210,7 @@ export function ParticipantsSection({ report }: { report: StudyReport }) {
 
   if (people.length === 0) {
     return (
-      <EmptyState icon={<Users className="size-5" />} title="Todavía no hay participantes">
+      <EmptyState art="results" title="Todavía no hay participantes">
         Cuando alguien haga el estudio, aquí verás su recorrido completo.
       </EmptyState>
     );
@@ -261,7 +261,7 @@ export function ParticipantsSection({ report }: { report: StudyReport }) {
             {excluded.map((x, i) => (
               <span key={x.sessionId}>
                 {i > 0 && ', '}
-                <Link to={{ name: 'player', id: x.sessionId }} className="underline underline-offset-4 hover:text-foreground">
+                <Link to={{ name: 'player', id: x.sessionId }} className="underline decoration-primary/40 underline-offset-4 hover:text-primary hover:decoration-primary">
                   {ctx.names.get(x.sessionId) ?? x.label}
                 </Link>
               </span>

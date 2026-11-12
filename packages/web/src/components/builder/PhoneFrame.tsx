@@ -192,7 +192,7 @@ export function PhoneFrame({
         </Hint>
       </div>
       {banner}
-      <div className={cn('overflow-hidden rounded-[2rem] border-[6px] border-foreground/85 bg-background shadow-lg transition-shadow', highlight && 'ring-4 ring-primary/40')}>
+      <div className={cn('overflow-hidden rounded-[2rem] border-[6px] border-foreground/85 bg-card shadow-lg transition-shadow', highlight && 'ring-4 ring-primary/40')}>
         {src ? (
           <iframe
             key={`${src}#${nonce}`}

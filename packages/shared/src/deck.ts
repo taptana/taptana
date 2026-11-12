@@ -71,6 +71,8 @@ export type Slide =
       blockId: string;
       /** "Tarea" o "Primer clic". */
       label: string;
+      /** El tipo de bloque, para pintarlo con su color. */
+      blockKind?: 'task' | 'first-click';
       /** Lo que leyó el participante. */
       instruction: string;
       score: number | null;
@@ -367,6 +369,7 @@ export function buildDeck(study: StudyRecord, report: StudyReport, options: Deck
         blockId: task.taskId,
         title: task.title || 'Tarea sin título',
         label: BLOCK_KIND_LABELS[task.kind],
+        blockKind: task.kind,
         instruction: tb?.instruction ?? '',
         score: task.score,
         tone: scoreBand(task.score).tone,

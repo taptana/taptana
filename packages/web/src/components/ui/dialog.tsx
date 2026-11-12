@@ -11,11 +11,11 @@ const DialogClose = DialogPrimitive.Close;
 function DialogContent({ className, children, hideClose = false, ...props }: React.ComponentProps<typeof DialogPrimitive.Content> & { hideClose?: boolean }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[oklch(0.21_0.045_285)]/45 backdrop-blur-[2px]" />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          'bg-background fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border p-6 shadow-lg max-h-[calc(100dvh-2rem)] overflow-y-auto outline-none',
+          'bg-card fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border p-6 shadow-lg max-h-[calc(100dvh-2rem)] overflow-y-auto outline-none',
           className,
         )}
         {...props}
@@ -40,7 +40,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
-  return <DialogPrimitive.Title data-slot="dialog-title" className={cn('text-lg leading-snug font-semibold', className)} {...props} />;
+  return <DialogPrimitive.Title data-slot="dialog-title" className={cn('text-xl leading-snug font-bold', className)} {...props} />;
 }
 
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {

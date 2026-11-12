@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Input } from '@/components/ui/input';
 import { nameScreen } from '@/lib/screens';
 import { cn } from '@/lib/utils';
+import { kindTone, TONE_TILE } from '@/lib/brand';
 
 export const KIND_INFO: Record<BlockKind, { label: string; hint: string; icon: LucideIcon; untitled: string }> = {
   task: { label: 'Tarea', hint: 'Le pides hacer algo en el prototipo y ves si lo logra.', icon: ListChecks, untitled: 'Tarea sin título' },
@@ -20,6 +21,21 @@ export const KIND_INFO: Record<BlockKind, { label: string; hint: string; icon: L
   text: { label: 'Pregunta abierta', hint: 'Responde con sus propias palabras.', icon: MessageSquareText, untitled: 'Pregunta sin texto' },
   context: { label: 'Pantalla de contexto', hint: 'Un texto para leer antes de seguir. No pide nada.', icon: FileText, untitled: 'Contexto sin título' },
 };
+
+const KIND_ICON_SIZES = { sm: 'size-7 rounded-lg [&_svg]:size-4', md: 'size-9 rounded-xl [&_svg]:size-[18px]', lg: 'size-11 rounded-2xl [&_svg]:size-5' } as const;
+
+/**
+ * El ícono de un tipo de bloque en su azulejo de color. Es la única forma de dibujar un bloque:
+ * así la tarea es violeta y el primer clic coral en el constructor, el reporte y la presentación.
+ */
+export function KindIcon({ kind, size = 'md', className }: { kind: BlockKind; size?: keyof typeof KIND_ICON_SIZES; className?: string }) {
+  const Icon = KIND_INFO[kind].icon;
+  return (
+    <span className={cn('grid shrink-0 place-items-center', KIND_ICON_SIZES[size], TONE_TILE[kindTone(kind)], className)} aria-hidden>
+      <Icon />
+    </span>
+  );
+}
 
 /** Orden del menú "Agregar bloque". */
 export const ADD_ORDER: BlockKind[] = ['task', 'first-click', 'scale', 'choice', 'yesno', 'text', 'context'];
@@ -170,7 +186,7 @@ export function OptionCards<T extends string>({
           <label
             key={o.value}
             className={cn(
-              'flex cursor-pointer items-start gap-3 rounded-lg border bg-background p-3 text-sm transition-colors has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50',
+              'flex cursor-pointer items-start gap-3 rounded-lg border bg-card p-3 text-sm transition-colors has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50',
               checked ? 'border-primary ring-1 ring-primary' : 'hover:bg-accent/50',
             )}
           >

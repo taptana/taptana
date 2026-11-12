@@ -1,31 +1,86 @@
 @import "tailwindcss";
 @import "rrweb-player/dist/style.css";
 
-/* Tokens al estilo shadcn (new-york). Se pueden reemplazar con `npx shadcn init` más adelante. */
-@custom-variant dark (&:is(.dark *));
+/*
+ * Identidad de Taptana: un tablero de puntos donde caen los toques.
+ * Papel cálido de fondo, tinta índigo, violeta para la acción principal y cuatro acentos de
+ * tejido andino (coral, maíz, turquesa, rosa). Cada acento tiene tres tonos: el color pleno
+ * (ilustraciones y marcas), `-soft` (fondos suaves) e `-ink` (texto e íconos sobre el fondo suave,
+ * con contraste AA). Los colores de resultados (verde, rojo, azul «por revisar», ámbar) NO son
+ * de marca y no se definen aquí: por eso la marca no tiene verde ni rojo.
+ */
+/* `dark:` sigue al sistema, igual que los tokens de abajo (no hay interruptor de tema). */
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+/* Tipografía de títulos, servida por el propio panel (sin pedir nada a otros sitios). */
+@font-face {
+  font-family: 'Bricolage Grotesque Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-ext-opsz-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-opsz-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
 
 :root {
   /* Relleno de tarjetas: 20px en celular, 28px desde tablet. */
   --card-pad: 1.25rem;
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --radius: 0.75rem;
+  --background: oklch(0.985 0.006 85);
+  --foreground: oklch(0.21 0.045 285);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.21 0.045 285);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.21 0.045 285);
+  --primary: oklch(0.5 0.22 285);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.962 0.008 85);
+  --secondary-foreground: oklch(0.21 0.045 285);
+  --muted: oklch(0.962 0.008 85);
+  --muted-foreground: oklch(0.5 0.03 285);
+  --accent: oklch(0.955 0.028 290);
+  --accent-foreground: oklch(0.36 0.17 285);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.915 0.012 80);
+  --input: oklch(0.87 0.016 80);
+  --ring: oklch(0.6 0.2 285);
+  /* Menú lateral: papel apenas teñido de violeta. */
+  --sidebar: oklch(0.972 0.011 300);
+
+  --violet: oklch(0.5 0.22 285);
+  --violet-soft: oklch(0.95 0.035 290);
+  --violet-ink: oklch(0.44 0.21 285);
+  --coral: oklch(0.72 0.17 40);
+  --coral-soft: oklch(0.95 0.04 45);
+  --coral-ink: oklch(0.5 0.16 38);
+  --maize: oklch(0.87 0.15 92);
+  --maize-soft: oklch(0.96 0.065 95);
+  --maize-ink: oklch(0.47 0.1 80);
+  /* Turquesa, no celeste: el azul claro ya significa «por revisar» en los resultados. */
+  --sky: oklch(0.74 0.12 195);
+  --sky-soft: oklch(0.95 0.04 195);
+  --sky-ink: oklch(0.45 0.085 205);
+  --pink: oklch(0.65 0.21 0);
+  --pink-soft: oklch(0.95 0.035 355);
+  --pink-ink: oklch(0.5 0.2 0);
+  --indigo: oklch(0.55 0.16 265);
+  --indigo-soft: oklch(0.95 0.03 265);
+  --indigo-ink: oklch(0.42 0.15 265);
+  --stone-soft: oklch(0.945 0.012 80);
+  --stone-ink: oklch(0.45 0.025 60);
+
+  /* Sombras suaves, teñidas de tinta violeta en vez de gris. */
+  --shadow-tint: 265 45% 30%;
 }
 
 @media (min-width: 640px) {
@@ -36,30 +91,62 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
+    --background: oklch(0.165 0.025 285);
+    --foreground: oklch(0.96 0.008 85);
+    --card: oklch(0.21 0.03 285);
+    --card-foreground: oklch(0.96 0.008 85);
+    --popover: oklch(0.23 0.032 285);
+    --popover-foreground: oklch(0.96 0.008 85);
+    /* En oscuro el violeta se aclara y el texto encima es tinta: así también sirve para links. */
+    --primary: oklch(0.76 0.13 288);
+    --primary-foreground: oklch(0.19 0.06 285);
+    --secondary: oklch(0.26 0.03 285);
+    --secondary-foreground: oklch(0.96 0.008 85);
+    --muted: oklch(0.26 0.03 285);
+    --muted-foreground: oklch(0.74 0.03 285);
+    --accent: oklch(0.29 0.07 285);
+    --accent-foreground: oklch(0.9 0.06 288);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --border: oklch(0.31 0.035 285);
+    --input: oklch(0.37 0.04 285);
+    --ring: oklch(0.68 0.18 285);
+    --sidebar: oklch(0.19 0.032 288);
+
+    --violet: oklch(0.68 0.18 285);
+    --violet-soft: oklch(0.3 0.09 285);
+    --violet-ink: oklch(0.85 0.1 288);
+    --coral: oklch(0.74 0.16 40);
+    --coral-soft: oklch(0.3 0.06 40);
+    --coral-ink: oklch(0.84 0.11 45);
+    --maize: oklch(0.87 0.15 92);
+    --maize-soft: oklch(0.31 0.05 90);
+    --maize-ink: oklch(0.88 0.12 92);
+    --sky: oklch(0.76 0.12 195);
+    --sky-soft: oklch(0.3 0.05 200);
+    --sky-ink: oklch(0.84 0.09 195);
+    --pink: oklch(0.68 0.2 0);
+    --pink-soft: oklch(0.3 0.07 0);
+    --pink-ink: oklch(0.83 0.11 0);
+    --indigo: oklch(0.62 0.15 265);
+    --indigo-soft: oklch(0.3 0.07 265);
+    --indigo-ink: oklch(0.83 0.09 265);
+    --stone-soft: oklch(0.28 0.02 285);
+    --stone-ink: oklch(0.8 0.02 85);
+    --shadow-tint: 260 60% 4%;
   }
 }
 
 /* Constructor a tres columnas (lista, editor, teléfono) desde 1400px. */
 @theme {
   --breakpoint-studio: 87.5rem;
+  --font-display: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-tint) / 0.06);
+  --shadow-sm: 0 1px 2px 0 hsl(var(--shadow-tint) / 0.06), 0 2px 6px -1px hsl(var(--shadow-tint) / 0.07);
+  --shadow-md: 0 2px 4px -1px hsl(var(--shadow-tint) / 0.06), 0 8px 18px -4px hsl(var(--shadow-tint) / 0.1);
+  --shadow-lg: 0 4px 8px -2px hsl(var(--shadow-tint) / 0.06), 0 18px 40px -8px hsl(var(--shadow-tint) / 0.16);
+  --animate-pop: tt-pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  --animate-ripple: tt-ripple 1.4s ease-out both;
+  --animate-rise: tt-rise 0.35s ease-out both;
 }
 
 @theme inline {
@@ -67,6 +154,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -85,6 +173,64 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-brand-violet: var(--violet);
+  --color-brand-violet-soft: var(--violet-soft);
+  --color-brand-violet-ink: var(--violet-ink);
+  --color-brand-coral: var(--coral);
+  --color-brand-coral-soft: var(--coral-soft);
+  --color-brand-coral-ink: var(--coral-ink);
+  --color-brand-maize: var(--maize);
+  --color-brand-maize-soft: var(--maize-soft);
+  --color-brand-maize-ink: var(--maize-ink);
+  --color-brand-sky: var(--sky);
+  --color-brand-sky-soft: var(--sky-soft);
+  --color-brand-sky-ink: var(--sky-ink);
+  --color-brand-pink: var(--pink);
+  --color-brand-pink-soft: var(--pink-soft);
+  --color-brand-pink-ink: var(--pink-ink);
+  --color-brand-indigo: var(--indigo);
+  --color-brand-indigo-soft: var(--indigo-soft);
+  --color-brand-indigo-ink: var(--indigo-ink);
+  --color-brand-stone-soft: var(--stone-soft);
+  --color-brand-stone-ink: var(--stone-ink);
+}
+
+@keyframes tt-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes tt-ripple {
+  from {
+    opacity: 0.7;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+@keyframes tt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* El motivo: una cuadrícula de puntos, como los hoyos del tablero. */
+@utility bg-dots {
+  background-image: radial-gradient(circle, color-mix(in oklab, var(--foreground) 13%, transparent) 1.2px, transparent 1.6px);
+  background-size: 20px 20px;
 }
 
 @layer base {
@@ -95,6 +241,25 @@
     @apply bg-background text-foreground;
     font-size: 15px;
     line-height: 1.6;
+  }
+  /* Títulos con la tipografía de marca; el texto corrido sigue en la del sistema. */
+  h1,
+  h2,
+  [data-slot='dialog-title'] {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 22%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
   @media (min-width: 640px) {
     body {

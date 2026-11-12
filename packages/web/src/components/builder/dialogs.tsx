@@ -18,6 +18,7 @@ import {
 } from '@taptana/shared';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { TapBurst } from '@/components/brand/art';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input, NativeSelect, Textarea } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
@@ -65,6 +66,7 @@ export function ShareDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
+          {link && !closed && <TapBurst className="mb-1" />}
           <DialogTitle>Compartir el estudio</DialogTitle>
           <DialogDescription>Cada persona que abra el link en su celular es una sesión nueva.</DialogDescription>
         </DialogHeader>
@@ -641,7 +643,7 @@ export function RecordPanel({
   };
 
   return (
-    <div className="space-y-3 rounded-xl border border-red-500/40 bg-background p-4 shadow-sm">
+    <div className="space-y-3 rounded-xl border border-red-500/40 bg-card p-4 shadow-sm">
       <div className="flex items-center gap-2">
         <span className="relative flex size-2.5">
           <span className="absolute inline-flex size-full animate-ping rounded-full bg-red-500 opacity-60 motion-reduce:hidden" />

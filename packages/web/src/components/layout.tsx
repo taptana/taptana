@@ -1,9 +1,11 @@
 import { useId, useState, type ReactNode } from 'react';
-import { ChevronDown, CircleAlert, Compass, FileArchive, FlaskConical, House, PlayCircle, ShieldCheck } from 'lucide-react';
+import { ChevronDown, CircleAlert, FileArchive, FlaskConical, House, PlayCircle, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IS_DEMO } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyArt, type EmptyArtKind } from '@/components/brand/art';
+import { LogoMark } from '@/components/brand/logo';
 import { Link, useRouter, type Route, type RouteName } from '@/router';
 
 const NAV: Array<{ to: Route; label: string; hint: string; icon: typeof FileArchive; match: (r: RouteName) => boolean }> = [
@@ -23,17 +25,17 @@ const WIDTHS = { default: 'max-w-[1040px]', wide: 'max-w-[1280px]', full: 'max-w
 export function Layout({ children, wide = false, width }: { children: ReactNode; wide?: boolean; width?: keyof typeof WIDTHS }) {
   const { route } = useRouter();
   return (
-    <div className="min-h-dvh bg-muted/30 lg:flex">
-      <a href="#contenido" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:shadow">
+    <div className="min-h-dvh bg-background lg:flex">
+      <a href="#contenido" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-card focus:px-3 focus:py-2 focus:shadow">
         Saltar al contenido
       </a>
-      <aside className="bg-background border-b lg:border-b-0 lg:border-r lg:w-64 lg:shrink-0 lg:sticky lg:top-0 lg:h-dvh lg:flex lg:flex-col print:hidden">
+      <aside className="bg-sidebar border-b lg:border-b-0 lg:border-r lg:w-64 lg:shrink-0 lg:sticky lg:top-0 lg:h-dvh lg:flex lg:flex-col print:hidden">
         <div className="px-4 lg:px-5 pt-3 pb-1 lg:py-6 flex items-center gap-2.5">
           <Link to={{ name: 'home' }} className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" aria-label="Taptana, ir al inicio">
-            <span className="size-7 lg:size-8 rounded-lg bg-primary text-primary-foreground grid place-items-center font-bold">T</span>
-            <span className="font-semibold tracking-tight text-base lg:text-lg">Taptana</span>
+            <LogoMark className="size-7 lg:size-8" />
+            <span className="font-display font-bold tracking-tight text-lg lg:text-[1.35rem] leading-none">Taptana</span>
           </Link>
-          {IS_DEMO && <span className="ml-auto lg:ml-1 rounded-full border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Demo</span>}
+          {IS_DEMO && <span className="ml-auto lg:ml-1 rounded-full bg-brand-maize-soft px-2 py-0.5 text-[11px] font-semibold text-brand-maize-ink">Demo</span>}
         </div>
         <nav aria-label="Secciones" className="grid grid-cols-4 gap-1 px-2 pb-2 lg:flex lg:flex-col lg:px-3 lg:pb-0">
           {NAV.map((item) => {
@@ -45,21 +47,27 @@ export function Layout({ children, wide = false, width }: { children: ReactNode;
                 to={item.to}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-xs transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                  'group relative flex flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-xs transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
                   'lg:flex-row lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm',
-                  active ? 'bg-accent text-foreground font-medium' : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                  active ? 'bg-accent text-accent-foreground font-semibold' : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
                 )}
               >
                 <Icon className="size-4.5 shrink-0" />
                 <span className="whitespace-nowrap">{item.label}</span>
-                <span className="hidden xl:inline ml-auto min-w-0 truncate whitespace-nowrap pl-2 text-xs text-muted-foreground/70 font-normal">{item.hint}</span>
+                {/* La pista de cada paso; en la sección actual, el punto del tablero. */}
+                {active ? (
+                  <span aria-hidden className="hidden lg:block ml-auto size-2 rounded-full bg-brand-coral ring-4 ring-brand-coral/20" />
+                ) : (
+                  <span className="hidden xl:inline ml-auto min-w-0 truncate whitespace-nowrap pl-2 text-xs text-muted-foreground/80 font-normal">{item.hint}</span>
+                )}
+                {active && <span aria-hidden className="lg:hidden absolute -bottom-0.5 size-1.5 rounded-full bg-brand-coral" />}
               </Link>
             );
           })}
         </nav>
-        <div className="hidden lg:block mt-auto p-5 text-xs text-muted-foreground space-y-1.5">
-          <p className="flex items-center gap-1.5 font-medium text-foreground">
-            <ShieldCheck className="size-4" />
+        <div className="hidden lg:block mt-auto m-3 rounded-2xl bg-card/70 p-4 text-xs text-muted-foreground space-y-1.5">
+          <p className="flex items-center gap-1.5 font-semibold text-foreground">
+            <ShieldCheck className="size-4 text-primary" />
             {IS_DEMO ? 'Modo demo' : 'Todo local'}
           </p>
           <p>{IS_DEMO ? 'Lo que subas o grabes queda solo en este navegador.' : 'Prototipos y sesiones quedan en esta computadora.'}</p>
@@ -82,7 +90,7 @@ export function PageHeader({ title, description, actions, back }: { title: React
       <div className="flex items-start gap-3 min-w-0">
         {back}
         <div className="min-w-0 space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight break-words">{title}</h1>
+          <h1 className="text-[1.7rem] sm:text-4xl font-bold tracking-tight leading-[1.1] break-words">{title}</h1>
           {description && <div className="text-muted-foreground max-w-prose leading-relaxed">{description}</div>}
         </div>
       </div>
@@ -111,7 +119,7 @@ export function Section({
     <section id={id} className={cn('space-y-5 sm:space-y-6', className)}>
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <div className="min-w-0 space-y-1">
-          <h2 className="text-lg sm:text-xl font-semibold tracking-tight">{title}</h2>
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">{title}</h2>
           {description && <p className="text-sm text-muted-foreground max-w-prose leading-relaxed">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>}
@@ -124,15 +132,15 @@ export function Section({
 /** Pestañas simples (estilo shadcn Tabs) que navegan entre rutas. */
 export function RouteTabs({ tabs }: { tabs: Array<{ label: string; to: Route; active: boolean; icon?: ReactNode }> }) {
   return (
-    <nav aria-label="Vistas" className="inline-flex max-w-full overflow-x-auto rounded-lg bg-muted p-1 gap-1 print:hidden">
+    <nav aria-label="Vistas" className="inline-flex max-w-full overflow-x-auto rounded-xl bg-brand-stone-soft p-1 gap-1 print:hidden">
       {tabs.map((t) => (
         <Link
           key={t.label}
           to={t.to}
           aria-current={t.active ? 'page' : undefined}
           className={cn(
-            'inline-flex shrink-0 items-center gap-2 rounded-md px-4 py-1.5 text-sm font-medium transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-            t.active ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            'inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-1.5 text-sm font-medium transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+            t.active ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground',
           )}
         >
           {t.icon}
@@ -143,12 +151,14 @@ export function RouteTabs({ tabs }: { tabs: Array<{ label: string; to: Route; ac
   );
 }
 
-/** Estado vacío con ícono, título, texto y una acción principal. */
-export function EmptyState({ icon, title, children, action }: { icon: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
+/**
+ * Estado vacío: una ilustración del tablero (`art`) o un ícono, título, texto y una acción principal.
+ */
+export function EmptyState({ icon, art, title, children, action }: { icon?: ReactNode; art?: EmptyArtKind; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-dashed bg-background px-6 py-16 sm:py-20 text-center flex flex-col items-center gap-3">
-      <div className="size-12 rounded-full bg-muted grid place-items-center text-muted-foreground">{icon}</div>
-      <h2 className="text-lg font-semibold">{title}</h2>
+    <div className="rounded-3xl border border-dashed border-input bg-card/60 px-6 py-14 sm:py-16 text-center flex flex-col items-center gap-3">
+      {art ? <EmptyArt kind={art} className="mb-1" /> : <div className="size-12 rounded-2xl bg-brand-violet-soft grid place-items-center text-brand-violet-ink">{icon}</div>}
+      <h2 className="text-xl font-bold tracking-tight">{title}</h2>
       {children && <div className="text-muted-foreground max-w-md text-sm space-y-2">{children}</div>}
       {action && <div className="pt-2 flex flex-wrap justify-center gap-2">{action}</div>}
     </div>
@@ -170,11 +180,11 @@ export function ErrorState({
   home?: boolean;
 }) {
   return (
-    <div role="alert" className="rounded-xl border border-destructive/30 bg-background px-6 py-12 text-center flex flex-col items-center gap-3">
+    <div role="alert" className="rounded-xl border border-destructive/30 bg-card px-6 py-12 text-center flex flex-col items-center gap-3">
       <div className="size-12 rounded-full bg-destructive/10 grid place-items-center text-destructive">
         <CircleAlert className="size-6" />
       </div>
-      <h2 className="text-lg font-semibold">{title}</h2>
+      <h2 className="text-lg font-bold">{title}</h2>
       <div className="text-muted-foreground max-w-md text-sm">{message}</div>
       {(onRetry || home) && (
         <div className="pt-2 flex flex-wrap justify-center gap-2">
@@ -242,7 +252,7 @@ export function NotFound() {
   return (
     <Layout>
       <EmptyState
-        icon={<Compass className="size-6" />}
+        art="lost"
         title="Esta página no existe"
         action={
           <Button asChild>
@@ -257,9 +267,9 @@ export function NotFound() {
 }
 
 const NOTICE_TONES = {
-  info: 'bg-sky-500/[0.06] text-foreground [&_[data-slot=notice-icon]]:text-sky-600 dark:[&_[data-slot=notice-icon]]:text-sky-400',
-  warning: 'bg-amber-500/[0.08] text-foreground [&_[data-slot=notice-icon]]:text-amber-600 dark:[&_[data-slot=notice-icon]]:text-amber-400',
-  neutral: 'bg-muted/70 text-foreground [&_[data-slot=notice-icon]]:text-muted-foreground',
+  info: 'bg-sky-500/[0.09] text-foreground [&_[data-slot=notice-icon]]:text-sky-600 dark:[&_[data-slot=notice-icon]]:text-sky-400',
+  warning: 'bg-amber-500/[0.11] text-foreground [&_[data-slot=notice-icon]]:text-amber-600 dark:[&_[data-slot=notice-icon]]:text-amber-400',
+  neutral: 'bg-brand-stone-soft text-foreground [&_[data-slot=notice-icon]]:text-muted-foreground',
 } as const;
 
 /**

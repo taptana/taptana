@@ -10,10 +10,10 @@
   transition: box-shadow 120ms;
 }
 .tt-editable:hover {
-  box-shadow: 0 0 0 2px rgb(24 24 27 / 0.12);
+  box-shadow: 0 0 0 2px rgb(95 62 216 / 0.18);
 }
 .tt-editable:focus {
-  box-shadow: 0 0 0 3px rgb(24 24 27 / 0.35);
+  box-shadow: 0 0 0 3px rgb(95 62 216 / 0.45);
   -webkit-line-clamp: unset !important;
   overflow: visible !important;
   background: rgb(255 255 255 / 0.9);

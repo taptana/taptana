@@ -53,6 +53,7 @@ qué resuelven para la prueba de usabilidad.
 | Reproducción | rrweb-player 2.x | Reproductor listo con línea de tiempo |
 | Panel | React + Vite + Tailwind v4 + shadcn en `packages/web` | Se compila a estáticos que Hono sirve |
 | Zip | `fflate` | JavaScript puro |
+| Tipografía de títulos | `@fontsource-variable/bricolage-grotesque` en `packages/web` | Archivos de fuente dentro del build: sin pedir nada a otros sitios |
 | Presentación (.pptx) | `pptxgenjs` en `packages/web` | JavaScript puro (MIT), se carga solo al descargar |
 | Red | Escucha en `0.0.0.0`, puerto 4321 (o el siguiente libre) | Accesible desde el celular en la misma Wi-Fi |
 | Pruebas con navegador | Playwright (devDependency de la raíz) | Solo para e2e, semillas y capturas; nunca en producción |
@@ -225,6 +226,13 @@ La sesión vive en `sessionStorage` (una pestaña). Cada carga de página es un 
 - **Nunca accede a datos directamente**: siempre por `api/client.ts`, con `http.ts` (API real)
   y `static.ts` (demo). Cada método existe en los dos.
 - Componentes de shadcn copiados a `src/components/ui/`, no instalados. Sin `window.confirm`.
+- **Identidad visual** («un tablero de puntos donde caen los toques»): los colores son tokens en
+  `src/index.css` (papel cálido, tinta índigo, violeta para la acción principal y acentos coral,
+  maíz, turquesa y rosa, cada uno con `-soft` e `-ink`). La marca no tiene verde ni rojo: esos son
+  de los resultados. Un color por tipo de bloque: `BLOCK_KIND_TONES` (`shared`) → clases en
+  `lib/brand.ts` → `KindIcon` (`builder/fields.tsx`); la presentación usa los mismos tonos en
+  `deck/theme.ts`. Logo e ilustraciones: `components/brand/`. Títulos en Bricolage Grotesque
+  (`@fontsource-variable/bricolage-grotesque`, servida por el panel; nunca desde otro sitio).
 - Las etiquetas de resultados y tipos de bloque salen de `shared` (`OUTCOME_LABELS`,
   `BLOCK_KIND_LABELS`) para que todo el panel diga lo mismo.
 

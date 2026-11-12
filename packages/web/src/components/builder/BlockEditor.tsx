@@ -31,18 +31,18 @@ import { Switch } from '@/components/ui/switch';
 import { plural } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { commonPath, emptyRule, fieldError, missedScreens, moveItem, rulesFor, samePathList, type DraftStudy, type DraftTask } from './draft';
-import { Field, KIND_INFO, OptionCards, ScreenName, ScreenPicker } from './fields';
+import { Field, KIND_INFO, KindIcon, OptionCards, ScreenName, ScreenPicker } from './fields';
 
 // ── Piezas comunes ───────────────────────────────────────────────────────
 
 export function EditorCard({ icon, kicker, title, children, actions }: { icon?: ReactNode; kicker: string; title: string; children: ReactNode; actions?: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border/70 bg-background">
+    <section className="rounded-2xl border border-border/80 bg-card shadow-xs">
       <header className="flex flex-wrap items-center gap-3 border-b border-border/70 px-(--card-pad) py-5">
-        {icon && <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">{icon}</span>}
+        {icon}
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{kicker}</p>
-          <h2 className="truncate text-lg font-semibold">{title}</h2>
+          <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{kicker}</p>
+          <h2 className="truncate text-xl font-bold tracking-tight">{title}</h2>
         </div>
         {actions}
       </header>
@@ -60,7 +60,7 @@ function Step({ n, title, hint, children }: { n?: number; title: string; hint?: 
     <section className="space-y-5 py-8 first:pt-7 last:pb-7">
       <header className="space-y-1">
         <h3 className="flex items-center gap-2.5 text-base font-semibold">
-          {n !== undefined && <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground tabular-nums">{n}</span>}
+          {n !== undefined && <span className="grid size-6 shrink-0 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground tabular-nums">{n}</span>}
           {title}
         </h3>
         {hint && <p className={cn('max-w-prose text-sm leading-relaxed text-muted-foreground', n !== undefined && 'pl-8.5')}>{hint}</p>}
@@ -402,7 +402,7 @@ function PathEditor({ path, onChange, tools }: { path: string[]; onChange: (path
           {path.map((screen, i) => (
             <li key={`${screen}-${i}`} className="flex items-center gap-1">
               {i > 0 && <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
-              <span className="inline-flex items-center gap-0.5 rounded-full border bg-background py-0.5 pr-1 pl-3 text-sm">
+              <span className="inline-flex items-center gap-0.5 rounded-full border bg-card py-0.5 pr-1 pl-3 text-sm">
                 <span className="mr-1 tabular-nums text-xs text-muted-foreground">{i + 1}</span>
                 <ScreenName id={screen} screens={tools.screens} className="max-w-36 truncate" />
                 <button type="button" className="ml-1 grid size-6 cursor-pointer place-items-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 disabled:pointer-events-none" aria-label={`Mover ${screen} antes`} disabled={i === 0} onClick={() => onChange(moveItem(path, i, i - 1))}>
@@ -442,7 +442,6 @@ function PathEditor({ path, onChange, tools }: { path: string[]; onChange: (path
 export function TaskEditor({ block, index, onChange, errors, tools }: { block: DraftTask; index: number; onChange: (next: DraftTask) => void; errors: readonly StudyIssue[]; tools: TaskTools }) {
   const kind = block.kind ?? 'task';
   const info = KIND_INFO[kind];
-  const Icon = info.icon;
   const rule = block.success;
   const set = (patch: Partial<DraftTask>): void => onChange(prune({ ...block, ...patch }, ['startPath', 'expectedPath']));
   const setRule = (success: SuccessRule): void => set({ success: success.type === 'visible' ? prune(success, ['text', 'selector']) : success });
@@ -455,7 +454,7 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
   const canUseCommon = kind === 'task' && common !== null && !samePathList(common, block.expectedPath);
 
   return (
-    <EditorCard icon={<Icon className="size-5" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.title || info.untitled}>
+    <EditorCard icon={<KindIcon kind={kind} size="lg" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.title || info.untitled}>
       <div className="flex flex-wrap items-center gap-2 py-6">
         {kind === 'first-click' ? (
           // Primer clic: no hay camino que grabar, solo un lugar que tocar. El toque no navega.
@@ -554,7 +553,7 @@ export function TaskEditor({ block, index, onChange, errors, tools }: { block: D
             {rule.selector ? (
               <div className="space-y-1.5 rounded-xl bg-muted/50 px-4 py-3.5">
                 <p className="text-sm">
-                  Elemento elegido: <code className="rounded bg-background px-1.5 py-0.5 font-mono text-xs break-all">{rule.selector}</code>
+                  Elemento elegido: <code className="rounded bg-card px-1.5 py-0.5 font-mono text-xs break-all">{rule.selector}</code>
                 </p>
                 <MatchNote selector={rule.selector} matches={tools.matches} />
               </div>
@@ -700,7 +699,7 @@ function ScaleEditor({ block, onChange, errors }: { block: ScaleBlock; onChange:
               role="radio"
               aria-checked={block.max === max}
               onClick={() => onChange({ ...block, max })}
-              className={cn('cursor-pointer rounded-md px-4 py-1.5 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50', block.max === max ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+              className={cn('cursor-pointer rounded-md px-4 py-1.5 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50', block.max === max ? 'bg-card shadow-sm' : 'text-muted-foreground hover:text-foreground')}
             >
               1 a {max}
             </button>
@@ -723,11 +722,10 @@ function ScaleEditor({ block, onChange, errors }: { block: ScaleBlock; onChange:
 
 export function QuestionEditor({ block, index, onChange, errors }: { block: QuestionBlock; index: number; onChange: (next: QuestionBlock) => void; errors: readonly StudyIssue[] }) {
   const info = KIND_INFO[block.kind];
-  const Icon = info.icon;
   const err = (...fields: string[]): string | undefined => fieldError(errors, block.id, ...fields);
   const set = (patch: Partial<QuestionBlock>): void => onChange(prune({ ...block, ...patch } as QuestionBlock, ['description', 'required']));
   return (
-    <EditorCard icon={<Icon className="size-5" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.question || info.untitled}>
+    <EditorCard icon={<KindIcon kind={block.kind} size="lg" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.question || info.untitled}>
       <Step n={1} title="Qué preguntas">
       <Field label="Pregunta" error={err('question')} help="Es lo que lee el participante.">
         {(p) => <Textarea {...p} value={block.question} maxLength={STUDY_LIMITS.question} placeholder={QUESTION_PLACEHOLDER[block.kind]} onChange={(e) => set({ question: e.target.value })} />}
@@ -770,9 +768,8 @@ export function QuestionEditor({ block, index, onChange, errors }: { block: Ques
 
 export function ContextEditor({ block, index, onChange, errors }: { block: ContextBlock; index: number; onChange: (next: ContextBlock) => void; errors: readonly StudyIssue[] }) {
   const info = KIND_INFO.context;
-  const Icon = info.icon;
   return (
-    <EditorCard icon={<Icon className="size-5" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.title || info.untitled}>
+    <EditorCard icon={<KindIcon kind="context" size="lg" />} kicker={`Bloque ${index + 1} · ${info.label}`} title={block.title || info.untitled}>
       <Step title="Qué lee el participante" hint='Lo lee y toca "Continuar". No se le pide nada.'>
       <Field label="Título" error={fieldError(errors, block.id, 'title')}>
         {(p) => <Input {...p} value={block.title} maxLength={STUDY_LIMITS.name} placeholder="Antes de seguir" onChange={(e) => onChange({ ...block, title: e.target.value })} />}

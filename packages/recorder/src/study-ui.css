@@ -10,14 +10,18 @@
 }
 
 .t {
-  --ink: #15181c;
-  --ink-2: #3a4149;
-  --muted: #626b76;
-  --line: #dfe3e8;
-  --tint: #f3f5f7;
+  /* Tinta índigo y violeta de marca (blanco encima: 6,6:1). Sin tipografía web: la del sistema. */
+  --ink: #16152c;
+  --ink-2: #3a3950;
+  --muted: #616174;
+  --line: #e2deea;
+  --tint: #f5f3fb;
   --paper: #fff;
   --ok: #1d7a4c;
-  --focus: #2f6fed;
+  --brand: #5f3ed8;
+  --brand-ink: #502cbe;
+  --brand-tint: #efecff;
+  --focus: #7965f0;
   --rib: 0px;
   font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   color: var(--ink);
@@ -86,7 +90,7 @@
   max-height: 100%;
   overflow: hidden;
   background: var(--paper);
-  border-radius: 22px 22px 0 0;
+  border-radius: 26px 26px 0 0;
   box-shadow: 0 -12px 44px rgba(13, 17, 23, 0.24);
   outline: none;
   animation: tt-up 0.28s cubic-bezier(0.2, 0.9, 0.25, 1);
@@ -160,7 +164,7 @@
   }
   .sheet {
     max-width: 460px;
-    border-radius: 22px;
+    border-radius: 26px;
     box-shadow: 0 24px 70px rgba(13, 17, 23, 0.3);
     animation-name: tt-pop;
   }
@@ -232,20 +236,20 @@
   font-weight: 650;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--brand-ink);
 }
 .track {
   height: 4px;
   margin: 9px 0 16px;
   border-radius: 4px;
-  background: #e9ecf0;
+  background: #e8e4f6;
   overflow: hidden;
 }
 .track i {
   display: block;
   height: 100%;
   border-radius: 4px;
-  background: var(--ink);
+  background: var(--brand);
 }
 .title {
   margin-top: 6px;
@@ -321,11 +325,11 @@
   -webkit-user-select: none;
 }
 .btn.primary {
-  background: var(--ink);
+  background: var(--brand);
   color: #fff;
 }
 .btn.primary[aria-disabled='true'] {
-  background: #c4cad1;
+  background: #c6c3d4;
   cursor: default;
 }
 /* "Continuar" recién activado: late una vez para que se note. */
@@ -372,7 +376,7 @@
 }
 .input:focus,
 .area:focus {
-  border-color: var(--ink);
+  border-color: var(--brand);
 }
 .area {
   min-height: 112px;
@@ -395,8 +399,8 @@
   border-radius: 50%;
 }
 .check:checked {
-  border-color: var(--ink);
-  background: var(--ink);
+  border-color: var(--brand);
+  background: var(--brand);
 }
 .check[type='checkbox']:checked::after {
   content: '';
@@ -429,7 +433,7 @@
   cursor: pointer;
 }
 .consent.nudge {
-  border-color: var(--ink);
+  border-color: var(--brand);
   animation: tt-nudge 0.4s;
 }
 .consent span {
@@ -483,8 +487,8 @@
   font-size: 18px;
 }
 .num[aria-checked='true'] {
-  border-color: var(--ink);
-  background: var(--ink);
+  border-color: var(--brand);
+  background: var(--brand);
   color: #fff;
 }
 .ends {
@@ -516,8 +520,8 @@
   cursor: pointer;
 }
 .opt.on {
-  border-color: var(--ink);
-  background: var(--tint);
+  border-color: var(--brand);
+  background: var(--brand-tint);
 }
 .opt span {
   font-size: 16px;
@@ -540,7 +544,7 @@
   padding: 0 14px 0 12px;
   border: 0;
   border-radius: 999px;
-  background: rgba(21, 24, 28, 0.94);
+  background: rgba(84, 52, 204, 0.96);
   color: #fff;
   font-size: 13.5px;
   font-weight: 650;
@@ -590,7 +594,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #5fe3a1;
+  background: #f8d14f;
 }
 .pill .see {
   opacity: 0.72;
@@ -713,11 +717,11 @@
 @keyframes tt-lit {
   0% {
     transform: scale(0.97);
-    box-shadow: 0 0 0 0 rgba(21, 24, 28, 0.35);
+    box-shadow: 0 0 0 0 rgba(95, 62, 216, 0.4);
   }
   100% {
     transform: none;
-    box-shadow: 0 0 0 10px rgba(21, 24, 28, 0);
+    box-shadow: 0 0 0 10px rgba(95, 62, 216, 0);
   }
 }
 @keyframes tt-drop {

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { blockKind, draftTitle, type DraftBlock, type Selection } from './draft';
-import { ADD_ORDER, KIND_INFO } from './fields';
+import { ADD_ORDER, KIND_INFO, KindIcon } from './fields';
 
 function Dot({ label }: { label: string }) {
   return (
@@ -21,7 +21,7 @@ function Dot({ label }: { label: string }) {
 }
 
 function GroupHeading({ children }: { children: ReactNode }) {
-  return <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{children}</p>;
+  return <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{children}</p>;
 }
 
 function FixedItem({ icon: Icon, label, hint, active, incomplete, onSelect }: { icon: LucideIcon; label: string; hint: string; active: boolean; incomplete: boolean; onSelect: () => void }) {
@@ -32,10 +32,12 @@ function FixedItem({ icon: Icon, label, hint, active, incomplete, onSelect }: { 
       onClick={onSelect}
       className={cn(
         'flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
-        active ? 'border-primary bg-background ring-1 ring-primary' : 'border-transparent hover:bg-accent/60',
+        active ? 'border-primary bg-card ring-1 ring-primary shadow-sm' : 'border-transparent hover:bg-accent/60',
       )}
     >
-      <Icon className="size-4 shrink-0 text-muted-foreground" />
+      <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-brand-stone-soft text-brand-stone-ink" aria-hidden>
+        <Icon className="size-4" />
+      </span>
       <span className="min-w-0">
         <span className="block font-medium">{label}</span>
         <span className="block truncate text-xs text-muted-foreground">{hint}</span>
@@ -52,10 +54,9 @@ export function AddBlockMenu({ onAdd, children }: { onAdd: (kind: BlockKind) => 
       <DropdownMenuContent align="start" className="w-80">
         {ADD_ORDER.map((kind) => {
           const info = KIND_INFO[kind];
-          const Icon = info.icon;
           return (
-            <DropdownMenuItem key={kind} onSelect={() => onAdd(kind)} className="items-start py-2">
-              <Icon className="mt-0.5" />
+            <DropdownMenuItem key={kind} onSelect={() => onAdd(kind)} className="items-center gap-3 py-2">
+              <KindIcon kind={kind} />
               <span className="min-w-0">
                 <span className="block font-medium">{info.label}</span>
                 <span className="block text-xs leading-snug text-muted-foreground">{info.hint}</span>
@@ -105,7 +106,6 @@ export function BlockList({
         {blocks.map((block, index) => {
           const kind = blockKind(block as Parameters<typeof blockKind>[0]);
           const info = KIND_INFO[kind];
-          const Icon = info.icon;
           const active = selection === block.id;
           const title = draftTitle(block);
           return (
@@ -134,8 +134,8 @@ export function BlockList({
                 setOver(null);
               }}
               className={cn(
-                'group flex items-stretch rounded-xl border border-border/70 bg-background transition-colors',
-                active ? 'border-primary ring-1 ring-primary' : 'hover:border-foreground/30',
+                'group flex items-stretch rounded-xl border border-border/70 bg-card transition-colors',
+                active ? 'border-primary ring-1 ring-primary shadow-sm' : 'hover:border-primary/40',
                 dragging === index && 'opacity-50',
                 over === index && dragging !== null && dragging !== index && (dragging < index ? 'border-b-primary border-b-2' : 'border-t-primary border-t-2'),
               )}
@@ -160,9 +160,7 @@ export function BlockList({
                 }}
                 className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl px-2.5 py-3 text-left text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <span className="grid size-7 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
-                  <Icon className="size-4" />
-                </span>
+                <KindIcon kind={kind} size="sm" />
                 <span className="min-w-0">
                   <span className={cn('block truncate font-medium', !title && 'text-muted-foreground font-normal italic')}>{title || info.untitled}</span>
                   <span className="block truncate text-xs text-muted-foreground">

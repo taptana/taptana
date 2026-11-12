@@ -1,10 +1,13 @@
+import type { BlockKind } from '@taptana/shared';
 import { cn } from '@/lib/utils';
+import { KindIcon } from '@/components/builder/fields';
 import { ScoreChip } from './overview.tsx';
 
 export interface IndexEntry {
   id: string;
   number: number;
   title: string;
+  kind: BlockKind;
   kindLabel: string;
   /** Solo tareas. */
   score?: number | null;
@@ -33,14 +36,14 @@ export function BlockPicker({ entries, current, onSelect, label }: { entries: In
                 aria-current={active ? 'true' : undefined}
                 className={cn(
                   'flex max-w-full sm:max-w-72 cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                  active ? 'border-primary bg-background ring-1 ring-primary' : 'border-transparent bg-background/70 text-muted-foreground hover:bg-background hover:text-foreground',
+                  active ? 'border-primary bg-card ring-1 ring-primary shadow-sm' : 'border-border/80 bg-card/70 text-muted-foreground hover:border-primary/40 hover:bg-card hover:text-foreground',
                 )}
               >
-                <span className={cn('size-6 shrink-0 rounded-full grid place-items-center text-xs font-semibold tabular-nums', active ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground')}>{e.number}</span>
+                <KindIcon kind={e.kind} size="sm" />
                 <span className="min-w-0 flex-1">
                   <span className={cn('block truncate font-medium', active && 'text-foreground')}>{e.title}</span>
                   <span className="block truncate text-xs text-muted-foreground">
-                    {e.kindLabel}
+                    {e.number}. {e.kindLabel}
                     {e.hint && ` · ${e.hint}`}
                   </span>
                 </span>

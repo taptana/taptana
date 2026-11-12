@@ -29,6 +29,8 @@ import { QuestionBody } from '@/components/report/question-section';
 import { ReviewDialog } from '@/components/report/review-dialog';
 import { clearSnapshotCache, whenSnapshotsReady } from '@/components/report/snapshot-view';
 import { StudyTabs } from '@/components/report/study-tabs';
+import { KindIcon } from '@/components/builder/fields';
+import { kindTone, TONE_INK } from '@/lib/brand';
 import { TaskBody } from '@/components/report/task-section';
 import { copyText, downloadText } from '@/lib/download';
 import { friendlyError } from '@/lib/errors';
@@ -179,6 +181,7 @@ export function ReportPage({ id }: { id: string }) {
         id: item.blockId,
         number: out.length + 1,
         title: task?.title || question?.question || (block ? blockTitle(block) : '') || 'Sin título',
+        kind: item.kind,
         kindLabel: BLOCK_KIND_LABELS[item.kind],
       };
       if (task) entry.score = task.score;
@@ -234,7 +237,7 @@ export function ReportPage({ id }: { id: string }) {
     return (
       <Layout>
         <EmptyState
-          icon={<Users className="size-5" />}
+          art="lost"
           title="Este estudio no existe"
           action={
             <Button asChild>
@@ -360,10 +363,12 @@ export function ReportPage({ id }: { id: string }) {
         className={cn('scroll-mt-6 min-w-0', printing ? 'rounded-xl border bg-card p-4 sm:p-6 space-y-5' : 'space-y-8')}
       >
         <header className="flex items-start gap-4" data-print="heading">
-          <span className="size-9 shrink-0 rounded-full bg-primary text-primary-foreground grid place-items-center text-sm font-semibold tabular-nums">{entry.number}</span>
+          <KindIcon kind={entry.kind} size="lg" />
           <div className="min-w-0 flex-1 space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{entry.kindLabel}</p>
-            <h2 id={`titulo-${entry.id}`} className="text-xl sm:text-2xl font-semibold tracking-tight break-words">
+            <p className={cn('text-xs font-semibold uppercase tracking-wider', TONE_INK[kindTone(entry.kind)])}>
+              {entry.number}. {entry.kindLabel}
+            </p>
+            <h2 id={`titulo-${entry.id}`} className="text-2xl sm:text-[1.75rem] font-bold tracking-tight leading-tight break-words">
               {entry.title}
             </h2>
           </div>
@@ -433,7 +438,7 @@ export function ReportPage({ id }: { id: string }) {
   const sessionsLink = (
     <p className="text-sm text-muted-foreground" data-print="hide">
       ¿Buscas una grabación completa?{' '}
-      <Link to={{ name: 'recordings', study: id }} className="underline underline-offset-4 hover:text-foreground">
+      <Link to={{ name: 'recordings', study: id }} className="underline decoration-primary/40 underline-offset-4 hover:text-primary hover:decoration-primary">
         Ver las sesiones de este estudio
       </Link>
     </p>
@@ -514,10 +519,10 @@ export function ReportPage({ id }: { id: string }) {
                       <TabsTrigger
                         key={t.id}
                         value={t.id}
-                        className="rounded-none border-b-2 border-transparent px-0.5 pt-1 pb-3 text-[15px] data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                        className="rounded-none border-b-2 border-transparent px-0.5 pt-1 pb-3 text-[15px] font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:font-semibold data-[state=active]:shadow-none"
                       >
                         {t.label}
-                        {t.count !== null && <span className="text-xs font-normal text-muted-foreground tabular-nums">{t.count}</span>}
+                        {t.count !== null && <span className="rounded-full bg-brand-stone-soft px-1.5 text-xs font-medium text-muted-foreground tabular-nums">{t.count}</span>}
                       </TabsTrigger>
                     ))}
                   </TabsList>
@@ -579,7 +584,7 @@ function NoParticipants({ base, excluded }: { base: Base; excluded: number }) {
 
   return (
     <EmptyState
-      icon={<Users className="size-5" />}
+      art="results"
       title="Todavía nadie hizo este estudio"
       action={
         <>

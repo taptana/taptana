@@ -131,7 +131,7 @@ function VariantTable({ task }: { task: TaskReport }) {
   const name = (id: string): string => study.variants?.find((v) => v.id === id)?.name ?? id;
   return (
     <div className="space-y-3" data-print="keep">
-      <h3 className="text-base font-semibold" data-print="heading">Por variante (A/B)</h3>
+      <h3 className="font-display text-lg font-bold tracking-tight" data-print="heading">Por variante (A/B)</h3>
       <div className="grid gap-3 sm:grid-cols-2">
         {task.byVariant.map((v) => (
           <div key={v.variantId} className="rounded-lg border p-3 space-y-2">
@@ -186,7 +186,7 @@ function ScreenCard({ screen, task, mode, anchor, highlighted }: { screen: Scree
   const drawn = screen.taps.length - left;
 
   return (
-    <article id={anchor} className={cn('rounded-xl border bg-background p-4 space-y-4 scroll-mt-20 min-w-0', wide && 'col-span-full', highlighted && 'ring-2 ring-primary/60')} data-print="keep">
+    <article id={anchor} className={cn('rounded-xl border bg-card p-4 space-y-4 scroll-mt-20 min-w-0', wide && 'col-span-full', highlighted && 'ring-2 ring-primary/60')} data-print="keep">
       <header className="space-y-1">
         <h5 className="font-medium break-words">{name}</h5>
         <p className="text-xs text-muted-foreground break-all">{screen.path}</p>
@@ -218,7 +218,7 @@ function ScreenCard({ screen, task, mode, anchor, highlighted }: { screen: Scree
         {backdrop === 'snapshot' && screen.sample && (
           <p>
             Fondo: lo que vio {ctx.names.get(screen.sample.sessionId) ?? 'un participante'} ({vw} px de ancho).{' '}
-            <Link to={recordingRoute(ctx, screen.sample.sessionId, screen.sample.t)} className="underline underline-offset-4 hover:text-foreground" data-print="hide">
+            <Link to={recordingRoute(ctx, screen.sample.sessionId, screen.sample.t)} className="underline decoration-primary/40 underline-offset-4 hover:text-primary hover:decoration-primary" data-print="hide">
               Ver ese momento
             </Link>
           </p>
@@ -296,7 +296,7 @@ function ScreensPanel({ task, focusScreen, limit }: { task: TaskReport; focusScr
                 onClick={() => setMode(m.id)}
                 className={cn(
                   'shrink-0 cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                  mode === m.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                  mode === m.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {m.label}
@@ -344,7 +344,7 @@ export function TaskSection({ title, description, aside, keep, children }: { tit
     <section className="space-y-4 min-w-0" {...(keep ? { 'data-print': 'keep' } : {})}>
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2" data-print="heading">
         <div className="min-w-0 space-y-1">
-          <h3 className="text-base font-semibold">{title}</h3>
+          <h3 className="font-display text-lg font-bold tracking-tight">{title}</h3>
           {description && <p className="max-w-prose text-sm text-muted-foreground leading-relaxed">{description}</p>}
         </div>
         {aside}
@@ -414,7 +414,7 @@ function PathsPanel({ task, limit }: { task: TaskReport; limit?: number }) {
         {paths.map((p, i) => {
           const isExpected = samePages(p.pages, task.expectedPath);
           return (
-            <li key={i} className="rounded-xl border border-border/70 bg-background p-4 space-y-2.5" data-print="keep">
+            <li key={i} className="rounded-xl border border-border/70 bg-card p-4 space-y-2.5" data-print="keep">
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span>
                   <span className="font-medium">{plural(p.count, 'persona', 'personas')}</span>
@@ -474,7 +474,7 @@ function ParticipantsPanel({ task }: { task: TaskReport }) {
 
   return (
     <div className="space-y-3">
-    <ul className="divide-y rounded-xl border border-border/70 bg-background">
+    <ul className="divide-y rounded-xl border border-border/70 bg-card">
       {rows.map((r) => {
         const session = ctx.sessions.get(r.sessionId);
         const variant = variantName(r.variantId);
@@ -603,7 +603,7 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
         </div>
         <div className="rounded-xl bg-muted/60 p-4 space-y-1">
           <dt className="text-xs text-muted-foreground">{firstClick ? 'Acertaron' : 'Lo lograron'}</dt>
-          <dd className="text-2xl font-semibold tabular-nums">{task.decided ? pct(task.successRate) : '—'}</dd>
+          <dd className="font-display text-2xl font-bold tabular-nums">{task.decided ? pct(task.successRate) : '—'}</dd>
           <dd className="text-xs text-muted-foreground">
             {task.decided
               ? `${task.outcomes.direct + task.outcomes.indirect} de ${task.decided}${task.outcomes.review > 0 ? ' ya decididos' : ''}`
@@ -613,12 +613,12 @@ export function TaskBody({ task, block, focusScreen }: { task: TaskReport; block
         </div>
         <div className="rounded-xl bg-muted/60 p-4 space-y-1">
           <dt className="text-xs text-muted-foreground">Tiempo mediano</dt>
-          <dd className="text-2xl font-semibold tabular-nums">{seconds(task.medianTimeMs)}</dd>
+          <dd className="font-display text-2xl font-bold tabular-nums">{seconds(task.medianTimeMs)}</dd>
           <dd className="text-xs text-muted-foreground">{firstClick ? 'Hasta el primer toque, de quienes acertaron' : 'De quienes lo lograron'}</dd>
         </div>
         <div className="rounded-xl bg-muted/60 p-4 space-y-1">
           <dt className="text-xs text-muted-foreground">Misclicks</dt>
-          <dd className="text-2xl font-semibold tabular-nums">{task.tapCount > 0 ? pct(task.misclickRate) : '—'}</dd>
+          <dd className="font-display text-2xl font-bold tabular-nums">{task.tapCount > 0 ? pct(task.misclickRate) : '—'}</dd>
           <dd className="text-xs text-muted-foreground">
             {task.tapCount > 0 ? `de ${plural(task.tapCount, 'toque', 'toques')} · ${task.avgMisclicks.toFixed(1).replace('.', ',')} por persona` : 'Sin toques'}
           </dd>

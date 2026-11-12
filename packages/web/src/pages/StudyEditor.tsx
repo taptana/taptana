@@ -646,7 +646,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
           icon={<TriangleAlert />}
           title={`Este estudio ya tiene ${plural(sessionCount, 'sesión', 'sesiones')}`}
           action={
-            <Button size="sm" variant="outline" className="bg-background" disabled={busy} onClick={() => void duplicateStudy()}>
+            <Button size="sm" variant="outline" className="bg-card" disabled={busy} onClick={() => void duplicateStudy()}>
               <Copy /> Duplicar estudio
             </Button>
           }
@@ -672,7 +672,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
             title="Este prototipo parece una app con rutas propias"
             action={
               client.canServeAtRoot ? (
-                <Button size="sm" variant="outline" className="bg-background" disabled={busy} onClick={() => void openAtRoot()}>
+                <Button size="sm" variant="outline" className="bg-card" disabled={busy} onClick={() => void openAtRoot()}>
                   Abrir en la raíz
                 </Button>
               ) : undefined
@@ -771,7 +771,7 @@ export function StudyEditorPage({ id }: { id: string | null }) {
               <>
                 <SettingsEditor draft={draft} onChange={update} errors={errors} protos={protos} screens={screens} saved={record !== null} />
                 {draft.blocks.length === 0 && (
-                  <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-background px-6 py-10 text-center">
+                  <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-card px-6 py-10 text-center">
                     <h2 className="text-base font-semibold">Ahora agrega el primer bloque</h2>
                     <p className="max-w-md text-sm text-muted-foreground">Un estudio es una lista de bloques: tareas sobre el prototipo y preguntas para el participante. Lo normal es empezar con una tarea.</p>
                     <div className="flex flex-wrap justify-center gap-2">
@@ -916,7 +916,7 @@ function SetupSteps({
 
       {step === 0 &&
         (protos.length === 0 ? (
-          <div className="space-y-4 rounded-2xl border border-dashed bg-background p-(--card-pad)">
+          <div className="space-y-4 rounded-2xl border border-dashed bg-card p-(--card-pad)">
             <p className="text-muted-foreground">Todavía no hay prototipos. Sube tu archivo .html o .zip, o agrega tu sitio por URL, y vuelve aquí.</p>
             <Button asChild>
               <Link to={{ name: 'prototypes' }}>
@@ -932,7 +932,7 @@ function SetupSteps({
                 <label
                   key={p.id}
                   className={cn(
-                    'flex min-h-16 cursor-pointer items-center gap-4 rounded-2xl border bg-background px-5 py-4 transition-colors',
+                    'flex min-h-16 cursor-pointer items-center gap-4 rounded-2xl border bg-card px-5 py-4 transition-colors',
                     checked ? 'border-primary ring-1 ring-primary' : 'border-border/70 hover:border-foreground/30',
                   )}
                 >
@@ -1004,7 +1004,7 @@ function SetupChoice({ icon, title, hint, ...rest }: { icon: React.ReactNode; ti
     <button
       type="button"
       {...rest}
-      className="flex min-h-16 w-full cursor-pointer items-center gap-4 rounded-2xl border border-border/70 bg-background px-5 py-4 text-left outline-none transition-colors hover:border-foreground/30 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="flex min-h-16 w-full cursor-pointer items-center gap-4 rounded-2xl border border-border/70 bg-card px-5 py-4 text-left outline-none transition-colors hover:border-foreground/30 focus-visible:ring-[3px] focus-visible:ring-ring/50"
     >
       <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground [&_svg]:size-5">{icon}</span>
       <span className="min-w-0 flex-1">

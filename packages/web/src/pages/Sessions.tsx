@@ -199,7 +199,7 @@ export function SessionsPage({ study: initialStudy }: { study?: string }) {
         <ListSkeleton count={5} />
       ) : all.length === 0 ? (
         <EmptyState
-          icon={<PlayCircle className="size-6" />}
+          art="sessions"
           title="Todavía no hay sesiones"
           action={
             <>
@@ -495,7 +495,7 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
       onClick={onClick}
       className={cn(
         'rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 max-w-full truncate',
-        active ? 'bg-primary text-primary-foreground border-primary' : 'bg-background text-muted-foreground hover:text-foreground',
+        active ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground hover:text-foreground',
       )}
     >
       {children}

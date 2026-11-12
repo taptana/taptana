@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { cn } from '@/lib/utils';
 import { pct, plural, seconds } from '@/lib/format';
 import { scoreBand, type ScoreTone } from './logic.ts';
+import { TONE_INK, TONE_WASH } from '@/lib/brand';
+import type { BrandTone } from '@taptana/shared';
 
 export const TONE_TEXT: Record<ScoreTone, string> = {
   good: 'text-emerald-600 dark:text-emerald-400',
@@ -24,6 +26,35 @@ export const TONE_BG: Record<ScoreTone, string> = {
   none: 'bg-muted-foreground/30',
 };
 
+/** El mismo color del puntaje, para el trazo del anillo. */
+const TONE_STROKE: Record<ScoreTone, string> = {
+  good: 'stroke-emerald-500',
+  ok: 'stroke-lime-500',
+  warn: 'stroke-amber-500',
+  bad: 'stroke-red-500',
+  none: 'stroke-muted-foreground/30',
+};
+
+/** El puntaje como anillo: el número grande al centro y el arco en el color de su tramo. */
+function ScoreRing({ score, tone }: { score: number | null; tone: ScoreTone }) {
+  const r = 52;
+  const len = 2 * Math.PI * r;
+  return (
+    <div className="relative size-40 shrink-0" role="img" aria-label={score === null ? 'Sin puntaje' : `${score} de 100`}>
+      <svg viewBox="0 0 120 120" className="size-full -rotate-90" aria-hidden="true">
+        <circle cx="60" cy="60" r={r} fill="none" strokeWidth="9" className="stroke-brand-stone-soft" />
+        {score !== null && score > 0 && <circle cx="60" cy="60" r={r} fill="none" strokeWidth="9" strokeLinecap="round" strokeDasharray={`${(score / 100) * len} ${len}`} className={TONE_STROKE[tone]} />}
+      </svg>
+      <div className="absolute inset-0 grid place-content-center text-center">
+        <span className={cn('font-display text-5xl font-bold tabular-nums tracking-tight leading-none', TONE_TEXT[tone])} data-testid="study-score">
+          {score === null ? '—' : score}
+        </span>
+        <span className="mt-1 text-xs text-muted-foreground">de 100</span>
+      </div>
+    </div>
+  );
+}
+
 /** Puntaje pequeño con su color, para encabezados de tarea e índice. */
 export function ScoreChip({ score, className }: { score: number | null; className?: string }) {
   const band = scoreBand(score);
@@ -35,14 +66,16 @@ export function ScoreChip({ score, className }: { score: number | null; classNam
   );
 }
 
-function Kpi({ icon, label, value, sub }: { icon: ReactNode; label: string; value: string; sub: ReactNode }) {
+function Kpi({ icon, label, value, sub, tone }: { icon: ReactNode; label: string; value: string; sub: ReactNode; tone: BrandTone }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-card p-5 sm:p-6 space-y-2 min-w-0" data-print="keep">
-      <div className="flex items-center gap-2 text-muted-foreground text-sm [&_svg]:size-4 [&_svg]:shrink-0">
-        {icon}
-        <span className="truncate">{label}</span>
+    <div className={cn('rounded-2xl p-5 sm:p-6 space-y-2.5 min-w-0', TONE_WASH[tone])} data-print="keep">
+      <div className="flex flex-col items-start gap-2 text-sm font-medium text-muted-foreground sm:flex-row sm:items-center sm:gap-2.5">
+        <span className={cn('grid size-8 shrink-0 place-items-center rounded-xl bg-card shadow-xs [&_svg]:size-4', TONE_INK[tone])} aria-hidden>
+          {icon}
+        </span>
+        <span className="min-w-0 max-w-full truncate">{label}</span>
       </div>
-      <div className="text-2xl sm:text-3xl font-semibold tabular-nums">{value}</div>
+      <div className="font-display text-3xl sm:text-4xl font-bold tabular-nums tracking-tight">{value}</div>
       <div className="text-xs text-muted-foreground leading-relaxed">{sub}</div>
     </div>
   );
@@ -60,22 +93,16 @@ export function Overview({ report }: { report: StudyReport }) {
       <Card data-print="keep">
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm text-muted-foreground">Puntaje de usabilidad</span>
+            <span className="text-sm font-medium text-muted-foreground">Puntaje de usabilidad</span>
             <Button variant="ghost" size="sm" className="-mr-2 text-muted-foreground" onClick={() => setHow(true)} data-print="hide">
               <CircleHelp />
               Cómo se calcula
             </Button>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className={cn('text-6xl font-semibold tabular-nums tracking-tight', TONE_TEXT[band.tone])} data-testid="study-score">
-              {report.score === null ? '—' : report.score}
-            </span>
-            <span className="text-muted-foreground">de 100</span>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 lg:flex-col lg:items-start xl:flex-row xl:items-center">
+            <ScoreRing score={report.score} tone={band.tone} />
+            <p className={cn('font-display text-xl font-bold tracking-tight', TONE_TEXT[band.tone])}>{band.label}</p>
           </div>
-          <div className="h-2 rounded-full bg-muted overflow-hidden" role="img" aria-label={report.score === null ? 'Sin puntaje' : `${report.score} de 100`}>
-            <div className={cn('h-full rounded-full', TONE_BG[band.tone])} style={{ width: `${report.score ?? 0}%` }} />
-          </div>
-          <p className={cn('text-sm font-medium', TONE_TEXT[band.tone])}>{band.label}</p>
           <p className="text-xs text-muted-foreground">
             {report.score === null
               ? 'Aparece cuando al menos una tarea tenga resultados decididos.'
@@ -86,6 +113,7 @@ export function Overview({ report }: { report: StudyReport }) {
 
       <div className="grid gap-4 sm:gap-5 grid-cols-2">
         <Kpi
+          tone="violet"
           icon={<Users />}
           label="Participantes"
           value={String(report.participants)}
@@ -105,13 +133,14 @@ export function Overview({ report }: { report: StudyReport }) {
           }
         />
         <Kpi
+          tone="sky"
           icon={<Target />}
           label="Tareas logradas"
           value={withData ? pct(report.successRate) : '—'}
           sub={withData ? 'De todos los intentos ya decididos' : 'Sin resultados decididos'}
         />
-        <Kpi icon={<Clock />} label="Duración mediana" value={seconds(report.medianDurationMs)} sub="Del estudio completo, por participante" />
-        <Kpi icon={<MousePointerClick />} label="Misclicks" value={pct(report.avgMisclickRate)} sub="De los toques de las tareas cayeron donde no pasa nada" />
+        <Kpi tone="maize" icon={<Clock />} label="Duración mediana" value={seconds(report.medianDurationMs)} sub="Del estudio completo, por participante" />
+        <Kpi tone="coral" icon={<MousePointerClick />} label="Misclicks" value={pct(report.avgMisclickRate)} sub="De los toques de las tareas cayeron donde no pasa nada" />
       </div>
 
       <HowDialog open={how} onOpenChange={setHow} />
@@ -152,7 +181,7 @@ export function InsightsCard({ insights, onJump }: { insights: Insight[]; onJump
   return (
     <Card data-print="keep">
       <CardHeader>
-        <CardTitle>Lo más importante</CardTitle>
+        <CardTitle className="font-display text-xl font-bold tracking-tight">Lo más importante</CardTitle>
         <CardDescription>Qué arreglar primero y qué salió bien, según los datos.</CardDescription>
       </CardHeader>
       <CardContent>
@@ -200,7 +229,7 @@ export function VariantsCard({ report }: { report: StudyReport }) {
   return (
     <Card data-print="keep">
       <CardHeader>
-        <CardTitle>Comparación A/B</CardTitle>
+        <CardTitle className="font-display text-xl font-bold tracking-tight">Comparación A/B</CardTitle>
         <CardDescription>Cada participante vio una sola variante, elegida al azar. Con pocos participantes, las diferencias chicas no dicen mucho.</CardDescription>
       </CardHeader>
       <CardContent>
